@@ -1,49 +1,49 @@
-# VMtips 2026 — Arkitektur- och Implementationsplan
+# VMTips 2026 — Architecture and Implementation Plan
 
-> **Datum:** 2026-05-14  
-> **Mål:** Bygga en komplett vmtips-applikation för VM 2026 med inloggning, ligor, tippning i två faser, realtidspoäng, och matchresultat-sync.  
+> **Date:** 2026-05-14  
+> **Goal:** Build a complete World Cup prediction app with login, leagues, two-phase predictions, live scoring, and match result sync.  
 > **Tech Stack:** React + Vite + MUI (frontend), Python FastAPI + SQLite (backend), flag emojis per team
 
 ---
 
-## 1. Kravspecifikation
+## 1. Requirements Specification
 
-### 1.1 Funktionella krav
+### 1.1 Functional Requirements
 
-| ID | Krav | Prioritet |
+| ID | Requirement | Priority |
 |---|---|---|
-| F1 | Användarregistrering och inloggning (email + lösenord) | Måste |
-| F2 | Användare kan skapa privata ligor med 6-teckens inbjudningskod | Måste |
-| F3 | Användare kan gå med i publika ligor | Måste |
-| F4 | **Fas 1:** Tippa alla 72 gruppspelsmatcher innan VM-start (spara stegvis) | Måste |
-| F5 | **Fas 2:** Tippa hela slutspelet efter gruppselets slut (bracket + matcher) | Måste |
-| F6 | Live-poängräkning baserat på definierat poängsystem | Måste |
-| F7 | Topplistor per liga och global topplista | Måste |
-| F8 | Turneringsbonusar (världsmästare, skyttekung, assistkung, totalt mål) | Måste |
-| F9 | Bonusfrågor per liga (admin kan skapa egna frågor) | Bör |
-| F10 | Matchresultat-sync från extern API (worldcupjson.net fallback) | Bör |
-| F11 | Admin-panel för att hantera ligor och dela ut bonuspoäng | Bör |
+| F1 | User registration and login (email + password) | Must |
+| F2 | Users can create private leagues with 6-character invite code | Must |
+| F3 | Users can join public leagues | Must |
+| F4 | **Phase 1:** Predict all 72 group stage matches before WC starts (save incrementally) | Must |
+| F5 | **Phase 2:** Predict entire knockout stage after group stage ends (bracket + matches) | Must |
+| F6 | Live scoring based on defined scoring rules | Must |
+| F7 | Leaderboards per league and global leaderboard | Must |
+| F8 | Tournament bonuses (world champion, top scorer, top assists, total goals) | Must |
+| F9 | Bonus questions per league (admin can create custom questions) | Should |
+| F10 | Match result sync from external API (worldcupjson.net fallback) | Should |
+| F11 | Admin panel to manage leagues and award bonus points | Should |
 
-### 1.2 Icke-funktionella krav
+### 1.2 Non-Functional Requirements
 
-| ID | Krav |
+| ID | Requirement |
 |---|---|
-| NF1 | SQLite för enkelhet (single-file, ingen server setup) |
-| NF2 | Stateless JWT-auth (ingen sessions-server) |
-| NF3 | Frontend och backend ska kunna köras separat (dev: Vite proxy → FastAPI) |
-| NF4 | Allt ska funka i en Docker-container (tillval men bra att ha) |
-| NF5 | Responsive design (mobil + desktop) |
+| NF1 | SQLite for simplicity (single file, no server setup) |
+| NF2 | Stateless JWT auth (no session server) |
+| NF3 | Frontend and backend should be runnable separately (dev: Vite proxy → FastAPI) |
+| NF4 | Everything should work in one Docker container (optional but good to have) |
+| NF5 | Responsive design (mobile + desktop) |
 
 ---
 
-## 2. Arkitektur
+## 2. Architecture
 
 ```
 ┌─────────────────────────────────────────────┐
 │                  React + Vite                  │
 │  ┌─────────┐  ┌──────────┐  ┌─────────────┐  │
-│  │  Auth   │  │ Tippning │  │ Topplistor  │  │
-│  │ (login) │  │(fas1/2) │  │  (liga/global)│ │
+│  │  Auth   │  │ Predict  │  │ Leaderboard │  │
+│  │ (login) │  │ (p1/p2)  │  │ (league/global)││
 │  └─────────┘  └──────────┘  └─────────────┘  │
 │                                              │
 │  Vite dev proxy ────────▶ FastAPI            │
@@ -53,12 +53,12 @@
 ┌─────────────────────────────────────────────┐
 │              Python FastAPI                  │
 │  ┌─────────┐  ┌──────────┐  ┌─────────────┐  │
-│  │  Auth   │  │  Tips    │  │  Poäng-     │  │
-│  │ (JWT)   │  │  CRUD    │  │  beräkning  │  │
+│  │  Auth   │  │  Tips    │  │  Scoring    │  │
+│  │ (JWT)   │  │  CRUD    │  │  Engine     │  │
 │  └─────────┘  └──────────┘  └─────────────┘  │
 │                                              │
 │  ┌──────────┐  ┌───────────────────────────┐  │
-│  │  Liga/   │  │  Matchresultat-sync       │  │
+│  │  League/ │  │  Match Result Sync        │  │
 │  │  Admin   │  │  (worldcupjson.net)       │  │
 │  └──────────┘  └───────────────────────────┘  │
 └─────────────────────────────────────────────┘
@@ -73,9 +73,9 @@
 
 ---
 
-## 3. Databasmodell (ER-struktur)
+## 3. Database Model (ER Structure)
 
-### 3.1 Entiteter
+### 3.1 Entities
 
 ```
 users
@@ -88,31 +88,31 @@ users
 teams
   id (PK)
   name
-  code (FIFA-kod, t.ex. "SWE")
+  code (FIFA code, e.g. "SWE")
   group (A-L)
-  flag_emoji (t.ex. "🇸🇪")
-  flag_svg (från country-flag-icons/lib/flags/1x1/SE.svg)
+  flag_emoji (e.g. "🇸🇪")
+  flag_svg (from country-flag-icons/lib/flags/1x1/SE.svg)
 
 matches
   id (PK)
-  match_number (1-104, för enkel identifiering)
-  group (A-L eller null för slutspel)
+  match_number (1-104, for easy identification)
+  group (A-L or null for knockout)
   round (group/ro32/ro16/qf/sf/final)
   home_team_id (FK → teams)
   away_team_id (FK → teams)
-  home_goals (null tills match spelats)
-  away_goals (null tills match spelats)
+  home_goals (null until match played)
+  away_goals (null until match played)
   match_date
   status (scheduled/ongoing/finished)
-  home_team_placeholder (t.ex. "1A" — gruppvinnare A)
-  away_team_placeholder (t.ex. "2B")
+  home_team_placeholder (e.g. "1A" — group A winner)
+  away_team_placeholder (e.g. "2B")
 
 predictions
   id (PK)
   user_id (FK → users)
-  match_id (FK → matches, null för turneringsbonusar)
-  home_goals (användarens tips)
-  away_goals (användarens tips)
+  match_id (FK → matches, null for tournament bonuses)
+  home_goals (user's prediction)
+  away_goals (user's prediction)
   created_at
   updated_at
   UNIQUE(user_id, match_id)
@@ -120,7 +120,7 @@ predictions
 leagues
   id (PK)
   name
-  invite_code (6 chars, unik)
+  invite_code (6 chars, unique)
   is_public (boolean)
   admin_user_id (FK → users)
   created_at
@@ -135,7 +135,7 @@ league_members
 tournament_bonuses
   id (PK)
   user_id (FK → users)
-  winner_team_id (FK → teams, världsmästare)
+  winner_team_id (FK → teams, world champion)
   top_scorer_name (str)
   top_assist_name (str)
   total_goals (int)
@@ -147,7 +147,7 @@ league_bonus_questions
   league_id (FK → leagues)
   question_text
   points_value
-  answer (null tills admin sätter)
+  answer (null until admin sets)
   created_at
 
 league_bonus_answers
@@ -155,7 +155,7 @@ league_bonus_answers
   question_id (FK → league_bonus_questions)
   user_id (FK → users)
   answer_text
-  is_correct (null tills admin bedömt)
+  is_correct (null until admin grades)
   points_awarded
 
 scores
@@ -172,83 +172,83 @@ scores
 
 ---
 
-## 4. API-specifikation (FastAPI)
+## 4. API Specification (FastAPI)
 
 ### 4.1 Auth
 
 ```
 POST /auth/register      → {email, password, display_name} → user + JWT
 POST /auth/login         → {email, password} → JWT
-GET  /auth/me            → aktuell användare
+GET  /auth/me            → current user
 ```
 
-### 4.2 Matcher
+### 4.2 Matches
 
 ```
-GET  /matches            → lista alla matcher med lag och status
-GET  /matches/{id}       → enskild match
-GET  /matches/groups     → gruppspelsmatcher (fas 1)
-GET  /matches/knockout   → slutspelsmatcher (fas 2, placeholders)
-POST /matches/{id}/result (admin) → {home_goals, away_goals} (eller sync från API)
+GET  /matches            → list all matches with team info and status
+GET  /matches/{id}       → single match
+GET  /matches/groups     → group stage matches (phase 1)
+GET  /matches/knockout   → knockout matches (phase 2, placeholders)
+POST /matches/{id}/result (admin) → {home_goals, away_goals} (or sync from API)
 ```
 
-### 4.3 Tippning
+### 4.3 Predictions
 
 ```
-GET    /predictions                → mina tips (alla matcher)
-POST   /predictions/batch           → spara/uppdatera batch-tips [{match_id, home, away}]
-GET    /predictions/tournament       → mina turneringsbonusar
-POST   /predictions/tournament      → spara turneringsbonusar
+GET    /predictions                → my predictions (all matches)
+POST   /predictions/batch           → save/update batch predictions [{match_id, home, away}]
+GET    /predictions/tournament       → my tournament bonuses
+POST   /predictions/tournament      → save tournament bonuses
 ```
 
-### 4.4 Ligor
+### 4.4 Leagues
 
 ```
-POST   /leagues              → skapa liga (auto-generera invite_code)
-GET    /leagues             → lista mina ligor
-GET    /leagues/{id}        → liga-detaljer med medlemmar
-POST   /leagues/{id}/join   → gå med via invite_code
-GET    /leagues/public      → lista publika ligor
+POST   /leagues              → create league (auto-generate invite_code)
+GET    /leagues             → list my leagues
+GET    /leagues/{id}        → league details with members
+POST   /leagues/{id}/join   → join via invite_code
+GET    /leagues/public      → list public leagues
 ```
 
-### 4.5 Topplistor / Poäng
+### 4.5 Leaderboards / Scores
 
 ```
-GET    /leaderboard/global           → global topplista
-GET    /leaderboard/league/{id}      → topplista per liga
-GET    /leaderboard/me               → min poängfördelning
-POST   /scores/recalculate (admin)  → omräkna alla poäng
+GET    /leaderboard/global           → global leaderboard
+GET    /leaderboard/league/{id}      → leaderboard per league
+GET    /leaderboard/me               → my score breakdown
+POST   /scores/recalculate (admin)  → recalculate all scores
 ```
 
 ---
 
-## 5. Frontend-struktur (React + Vite + MUI)
+## 5. Frontend Structure (React + Vite + MUI)
 
-### 5.1 Tema-system (light/dark)
+### 5.1 Theme System (light/dark)
 
 ```
 src/
   theme/
-    ThemeContext.tsx      → React Context för light/dark-toggle
+    ThemeContext.tsx      → React Context for light/dark toggle
     lightTheme.ts         → MUI createTheme({ palette: { mode: 'light', ... } })
     darkTheme.ts          → MUI createTheme({ palette: { mode: 'dark', ... } })
     index.ts              → export useThemeMode() hook
 ```
 
-**Design-principer:**
-- **Light:** Vit bakgrund, mörkblå primärfärg (`#1a237e`), rena cards med subtila skuggor
-- **Dark:** `#121212` bakgrund, elektrisk blå accent (`#82b1ff`), högkontrast text
-- Konsekvent `border-radius: 12px` på cards, `8px` på knappar
-- Flaggor som emoji (🇸🇪) eller SVG via `country-flag-icons` per lag
-- MUI `CssBaseline` + `ThemeProvider` wrappar hela appen i `main.tsx`
+**Design principles:**
+- **Light:** White background, dark blue primary (`#1a237e`), clean cards with subtle shadows
+- **Dark:** `#121212` background, electric blue accent (`#82b1ff`), high-contrast text
+- Consistent `border-radius: 12px` on cards, `8px` on buttons
+- Flags as emoji (🇸🇪) or SVG via `country-flag-icons` per team
+- MUI `CssBaseline` + `ThemeProvider` wraps entire app in `main.tsx`
 
-### 5.2 Projektstruktur
+### 5.2 Project Structure
 
 ```
 src/
   main.tsx
   App.tsx
-  api/              → Axios-instans med JWT-interceptor
+  api/              → Axios instance with JWT interceptor
     client.ts
   components/
     Auth/
@@ -270,8 +270,8 @@ src/
     HomePage.tsx
     LoginPage.tsx
     RegisterPage.tsx
-    GroupStagePage.tsx      → Fas 1: tippa gruppspel
-    KnockoutPage.tsx        → Fas 2: tippa slutspel
+    GroupStagePage.tsx      → Phase 1: predict group stage
+    KnockoutPage.tsx        → Phase 2: predict knockout stage
     LeaderboardPage.tsx
     LeaguePage.tsx
     ProfilePage.tsx
@@ -280,22 +280,22 @@ src/
     usePredictions.ts
     useMatches.ts
   types/
-    api.ts                  → TypeScript-typer för API-responses
+    api.ts                  → TypeScript types for API responses
 ```
 
 ---
 
-## 6. Poängberäkningslogik (Python)
+## 6. Scoring Engine Logic (Python)
 
 ```python
-def calculate_match_points(pred_home, pred_away, actual_home, actual_goals):
+def calculate_match_points(pred_home, pred_away, actual_home, actual_away):
     points = 0
-    # Utfall (1X2)
+    # Outcome (1X2)
     pred_outcome = sign(pred_home - pred_away)
     actual_outcome = sign(actual_home - actual_away)
     if pred_outcome == actual_outcome:
         points += 3
-    # Exakta mål
+    # Exact goals
     if pred_home == actual_home:
         points += 2
     if pred_away == actual_away:
@@ -303,7 +303,7 @@ def calculate_match_points(pred_home, pred_away, actual_home, actual_goals):
     return points
 
 def calculate_bracket_points(user_bracket, actual_bracket):
-    # Jämför lag per runda
+    # Compare teams per round
     round_points = {"ro32": 4, "ro16": 6, "qf": 8, "sf": 10, "final": 15}
     points = 0
     for round_name, point_value in round_points.items():
@@ -315,240 +315,268 @@ def calculate_bracket_points(user_bracket, actual_bracket):
 
 ---
 
-## 7. Matchresultat-sync
+## 7. Match Result Sync
 
-### Strategi
+### Strategy
 
-1. **Primär källa:** `worldcupjson.net` — gratis, JSON, realtid.  
+1. **Primary source:** `worldcupjson.net` — free, JSON, real-time.  
    Endpoints: `GET /matches`, `GET /matches/today`, `GET /matches/current`
 
-2. **Fallback:** `football-data.org` — gratis tier finns, kräver API-nyckel.
+2. **Fallback:** `football-data.org` — free tier available, requires API key.
 
-3. **Backup:** Manuell inmatning via admin-panel.
+3. **Backup:** Manual entry via admin panel.
 
-### Sync-jobb
+### Sync Job
 
-En bakgrundscron eller endpoint som:
-1. Hämtar alla matcher från worldcupjson.net
-2. Mappar `match_number` eller datum+lag till vår `matches`-tabell
-3. Uppdaterar `home_goals`, `away_goals`, `status`
-4. Triggern omräkning av poäng (async eller on-demand)
+A background cron or endpoint that:
+1. Fetches all matches from worldcupjson.net
+2. Maps `match_number` or date+team to our `matches` table
+3. Updates `home_goals`, `away_goals`, `status`
+4. Triggers score recalculation (async or on-demand)
 
 ```bash
-# Manuell sync
+# Manual sync
 POST /admin/sync-results
 
-# Automatisk: köras var 15:e minut under VM via cronjob eller APScheduler
+# Automatic: runs every 15 minutes during WC via cronjob or APScheduler
 ```
 
 ---
 
-## 8. Implementationsplan — Bite-Sized Tasks
+## 8. Implementation Plan — Bite-Sized Tasks
 
-> Varje task = 5-15 minuter fokuserat arbete. TDD där det är praktiskt.
+> Each task = 5-15 minutes of focused work. TDD where practical.
 
-### Fas A: Backend-grund (FastAPI + SQLite + Auth)
+### Phase A: Backend Foundation (FastAPI + SQLite + Auth)
 
-#### Task A1: Projektstruktur och dependencies
-**Fil:** `backend/requirements.txt`, `backend/main.py`  
-**Steg:**
-1. Skapa `backend/` med `requirements.txt`: `fastapi`, `uvicorn`, `sqlalchemy`, `pydantic`, `passlib[bcrypt]`, `python-jose[cryptography]`, `python-multipart`
-2. Skapa `backend/main.py` med grundläggande FastAPI-app
-3. Testa: `uvicorn main:app --reload` → `curl http://localhost:8000/health`
+#### Task A1: Project structure and dependencies
+**File:** `backend/requirements.txt`, `backend/main.py`  
+**Steps:**
+1. Create `backend/` with `requirements.txt`: `fastapi`, `uvicorn`, `sqlalchemy`, `pydantic`, `passlib[bcrypt]`, `python-jose[cryptography]`, `python-multipart`
+2. Create `backend/main.py` with basic FastAPI app
+3. Test: `uvicorn main:app --reload` → `curl http://localhost:8000/health`
 
-#### Task A2: Databas-setup (SQLAlchemy + SQLite)
-**Fil:** `backend/database.py`, `backend/models.py`  
-**Steg:**
-1. `database.py`: skapa engine, SessionLocal, Base
-2. `models.py`: definiera alla tabeller (users, teams, matches, predictions, leagues, league_members, tournament_bonuses, scores)
-3. Skapa migrering: `Base.metadata.create_all(bind=engine)`
-4. Testa: verifiera att SQLite-fil skapas
+#### Task A2: Database setup (SQLAlchemy + SQLite)
+**File:** `backend/database.py`, `backend/models.py`  
+**Steps:**
+1. `database.py`: create engine, SessionLocal, Base
+2. `models.py`: define all tables (users, teams, matches, predictions, leagues, league_members, tournament_bonuses, scores)
+3. Create migration: `Base.metadata.create_all(bind=engine)`
+4. Test: verify SQLite file is created
 
-#### Task A3: Seed VM 2026 data (grupper + matcher)
-**Fil:** `backend/seed.py`  
-**Steg:**
-1. Definiera alla 12 grupper (A-L) med 4 lag vardera
-2. Definiera alla 72 gruppspelsmatcher (runda robin inom grupp)
-3. Definiera slutspelsstrukturen med placeholders (1A, 2B, etc.)
-4. Seed:a in i databasen
-5. Testa: `SELECT COUNT(*) FROM matches` → 104
+#### Task A3: Seed WC 2026 data (groups + matches)
+**File:** `backend/seed.py`  
+**Steps:**
+1. Define all 12 groups (A-L) with 4 teams each
+2. Define all 72 group stage matches (round robin within group)
+3. Define knockout structure with placeholders (1A, 2B, etc.)
+4. Seed into database
+5. Test: `SELECT COUNT(*) FROM matches` → 104
 
 #### Task A4: JWT Auth (register + login)
-**Fil:** `backend/routers/auth.py`, `backend/security.py`  
-**Steg:**
+**File:** `backend/routers/auth.py`, `backend/security.py`  
+**Steps:**
 1. `security.py`: bcrypt hashing, JWT encode/decode
 2. `auth.py`: `/auth/register`, `/auth/login`
-3. Dependency `get_current_user` för skyddade routes
-4. Testa: registrera + logga in via curl, verifiera JWT
+3. Dependency `get_current_user` for protected routes
+4. Test: register + login via curl, verify JWT
 
-#### Task A5: Matcher API
-**Fil:** `backend/routers/matches.py`  
-**Steg:**
-1. `GET /matches` — lista alla matcher med lag-info
-2. `GET /matches/groups` — gruppspelsmatcher
-3. `GET /matches/knockout` — slutspelsmatcher
-4. Testa: curl endpoints, verifiera JSON-struktur
+#### Task A5: Matches API
+**File:** `backend/routers/matches.py`  
+**Steps:**
+1. `GET /matches` — list all matches with team info
+2. `GET /matches/groups` — group stage matches
+3. `GET /matches/knockout` — knockout matches
+4. Test: curl endpoints, verify JSON structure
 
-#### Task A6: Tippning API (batch-save)
-**Fil:** `backend/routers/predictions.py`  
-**Steg:**
-1. `GET /predictions` — hämta aktuell användares tips
-2. `POST /predictions/batch` — spara/uppdatera tips för flera matcher
-3. Validera: deadline-kontroll (före matchstart)
-4. Testa: spara tips, hämta, verifiera unik constraint
+#### Task A6: Prediction API (batch-save)
+**File:** `backend/routers/predictions.py`  
+**Steps:**
+1. `GET /predictions` — fetch current user's predictions
+2. `POST /predictions/batch` — save/update predictions for multiple matches
+3. Validate: deadline check (before match start)
+4. Test: save predictions, fetch, verify unique constraint
 
-#### Task A7: Turneringsbonusar API
-**Fil:** `backend/routers/predictions.py` (utöka)  
-**Steg:**
-1. `GET /predictions/tournament` — hämta bonus-tips
-2. `POST /predictions/tournament` — spara bonus-tips
-3. Testa: spara och hämta
+#### Task A7: Tournament Bonuses API
+**File:** `backend/routers/predictions.py` (extend)  
+**Steps:**
+1. `GET /predictions/tournament` — fetch bonus predictions
+2. `POST /predictions/tournament` — save bonus predictions
+3. Test: save and fetch
 
-#### Task A8: Liga API (skapa, gå med, lista)
-**Fil:** `backend/routers/leagues.py`  
-**Steg:**
-1. `POST /leagues` — skapa liga med auto-genererad 6-siffrig kod
-2. `GET /leagues` — mina ligor
-3. `POST /leagues/{id}/join` — gå med via kod
-4. `GET /leagues/public` — publika ligor
-5. Testa: skapa liga, bjud in, gå med
+#### Task A8: League API (create, join, list)
+**File:** `backend/routers/leagues.py`  
+**Steps:**
+1. `POST /leagues` — create league with auto-generated 6-char code
+2. `GET /leagues` — my leagues
+3. `POST /leagues/{id}/join` — join via code
+4. `GET /leagues/public` — public leagues
+5. Test: create league, invite, join
 
-#### Task A9: Poängberäkningsmotor
-**Fil:** `backend/scoring.py`  
-**Steg:**
-1. Implementera `calculate_match_points()` enligt regelverket
-2. Implementera `calculate_bracket_points()`
-3. Implementera `calculate_tournament_bonus_points()`
-4. Testa: enhetstester med olika scenarios
+#### Task A9: Scoring engine
+**File:** `backend/scoring.py`  
+**Steps:**
+1. Implement `calculate_match_points()` per rules document
+2. Implement `calculate_bracket_points()`
+3. Implement `calculate_tournament_bonus_points()`
+4. Test: unit tests with various scenarios
 
-#### Task A10: Topplista API
-**Fil:** `backend/routers/leaderboard.py`  
-**Steg:**
-1. `GET /leaderboard/global` — summera poäng per användare
-2. `GET /leaderboard/league/{id}` — summera per liga
-3. `GET /leaderboard/me` — detaljerad poängfördelning
-4. Testa: skapa data, verifiera ranking
+#### Task A10: Leaderboard API
+**File:** `backend/routers/leaderboard.py`  
+**Steps:**
+1. `GET /leaderboard/global` — sum points per user
+2. `GET /leaderboard/league/{id}` — sum per league
+3. `GET /leaderboard/me` — detailed score breakdown
+4. Test: create data, verify ranking
 
-#### Task A11: Matchresultat-sync endpoint
-**Fil:** `backend/routers/admin.py`, `backend/sync.py`  
-**Steg:**
-1. `sync.py`: funktion för att hämta från worldcupjson.net och uppdatera `matches`
-2. `admin.py`: `POST /admin/sync-results` (skyddat, endast admin)
-3. Efter sync: trigger poängomräkning
-4. Testa: mocka extern API, verifiera uppdatering
+#### Task A11: Match result sync endpoint
+**File:** `backend/routers/admin.py`, `backend/sync.py`  
+**Steps:**
+1. `sync.py`: function to fetch from worldcupjson.net and update `matches`
+2. `admin.py`: `POST /admin/sync-results` (protected, admin only)
+3. After sync: trigger score recalculation
+4. Test: mock external API, verify update
 
-### Fas B: Frontend-grund (React + Vite)
+### Phase B: Frontend Foundation (React + Vite)
 
-#### Task B1: Vite-setup + routing
-**Fil:** `frontend/` (hela projektet)
-**Steg:**
+#### Task B1: Vite setup + routing + MUI
+**File:** `frontend/` (entire project)  
+**Steps:**
 1. `npm create vite@latest frontend -- --template react-ts`
-2. Installera: `react-router-dom`, `axios`, `@mui/material`, `@emotion/react`, `@emotion/styled`, `@mui/icons-material`, `country-flag-icons`
-3. Konfigurera proxy i `vite.config.ts`: `/api` → `http://localhost:8000`
-4. Testa: `npm run dev`, verifiera routing
+2. Install: `react-router-dom`, `axios`, `@mui/material`, `@emotion/react`, `@emotion/styled`, `@mui/icons-material`, `country-flag-icons`
+3. Configure proxy in `vite.config.ts`: `/api` → `http://localhost:8000`
+4. Test: `npm run dev`, verify routing
 
-#### Task B2: API-klient + Auth-hanterare
-**Fil:** `frontend/src/api/client.ts`, `frontend/src/hooks/useAuth.ts`  
-**Steg:**
-1. `client.ts`: Axios med baseURL, JWT-interceptor
-2. `useAuth.ts`: context eller zustand-store för auth-state
-3. Testa: login-request via frontend
+#### Task B2: API client + Auth handler
+**File:** `frontend/src/api/client.ts`, `frontend/src/hooks/useAuth.ts`  
+**Steps:**
+1. `client.ts`: Axios with baseURL, JWT interceptor
+2. `useAuth.ts`: context or zustand store for auth state
+3. Test: login request via frontend
 
-#### Task B3: Login / Register-sidor
-**Fil:** `frontend/src/pages/LoginPage.tsx`, `RegisterPage.tsx`  
-**Steg:**
-1. Formulär med validering
-2. Anropa `/auth/login` och `/auth/register`
-3. Spara JWT i localStorage
-4. Redirect efter login
+#### Task B3: Login / Register pages
+**File:** `frontend/src/pages/LoginPage.tsx`, `RegisterPage.tsx`  
+**Steps:**
+1. Forms with validation
+2. Call `/auth/login` and `/auth/register`
+3. Save JWT in localStorage
+4. Redirect after login
 
-#### Task B4: Layout + Navbar
-**Fil:** `frontend/src/components/Layout/Navbar.tsx`, `App.tsx`  
-**Steg:**
-1. Navbar med länkar: Matcher, Ligor, Topplista, Profil
-2. Visa inloggad användare / login-knapp
-3. ProtectedRoute: kräv auth för tippning
+#### Task B4: Layout + Navbar + Theme toggle
+**File:** `frontend/src/components/Layout/Navbar.tsx`, `App.tsx`  
+**Steps:**
+1. Navbar with links: Matches, Leagues, Leaderboard, Profile
+2. Show logged-in user / login button
+3. Light/dark theme toggle button (uses MUI ThemeContext)
+4. ProtectedRoute: require auth for predictions
 
-#### Task B5: Gruppspels-tippning (Fas 1)
-**Fil:** `frontend/src/pages/GroupStagePage.tsx`  
-**Steg:**
-1. Hämta gruppspelsmatcher från `/matches/groups`
-2. Visa matcher per grupp (A-L)
-3. Input-fält för hemma/borta-mål
-4. "Spara alla tips"-knapp → `POST /predictions/batch`
-5. Visa sparade tips vid återbesök
+#### Task B5: Group stage prediction (Phase 1)
+**File:** `frontend/src/pages/GroupStagePage.tsx`  
+**Steps:**
+1. Fetch group stage matches from `/matches/groups`
+2. Show matches per group (A-L)
+3. Input fields for home/away goals
+4. "Save all predictions" button → `POST /predictions/batch`
+5. Show saved predictions on revisit
 
-#### Task B6: Slutspels-tippning (Fas 2)
-**Fil:** `frontend/src/pages/KnockoutPage.tsx`  
-**Steg:**
-1. Hämta slutspelsmatcher med placeholders
-2. Visa bracket-visuellt (trädstruktur)
-3. Tippa varje match + spara
-4. Visa "mina lag i varje runda" för bracket-bonus
+#### Task B6: Knockout prediction (Phase 2)
+**File:** `frontend/src/pages/KnockoutPage.tsx`  
+**Steps:**
+1. Fetch knockout matches with placeholders
+2. Show bracket visually (tree structure)
+3. Predict each match + save
+4. Show "my teams per round" for bracket bonus
 
-#### Task B7: Topplistor
-**Fil:** `frontend/src/pages/LeaderboardPage.tsx`, `frontend/src/components/Leagues/Leaderboard.tsx`  
-**Steg:**
-1. Global topplista
-2. Per-liga topplista (dropdown för att välja liga)
-3. Visa poängfördelning: match, bracket, bonus
+#### Task B7: Leaderboards
+**File:** `frontend/src/pages/LeaderboardPage.tsx`, `frontend/src/components/Leagues/Leaderboard.tsx`  
+**Steps:**
+1. Global leaderboard
+2. Per-league leaderboard (dropdown to select league)
+3. Show score breakdown: match, bracket, bonus
 
-#### Task B8: Liga-hantering
-**Fil:** `frontend/src/pages/LeaguePage.tsx`  
-**Steg:**
-1. Lista mina ligor
-2. Skapa ny liga (namn, publik/privat)
-3. Visa invite-kod
-4. Gå med i liga via kod
-5. Lista publika ligor
+#### Task B8: League management
+**File:** `frontend/src/pages/LeaguePage.tsx`  
+**Steps:**
+1. List my leagues
+2. Create new league (name, public/private)
+3. Show invite code
+4. Join league via code
+5. List public leagues
 
-#### Task B9: Turneringsbonusar-sida
-**Fil:** `frontend/src/pages/TournamentBonusesPage.tsx`  
-**Steg:**
-1. Dropdown för världsmästare (alla lag)
-2. Text-input för skyttekung, assistkung
-3. Number-input för totalt antal mål
-4. Spara-knapp
+#### Task B9: Tournament bonuses page
+**File:** `frontend/src/pages/TournamentBonusesPage.tsx`  
+**Steps:**
+1. Dropdown for world champion (all teams)
+2. Text input for top scorer, top assists
+3. Number input for total goals
+4. Save button
 
-### Fas C: Integration och avslutning
+### Phase C: Integration and Wrap-up
 
-#### Task C1: Docker Compose (valfritt men bra)
-**Fil:** `docker-compose.yml`, `Dockerfile` (frontend + backend)
-**Steg:**
-1. Backend-Dockerfile med Python
-2. Frontend byggs till statiska filer och serveras via nginx
-3. `docker-compose up` ska starta hela stacken
+#### Task C1: Docker Compose (optional but good)
+**File:** `docker-compose.yml`, `Dockerfile` (frontend + backend)  
+**Steps:**
+1. Backend Dockerfile with Python
+2. Frontend builds to static files and served via nginx
+3. `docker-compose up` should start entire stack
 
-#### Task C2: README och dokumentation
-**Fil:** `README.md`, `docs/DEPLOY.md`  
-**Steg:**
-1. Installationsinstruktioner
-2. Miljövariabler (JWT_SECRET, ADMIN_EMAIL, etc.)
-3. Hur man seed:ar VM-data
-4. Hur man kör sync-jobbet
+#### Task C2: README and documentation
+**File:** `README.md`, `docs/DEPLOY.md`  
+**Steps:**
+1. Installation instructions
+2. Environment variables (JWT_SECRET, ADMIN_EMAIL, etc.)
+3. How to seed WC data
+4. How to run sync job
 
-#### Task C3: Manuell test av hela flödet
-**Steg:**
-1. Registrera användare
-2. Skapa liga
-3. Tippa gruppspel
-4. Spara
-5. Tippa turneringsbonusar
-6. Kontrollera topplista
-7. Verifiera poängberäkning
+#### Task C3: Manual test of entire flow
+**Steps:**
+1. Register user
+2. Create league
+3. Predict group stage
+4. Save
+5. Predict tournament bonuses
+6. Check leaderboard
+7. Verify scoring calculation
 
 ---
 
-## 9. Miljövariabler
+## 9. Development Setup (Docker)
+
+### Local Development
+
+```bash
+# Start dev environment (backend + frontend hot reload)
+./scripts/dev.sh up
+
+# Open:
+#   Frontend: http://localhost:5173
+#   Backend API: http://localhost:8000
+#   API docs: http://localhost:8000/docs
+```
+
+### Production Deploy
+
+```bash
+# On production server
+docker pull pexnet/vmtips:latest
+docker compose -f docker-compose.prod.yml up -d
+```
+
+See `docs/DEPLOY.md` for full details.
+
+---
+
+## 10. Environment Variables
 
 ```bash
 # backend/.env
 DATABASE_URL=sqlite:///./vmtips.db
-JWT_SECRET_KEY=byt-ut-denna-i-produktion
+JWT_SECRET_KEY=change-this-in-production
 JWT_ALGORITHM=HS256
-JWT_EXPIRATION_HOURS=168  # 7 dagar
+JWT_EXPIRATION_HOURS=168  # 7 days
 ADMIN_EMAIL=admin@example.com
 WORLD_CUP_JSON_URL=https://worldcupjson.net/matches
+CORS_ORIGINS=http://localhost:5173
 
 # frontend/.env
 VITE_API_BASE_URL=/api
@@ -556,19 +584,19 @@ VITE_API_BASE_URL=/api
 
 ---
 
-## 10. Tidsuppskattning
+## 11. Time Estimate
 
-| Fas | Tasks | Uppskattad tid |
+| Phase | Tasks | Estimated Time |
 |---|---|---|
-| A: Backend | 11 tasks | ~6-8 timmar |
-| B: Frontend | 9 tasks | ~8-10 timmar |
-| C: Integration | 3 tasks | ~2-3 timmar |
-| **Totalt** | **23 tasks** | **~16-21 timmar** |
+| A: Backend | 11 tasks | ~6-8 hours |
+| B: Frontend | 9 tasks | ~8-10 hours |
+| C: Integration | 3 tasks | ~2-3 hours |
+| **Total** | **23 tasks** | **~16-21 hours** |
 
 ---
 
-## 11. Nästa steg
+## 12. Next Steps
 
-1. **Godkänn planen** — justera poängsystem, scope, eller prioriteringar
-2. **Välj CSS-ramverk** — Tailwind, MUI, eller plain CSS?
-3. **Börja implementera** — backend först (data + API), sedan frontend (UI + integration)
+1. **Approve the plan** — adjust scoring, scope, or priorities
+2. **Choose CSS framework** — Tailwind, MUI, or plain CSS?
+3. **Start implementing** — backend first (data + API), then frontend (UI + integration)

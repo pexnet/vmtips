@@ -1,32 +1,32 @@
-# VMTips - Poängsystem och Regler (VM 2026)
+# VMTips — Scoring Rules (World Cup 2026)
 
-> **Dokumentversion:** 1.0  
-> **Syfte:** Definiera samtliga poängregler på ett ställe så att ändringar kan göras enkelt innan och under turneringen.
-
----
-
-## 1. Grundstruktur
-
-- **Gruppspel:** 12 grupper (A–L), 4 lag per grupp. Toppen 2 + 8 bästa treor går vidare till slutspel.
-- **Slutspel:** Round of 32 (åttondelsfinal) → Round of 16 → Quarterfinal → Semifinal → Final.
-- **Tippning sker i två faser:**
-  1. **Fas 1:** Tippa hela gruppspelet (alla 72 matcher) innan deadline.
-  2. **Fas 2:** Tippa hela slutspelet (bracket + individuella matcher) efter gruppselets slut.
+> **Document Version:** 1.0  
+> **Purpose:** Define all scoring rules in one place so changes can be made easily before and during the tournament.
 
 ---
 
-## 2. Matchresultat-poäng (Gruppspel + Slutspel)
+## 1. Tournament Structure
 
-| Poängtyp | Poäng | Beskrivning |
+- **Group Stage:** 12 groups (A–L), 4 teams per group. Top 2 + 8 best third-placed teams advance to the knockout stage.
+- **Knockout Stage:** Round of 32 (Round of 16) → Round of 16 → Quarterfinal → Semifinal → Final.
+- **Prediction happens in two phases:**
+  1. **Phase 1:** Predict all 72 group stage matches before the WC deadline (save incrementally).
+  2. **Phase 2:** Predict the entire knockout stage (bracket + matches) after the group stage ends.
+
+---
+
+## 2. Match Result Points (Group Stage + Knockout)
+
+| Point Type | Points | Description |
 |---|---|---|
-| **Rätt utfall (1X2)** | 3 p | Pricka rätt vinnare eller oavgjort |
-| **Rätt hemmaresultat** | 2 p | Pricka hemmalagets exakta målantal |
-| **Rätt bortaresultat** | 2 p | Pricka bortalagets exakta målantal |
-| **Perfekt tips** | 7 p | Rätt utfall + båda resultaten (3+2+2) |
+| **Correct outcome (1X2)** | 3 p | Correct winner or draw |
+| **Correct home score** | 2 p | Exact number of goals for the home team |
+| **Correct away score** | 2 p | Exact number of goals for the away team |
+| **Perfect prediction** | 7 p | Correct outcome + both exact scores (3+2+2) |
 
-### Exempel
+### Examples
 
-| Tips | Resultat | Utfall | Hemma | Borta | Totalt |
+| Prediction | Result | Outcome | Home | Away | Total |
 |---|---|---|---|---|---|
 | 2-1 | **2-1** | ✅ 3p | ✅ 2p | ✅ 2p | **7p** |
 | 2-1 | **3-1** | ✅ 3p | ❌ | ✅ 2p | **5p** |
@@ -35,66 +35,66 @@
 
 ---
 
-## 3. Slutspelsträd-poäng (Bonus)
+## 3. Knockout Bracket Points (Bonus)
 
-> Gäller endast om man tippat rätt lag i rätt slutspelsrunda.
+> Applies only if you predicted the correct team in the correct knockout round.
 
-| Runda | Poäng per lag |
+| Round | Points per team |
 |---|---|
-| Round of 32 (åttondelsfinal) | 4 p |
+| Round of 32 (Round of 16) | 4 p |
 | Round of 16 | 6 p |
 | Quarterfinal | 8 p |
 | Semifinal | 10 p |
 | Final | 15 p |
-| **Max totalt slutspelsträd** | ~228 p |
+| **Max total bracket** | ~228 p |
 
-### Notering: Dubbel matchresultat-poäng i slutspelet
+### Note: Dual match result points in knockout stage
 
-För slutspelsmatcherna räknas poäng i två parallella spår:
+For knockout matches, points are calculated in two parallel tracks:
 
-1. **Matchresultat-poäng** — Du får poäng för rätt utfall/mål på varje matchplats (oavsett vilka lag som spelar). T.ex. om du tippat Tyskland–Sydkorea 3-1 i åttondelsfinal 1, och matchen i verkligheten blir Brasilien–Skottland 3-1, får du 7p för resultattipset.
+1. **Match result points** — You get points for correct outcome/goals on each match slot (regardless of which teams actually play). For example, if you predicted Germany–South Korea 3-1 in Round of 32 match #1, and the real match becomes Brazil–Scotland 3-1, you still get 7p for your result prediction.
 
-2. **Lagbonus** — Extra poäng för varje lag du prickat rätt i rätt runda.
+2. **Team bonus** — Extra points for each team you correctly placed in the right round.
 
 ---
 
-## 4. Turneringsbonusar (Långsiktiga tips innan VM)
+## 4. Tournament Bonuses (Long-term predictions before WC starts)
 
-| Bonus | Poäng | Beskrivning |
+| Bonus | Points | Description |
 |---|---|---|
-| **Världsmästare** | 25 p | Tippa vilket lag som vinner VM |
-| **Skyttekung** | 25 p | Tippa vem som gör flest mål i turneringen |
-| **Assistkung** | 30 p | Tippa vem som får flest assist |
-| **Totalt antal mål** | 20 p | Gissa totala antalet mål i hela VM |
-| **Turneringsbonusar max** | **100 p** | |
+| **World Champion** | 25 p | Predict which team wins the WC |
+| **Top Scorer** | 25 p | Predict who scores the most goals in the tournament |
+| **Top Assists** | 30 p | Predict who gets the most assists |
+| **Total Goals** | 20 p | Guess the total number of goals in the entire WC |
+| **Tournament bonuses max** | **100 p** | |
 
-> Turneringsbonusarna räknas med i den globala topplistan.
-
----
-
-## 5. Bonusfrågor (per liga)
-
-Liga-administratörer kan skapa egna bonusfrågor:
-- Flexibla poäng (1–100 p per fråga)
-- Exempel: "Vilket lag gör flest mål i gruppspelet?"
-- Admin avgör svaret och delar ut poäng manuellt
+> Tournament bonuses are counted in the global leaderboard.
 
 ---
 
-## 6. Maxpoängsammanställning
+## 5. Bonus Questions (per league)
 
-| Kategori | Max poäng |
+League administrators can create custom bonus questions:
+- Flexible points (1–100 p per question)
+- Example: "Which team scores the most goals in the group stage?"
+- Admin decides the answer and awards points manually
+
+---
+
+## 6. Maximum Points Summary
+
+| Category | Max Points |
 |---|---|
-| Gruppspelsmatcher (72 × 7p) | 504 p |
-| Slutspelsmatcher (31 × 7p) | 217 p |
-| Slutspelsträd-bonus | ~228 p |
-| Turneringsbonusar | 100 p |
-| **Totalt teoretiskt max** | **~1049 p** |
+| Group stage matches (72 × 7p) | 504 p |
+| Knockout matches (31 × 7p) | 217 p |
+| Knockout bracket bonus | ~228 p |
+| Tournament bonuses | 100 p |
+| **Total theoretical max** | **~1049 p** |
 
 ---
 
-## 7. Ändringslogg
+## 7. Change Log
 
-| Datum | Ändring | Utfört av |
+| Date | Change | Done by |
 |---|---|---|
 | 2026-05-14 | Initial version | Hermes / pexnet |
