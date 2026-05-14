@@ -2,7 +2,7 @@
 
 > **Datum:** 2026-05-14  
 > **Mål:** Bygga en komplett vmtips-applikation för VM 2026 med inloggning, ligor, tippning i två faser, realtidspoäng, och matchresultat-sync.  
-> **Tech Stack:** React + Vite (frontend), Python FastAPI + SQLite (backend)
+> **Tech Stack:** React + Vite + MUI (frontend), Python FastAPI + SQLite (backend), flag emojis per team
 
 ---
 
@@ -90,7 +90,8 @@ teams
   name
   code (FIFA-kod, t.ex. "SWE")
   group (A-L)
-  flag_url (emoji eller URL)
+  flag_emoji (t.ex. "🇸🇪")
+  flag_svg (från country-flag-icons/lib/flags/1x1/SE.svg)
 
 matches
   id (PK)
@@ -221,7 +222,27 @@ POST   /scores/recalculate (admin)  → omräkna alla poäng
 
 ---
 
-## 5. Frontend-struktur (React + Vite)
+## 5. Frontend-struktur (React + Vite + MUI)
+
+### 5.1 Tema-system (light/dark)
+
+```
+src/
+  theme/
+    ThemeContext.tsx      → React Context för light/dark-toggle
+    lightTheme.ts         → MUI createTheme({ palette: { mode: 'light', ... } })
+    darkTheme.ts          → MUI createTheme({ palette: { mode: 'dark', ... } })
+    index.ts              → export useThemeMode() hook
+```
+
+**Design-principer:**
+- **Light:** Vit bakgrund, mörkblå primärfärg (`#1a237e`), rena cards med subtila skuggor
+- **Dark:** `#121212` bakgrund, elektrisk blå accent (`#82b1ff`), högkontrast text
+- Konsekvent `border-radius: 12px` på cards, `8px` på knappar
+- Flaggor som emoji (🇸🇪) eller SVG via `country-flag-icons` per lag
+- MUI `CssBaseline` + `ThemeProvider` wrappar hela appen i `main.tsx`
+
+### 5.2 Projektstruktur
 
 ```
 src/
@@ -422,7 +443,7 @@ POST /admin/sync-results
 **Fil:** `frontend/` (hela projektet)
 **Steg:**
 1. `npm create vite@latest frontend -- --template react-ts`
-2. Installera: `react-router-dom`, `axios`, `tailwindcss` (eller valfritt CSS)
+2. Installera: `react-router-dom`, `axios`, `@mui/material`, `@emotion/react`, `@emotion/styled`, `@mui/icons-material`, `country-flag-icons`
 3. Konfigurera proxy i `vite.config.ts`: `/api` → `http://localhost:8000`
 4. Testa: `npm run dev`, verifiera routing
 
