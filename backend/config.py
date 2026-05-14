@@ -2,7 +2,7 @@
 Configuration module for the VMTips backend.
 All settings are loaded from environment variables with sensible defaults.
 """
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -14,8 +14,7 @@ class Settings(BaseSettings):
     world_cup_json_url: str = "https://worldcupjson.net/matches"
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
 
-    class Config:
-        env_file = ".env"
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 
 settings = Settings()

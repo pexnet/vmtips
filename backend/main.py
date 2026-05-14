@@ -5,7 +5,11 @@ Provides a FastAPI application with health check, CORS, and modular routers.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from database import engine, Base
 from config import settings
+
+# Create tables on startup
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="VMTips API",
