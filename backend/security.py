@@ -12,6 +12,8 @@ from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
 from config import settings
+from database import get_db
+from models import User
 
 # OAuth2 scheme for token extraction from Authorization header
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
@@ -83,3 +85,18 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> Optional[dict]:
         )
 
     return {"user_id": int(user_id)}
+
+
+def fetch_current_user(
+    token_payload: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> User:
+    """Dependency: validate JWT and return the actual User DB row."""
+    user = db.query(User).filter(User.id == token_payload["user_id"]).first()
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="user_not_found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user

@@ -7,23 +7,15 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import User
 from schemas import UserCreate, UserLogin, Token, UserOut
-from security import get_password_hash, verify_password, create_access_token, get_current_user
+from security import get_password_hash, verify_password, create_access_token, fetch_current_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def _fetch_current_user(
-    token_payload: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    user: User = Depends(fetch_current_user),
 ) -> User:
-    """Dependency: validate JWT and return the actual User DB row."""
-    user = db.query(User).filter(User.id == token_payload["user_id"]).first()
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="user_not_found",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    """Re-export fetch_current_user for local use."""
     return user
 
 

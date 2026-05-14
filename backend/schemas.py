@@ -87,3 +87,7 @@ class TournamentBonusCreate(BaseModel):
     top_scorer_name: str | None = None
     top_assist_name: str | None = None
     total_goals: int | None = None
+
+
+class PredictionBatchCreate(BaseModel):
+    predictions: list[PredictionCreate]
