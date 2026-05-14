@@ -233,6 +233,13 @@ src/
     lightTheme.ts         → MUI createTheme({ palette: { mode: 'light', ... } })
     darkTheme.ts          → MUI createTheme({ palette: { mode: 'dark', ... } })
     index.ts              → export useThemeMode() hook
+  i18n/
+    I18nProvider.tsx      → Wraps app, provides locale context
+    locales/
+      sv.json             → Swedish translations (default)
+      en.json             → English translations
+    useTranslation.ts     → Hook: t('key') returns string in current locale
+    types.ts              → Type-safe keys for all translation strings
 ```
 
 **Design principles:**
@@ -241,6 +248,14 @@ src/
 - Consistent `border-radius: 12px` on cards, `8px` on buttons
 - Flags as emoji (🇸🇪) or SVG via `country-flag-icons` per team
 - MUI `CssBaseline` + `ThemeProvider` wraps entire app in `main.tsx`
+
+**Internationalization:**
+- Default language: **Swedish** (`sv`)
+- Secondary language: **English** (`en`)
+- Language toggle in Navbar (e.g. 🇸🇪 / 🇬🇧 button)
+- All UI strings sourced from `i18n/locales/*.json` — no hardcoded text in components
+- User's language preference persisted in localStorage + sent to backend in `Accept-Language` header
+- Backend errors returned with message keys that frontend translates
 
 ### 5.2 Project Structure
 
