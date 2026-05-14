@@ -1,0 +1,44 @@
+"""
+VMTips backend entrypoint.
+Provides a FastAPI application with health check, CORS, and modular routers.
+"""
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from config import settings
+
+app = FastAPI(
+    title="VMTips API",
+    description="Backend API for the VMTips World Cup 2026 prediction game.",
+    version="0.1.0",
+)
+
+# CORS — parse comma-separated origins
+def _parse_origins(raw: str) -> list[str]:
+    """Split a comma-separated string of origins into a list."""
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_parse_origins(settings.cors_origins),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/health")
+def health_check() -> dict:
+    """Health endpoint used by Docker and load balancers."""
+    return {"status": "ok"}
+
+
+@app.get("/")
+def root() -> dict:
+    """API root redirecting to documentation."""
+    return {
+        "message": "Welcome to VMTips API",
+        "docs": "/docs",
+        "health": "/health",
+    }
