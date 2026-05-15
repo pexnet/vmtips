@@ -148,3 +148,74 @@ def test_get_league_not_member(client):
     )
     assert detail_r.status_code == 403
     assert detail_r.json()["detail"] == "not_a_member"
+
+
+def test_list_public_leagues(client):
+    """GET /leagues/public returns only public leagues without needing auth."""
+    # Create a public league
+    token = _register_and_login(client, "pubadmin@example.com", "secret123", "PubAdmin")
+    create_r = client.post(
+        "/leagues",
+        json={"name": "Public League", "is_public": True},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert create_r.status_code == 201
+    public_league_id = create_r.json()["id"]
+
+    # Create a private league
+    create_r2 = client.post(
+        "/leagues",
+        json={"name": "Private League", "is_public": False},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert create_r2.status_code == 201
+
+    # Request without auth
+    response = client.get("/leagues/public")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["name"] == "Public League"
+    assert data[0]["id"] == public_league_id
+    assert data[0]["member_count"] == 1  # creator is auto-added
+    assert "invite_code" not in data[0]
+
+
+def test_list_public_leagues_empty(client):
+    """GET /leagues/public returns empty list when no public leagues exist."""
+    token = _register_and_login(client, "nope@example.com", "secret123", "Nope")
+    client.post(
+        "/leagues",
+        json={"name": "Private Only", "is_public": False},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    response = client.get("/leagues/public")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_list_public_leagues_member_count(client):
+    """GET /leagues/public member_count reflects all joined members."""
+    admin_token = _register_and_login(client, "mcadmin@example.com", "secret123", "MCAdmin")
+    create_r = client.post(
+        "/leagues",
+        json={"name": "Big Public League", "is_public": True},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    league_id = create_r.json()["id"]
+    invite_code = create_r.json()["invite_code"]
+
+    # Second user joins
+    user_token = _register_and_login(client, "mcuser@example.com", "secret123", "MCUser")
+    client.post(
+        f"/leagues/{league_id}/join",
+        json={"invite_code": invite_code},
+        headers={"Authorization": f"Bearer {user_token}"},
+    )
+
+    response = client.get("/leagues/public")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["member_count"] == 2

@@ -61,15 +61,19 @@ class TestAdminMatchResult:
 
 class TestAdminSync:
     def test_sync_stub(self, client):
-        """Sync endpoint returns useful info."""
+        """Sync endpoint returns useful info (now actually implemented)."""
         token = _register_and_login(client, "admin4@example.com", "secret123", "Admin")
         r = client.post(
             "/admin/sync-results",
             headers={"Authorization": f"Bearer {token}"},
         )
         assert r.status_code == 200
-        assert r.json()["synced"] is False
-        assert "manual" in r.json()["message"].lower() or "not yet" in r.json()["message"].lower()
+        data = r.json()
+        # The sync endpoint is now implemented; it returns synced=True if
+        # the external API was reachable, or synced=False with an error
+        # message if it wasn't.
+        assert "synced" in data
+        assert "updated" in data
 
     def test_sync_non_admin(self, client):
         _register_and_login(client, "admin5@example.com", "secret123", "Admin")

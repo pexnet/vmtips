@@ -168,3 +168,123 @@ class TestTournamentBonusScoring:
         )
         assert result["points"] == 0
         assert result["winner_correct"] is False
+
+
+# ── Bracket scoring ────────────────────────────────────────────
+
+class TestBracketScoring:
+    def test_no_predictions(self):
+        """Empty predictions give 0 points."""
+        from scoring import calculate_bracket_points
+        result = calculate_bracket_points([], [])
+        assert result["points"] == 0
+        assert result["details"] == []
+
+    def test_no_actual_advancements(self):
+        """Predictions with no actual advancements give 0 points."""
+        from scoring import calculate_bracket_points
+        preds = [{"team_id": 1, "round": "quarter_final"}]
+        result = calculate_bracket_points(preds, [])
+        assert result["points"] == 0
+
+    def test_correct_round_of_32(self):
+        """Correct round_of_32 placement earns 4 points."""
+        from scoring import calculate_bracket_points
+        preds = [{"team_id": 1, "round": "round_of_32"}]
+        actuals = [{"team_id": 1, "round": "round_of_32"}]
+        result = calculate_bracket_points(preds, actuals)
+        assert result["points"] == 4
+        assert len(result["details"]) == 1
+        assert result["details"][0]["team_id"] == 1
+        assert result["details"][0]["round"] == "round_of_32"
+        assert result["details"][0]["points"] == 4
+
+    def test_correct_round_of_16(self):
+        """Correct round_of_16 placement earns 6 points."""
+        from scoring import calculate_bracket_points
+        preds = [{"team_id": 1, "round": "round_of_16"}]
+        actuals = [{"team_id": 1, "round": "round_of_16"}]
+        result = calculate_bracket_points(preds, actuals)
+        assert result["points"] == 6
+
+    def test_correct_quarter_final(self):
+        """Correct quarter_final placement earns 8 points."""
+        from scoring import calculate_bracket_points
+        preds = [{"team_id": 1, "round": "quarter_final"}]
+        actuals = [{"team_id": 1, "round": "quarter_final"}]
+        result = calculate_bracket_points(preds, actuals)
+        assert result["points"] == 8
+
+    def test_correct_semi_final(self):
+        """Correct semi_final placement earns 10 points."""
+        from scoring import calculate_bracket_points
+        preds = [{"team_id": 1, "round": "semi_final"}]
+        actuals = [{"team_id": 1, "round": "semi_final"}]
+        result = calculate_bracket_points(preds, actuals)
+        assert result["points"] == 10
+
+    def test_correct_final(self):
+        """Correct final placement earns 15 points."""
+        from scoring import calculate_bracket_points
+        preds = [{"team_id": 1, "round": "final"}]
+        actuals = [{"team_id": 1, "round": "final"}]
+        result = calculate_bracket_points(preds, actuals)
+        assert result["points"] == 15
+
+    def test_wrong_team_same_round(self):
+        """Wrong team in same round gives 0 points for that placement."""
+        from scoring import calculate_bracket_points
+        preds = [{"team_id": 2, "round": "quarter_final"}]
+        actuals = [{"team_id": 1, "round": "quarter_final"}]
+        result = calculate_bracket_points(preds, actuals)
+        assert result["points"] == 0
+
+    def test_team_in_wrong_round(self):
+        """Team predicted in wrong round gives 0 points."""
+        from scoring import calculate_bracket_points
+        preds = [{"team_id": 1, "round": "quarter_final"}]
+        actuals = [{"team_id": 1, "round": "semi_final"}]
+        result = calculate_bracket_points(preds, actuals)
+        assert result["points"] == 0
+
+    def test_multiple_correct_predictions(self):
+        """Multiple correct placements accumulate points."""
+        from scoring import calculate_bracket_points
+        preds = [
+            {"team_id": 1, "round": "round_of_16"},
+            {"team_id": 2, "round": "quarter_final"},
+            {"team_id": 3, "round": "semi_final"},
+        ]
+        actuals = [
+            {"team_id": 1, "round": "round_of_16"},
+            {"team_id": 2, "round": "quarter_final"},
+            {"team_id": 3, "round": "semi_final"},
+        ]
+        result = calculate_bracket_points(preds, actuals)
+        # 6 + 8 + 10 = 24
+        assert result["points"] == 24
+        assert len(result["details"]) == 3
+
+    def test_mixed_correct_and_wrong(self):
+        """Only matching placements earn points."""
+        from scoring import calculate_bracket_points
+        preds = [
+            {"team_id": 1, "round": "round_of_16"},
+            {"team_id": 99, "round": "quarter_final"},
+        ]
+        actuals = [
+            {"team_id": 1, "round": "round_of_16"},
+            {"team_id": 2, "round": "quarter_final"},
+        ]
+        result = calculate_bracket_points(preds, actuals)
+        assert result["points"] == 6
+        assert len(result["details"]) == 1
+
+    def test_bracket_round_points_constant(self):
+        """BRACKET_ROUND_POINTS has expected values."""
+        from scoring import BRACKET_ROUND_POINTS
+        assert BRACKET_ROUND_POINTS["round_of_32"] == 4
+        assert BRACKET_ROUND_POINTS["round_of_16"] == 6
+        assert BRACKET_ROUND_POINTS["quarter_final"] == 8
+        assert BRACKET_ROUND_POINTS["semi_final"] == 10
+        assert BRACKET_ROUND_POINTS["final"] == 15
