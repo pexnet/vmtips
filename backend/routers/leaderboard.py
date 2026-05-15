@@ -1,10 +1,14 @@
 """
 Leaderboard router: global, per-league, and personal score breakdown.
 """
-from fastapi import APIRouter, Depends, HTTPException
+import math
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from database import get_db
+from errors import NotFoundError, ForbiddenError
 from models import User, Prediction, Match, League, LeagueMember, Score
 from security import fetch_current_user
 from scoring import calculate_match_points
@@ -65,8 +69,16 @@ def _calculate_user_score(user_id: int, db: Session) -> dict:
 
 
 @router.get("/global")
-def global_leaderboard(db: Session = Depends(get_db)):
-    """Return the global leaderboard across all users, sorted by total points."""
+def global_leaderboard(
+    page: Optional[int] = Query(None, ge=1, description="Page number (1-indexed)"),
+    per_page: Optional[int] = Query(None, ge=1, le=200, description="Items per page"),
+    db: Session = Depends(get_db),
+):
+    """Return the global leaderboard across all users, sorted by total points.
+    
+    If page and per_page are provided, returns a paginated response.
+    Otherwise returns the full list (backward compatible).
+    """
     users = db.query(User).all()
     entries = []
 
@@ -84,7 +96,23 @@ def global_leaderboard(db: Session = Depends(get_db)):
     for i, entry in enumerate(entries):
         entry["rank"] = i + 1
 
-    return {"leaderboard": entries}
+    # If no pagination params given, return full response (backward compatible)
+    if page is None or per_page is None:
+        return {"leaderboard": entries}
+
+    # Paginated response
+    total = len(entries)
+    total_pages = math.ceil(total / per_page) if per_page > 0 else 1
+    offset = (page - 1) * per_page
+    paginated_entries = entries[offset:offset + per_page]
+
+    return {
+        "leaderboard": paginated_entries,
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": total_pages,
+    }
 
 
 @router.get("/league/{league_id}")
@@ -96,7 +124,7 @@ def league_leaderboard(
     """Return leaderboard for a specific league (members only)."""
     league = db.query(League).filter(League.id == league_id).first()
     if not league:
-        raise HTTPException(status_code=404, detail="league_not_found")
+        raise NotFoundError(detail="league_not_found", error_code="league_not_found")
 
     # Check if user is a member
     is_member = (
@@ -108,7 +136,7 @@ def league_leaderboard(
         .first()
     )
     if not is_member:
-        raise HTTPException(status_code=403, detail="not_a_member")
+        raise ForbiddenError(detail="not_a_member", error_code="not_a_member")
 
     members = (
         db.query(User)

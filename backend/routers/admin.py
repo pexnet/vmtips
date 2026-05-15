@@ -4,10 +4,11 @@ All endpoints require admin status (checked via user_id against env ADMIN_USER_I
 """
 import os
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from database import get_db
+from errors import NotFoundError, ForbiddenError
 from models import Match, User, Prediction, Score
 from schemas import MatchResultUpdate
 from security import fetch_current_user
@@ -28,10 +29,7 @@ def _is_admin(current_user: User) -> bool:
 def require_admin(current_user: User = Depends(fetch_current_user)) -> User:
     """Dependency: raises 403 if user is not admin."""
     if not _is_admin(current_user):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="admin_only",
-        )
+        raise ForbiddenError(detail="admin_only", error_code="admin_only")
     return current_user
 
 
@@ -45,7 +43,7 @@ def set_match_result(
     """Manually set the result for a specific match."""
     match = db.query(Match).filter(Match.id == match_id).first()
     if not match:
-        raise HTTPException(status_code=404, detail="match_not_found")
+        raise NotFoundError(detail="match_not_found", error_code="match_not_found")
 
     match.home_goals = payload.home_goals
     match.away_goals = payload.away_goals

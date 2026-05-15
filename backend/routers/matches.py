@@ -1,10 +1,14 @@
 """
 Matches router: list all matches, filter by group/knockout, and fetch single match.
 """
-from fastapi import APIRouter, Depends, HTTPException
+import math
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from database import get_db
+from errors import NotFoundError
 from models import Match
 from schemas import MatchOut
 
@@ -48,16 +52,41 @@ def _match_to_dict(match: Match) -> dict:
         },
         "home_goals": match.home_goals,
         "away_goals": match.away_goals,
-        "match_date": match.match_date.isoformat() if match.match_date else None,
+        "match_date": match.match_date.isoformat() + "Z" if match.match_date else None,
         "status": match.status,
     }
 
 
-@router.get("", response_model=list[MatchOut])
-def list_matches(db: Session = Depends(get_db)):
-    """Return every match in the tournament with team details."""
-    matches = db.query(Match).order_by(Match.match_number).all()
-    return [_match_to_dict(m) for m in matches]
+@router.get("")
+def list_matches(
+    page: Optional[int] = Query(None, ge=1, description="Page number (1-indexed)"),
+    per_page: Optional[int] = Query(None, ge=1, le=200, description="Items per page"),
+    db: Session = Depends(get_db),
+):
+    """Return every match in the tournament with team details.
+    
+    If page and per_page are provided, returns a paginated response.
+    Otherwise returns the full list (backward compatible).
+    """
+    query = db.query(Match).order_by(Match.match_number)
+    total = query.count()
+
+    # If no pagination params given, return full list (backward compatible)
+    if page is None or per_page is None:
+        matches = query.all()
+        return [_match_to_dict(m) for m in matches]
+
+    # Paginated response
+    offset = (page - 1) * per_page
+    matches = query.offset(offset).limit(per_page).all()
+    total_pages = math.ceil(total / per_page) if per_page > 0 else 1
+    return {
+        "items": [_match_to_dict(m) for m in matches],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": total_pages,
+    }
 
 
 @router.get("/groups", response_model=list[MatchOut])
@@ -89,5 +118,5 @@ def get_match(match_id: int, db: Session = Depends(get_db)):
     """Return a single match by its database id."""
     match = db.query(Match).filter(Match.id == match_id).first()
     if not match:
-        raise HTTPException(status_code=404, detail="match_not_found")
+        raise NotFoundError(detail="match_not_found", error_code="match_not_found")
     return _match_to_dict(match)

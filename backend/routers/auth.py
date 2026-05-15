@@ -1,16 +1,20 @@
 """
 Authentication router: register, login, and current-user endpoints.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.orm import Session
 
 from database import get_db
+from errors import ConflictError, UnauthorizedError
 from models import User
 from schemas import UserCreate, UserLogin, Token, UserOut
 from security import get_password_hash, verify_password, create_access_token, fetch_current_user
+from rate_limit import limiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+# Pre-computed bcrypt hash of "dummy" for constant-time login failure
+_DUMMY_HASH = "$2b$12$EIx9hO4im1St7uFtCC0zYe4M05Ao6CRKu0VJgPnlLz9xqf4N0AG2S"
 
 def _fetch_current_user(
     user: User = Depends(fetch_current_user),
@@ -20,14 +24,12 @@ def _fetch_current_user(
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-def register(payload: UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def register(request: Request, payload: UserCreate, db: Session = Depends(get_db)):
     """Create a new user account."""
     existing = db.query(User).filter(User.email == payload.email).first()
     if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="email_already_registered",
-        )
+        raise ConflictError(detail="email_already_registered", error_code="email_already_registered")
 
     user = User(
         email=payload.email,
@@ -41,15 +43,17 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-def login(payload: UserLogin, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login(request: Request, payload: UserLogin, db: Session = Depends(get_db)):
     """Authenticate a user and return a JWT access token."""
     user = db.query(User).filter(User.email == payload.email).first()
-    if not user or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="invalid_credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    if not user:
+        # Always run bcrypt to prevent timing-based email enumeration
+        verify_password("dummy", _DUMMY_HASH)
+        raise UnauthorizedError(detail="invalid_credentials", error_code="invalid_credentials")
+
+    if not verify_password(payload.password, user.password_hash):
+        raise UnauthorizedError(detail="invalid_credentials", error_code="invalid_credentials")
 
     token = create_access_token(data={"sub": str(user.id)})
     return {"access_token": token, "token_type": "bearer"}

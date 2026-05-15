@@ -1,11 +1,15 @@
 """
 Predictions router: save batch predictions and tournament bonuses.
 """
+import math
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from database import get_db
+from errors import ForbiddenError, ValidationError
 from models import Prediction, Match, TournamentBonus
 from schemas import PredictionBatchCreate, TournamentBonusCreate
 from routers.auth import fetch_current_user
@@ -26,17 +30,43 @@ def _pred_to_dict(pred: Prediction) -> dict:
             "match_number": pred.match.match_number,
             "round": pred.match.round,
             "group": pred.match.group,
-            "home_team": {"name": pred.match.home_team.name, "flag": pred.match.home_team.flag_emoji},
-            "away_team": {"name": pred.match.away_team.name, "flag": pred.match.away_team.flag_emoji},
+            "home_team": {"name": pred.match.home_team.name, "flag_emoji": pred.match.home_team.flag_emoji},
+            "away_team": {"name": pred.match.away_team.name, "flag_emoji": pred.match.away_team.flag_emoji},
         },
     }
 
 
 @router.get("")
-def list_predictions(current_user=Depends(fetch_current_user), db: Session = Depends(get_db)):
-    """Return all predictions for the authenticated user."""
-    preds = db.query(Prediction).filter(Prediction.user_id == current_user.id).all()
-    return [_pred_to_dict(p) for p in preds]
+def list_predictions(
+    page: Optional[int] = Query(None, ge=1, description="Page number (1-indexed)"),
+    per_page: Optional[int] = Query(None, ge=1, le=200, description="Items per page"),
+    current_user=Depends(fetch_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return all predictions for the authenticated user.
+    
+    If page and per_page are provided, returns a paginated response.
+    Otherwise returns the full list (backward compatible).
+    """
+    query = db.query(Prediction).filter(Prediction.user_id == current_user.id)
+    total = query.count()
+
+    # If no pagination params given, return full list (backward compatible)
+    if page is None or per_page is None:
+        preds = query.all()
+        return [_pred_to_dict(p) for p in preds]
+
+    # Paginated response
+    offset = (page - 1) * per_page
+    preds = query.offset(offset).limit(per_page).all()
+    total_pages = math.ceil(total / per_page) if per_page > 0 else 1
+    return {
+        "items": [_pred_to_dict(p) for p in preds],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": total_pages,
+    }
 
 
 @router.post("/batch")
@@ -50,49 +80,51 @@ def save_batch(
     matches = {m.id: m for m in db.query(Match).filter(Match.id.in_(match_ids)).all()}
     missing = match_ids - set(matches.keys())
     if missing:
-        raise HTTPException(
-            status_code=400,
-            detail={"error": "invalid_match_ids", "ids": list(missing)},
-        )
+        raise ValidationError(detail="invalid_match_ids", error_code="invalid_match_ids")
 
-    now = datetime.utcnow()
-    saved = 0
+    now = datetime.now(timezone.utc)
+
+    # Validate ALL predictions before making any changes (atomicity)
     for pred_create in payload.predictions:
         match = matches[pred_create.match_id]
-        # Reject prediction if match has already started
-        if match.match_date <= now:
-            raise HTTPException(
-                status_code=403,
-                detail={
-                    "error": "match_locked",
-                    "match_id": match.id,
-                    "kickoff": match.match_date.isoformat(),
-                },
-            )
+        # match_date may be offset-naive (SQLite stores without tz);
+        # add UTC timezone to allow comparison with the aware `now`.
+        kickoff = match.match_date
+        if kickoff is not None and kickoff.tzinfo is None:
+            kickoff = kickoff.replace(tzinfo=timezone.utc)
+        if kickoff is not None and kickoff <= now:
+            raise ForbiddenError(detail="match_locked", error_code="match_locked")
 
-        existing = (
-            db.query(Prediction)
-            .filter(
-                Prediction.user_id == current_user.id,
-                Prediction.match_id == pred_create.match_id,
-            )
-            .first()
-        )
-        if existing:
-            existing.home_goals = pred_create.home_goals
-            existing.away_goals = pred_create.away_goals
-        else:
-            db.add(
-                Prediction(
-                    user_id=current_user.id,
-                    match_id=pred_create.match_id,
-                    home_goals=pred_create.home_goals,
-                    away_goals=pred_create.away_goals,
+    # All validated — now upsert
+    saved = 0
+    try:
+        for pred_create in payload.predictions:
+            existing = (
+                db.query(Prediction)
+                .filter(
+                    Prediction.user_id == current_user.id,
+                    Prediction.match_id == pred_create.match_id,
                 )
+                .first()
             )
-        saved += 1
+            if existing:
+                existing.home_goals = pred_create.home_goals
+                existing.away_goals = pred_create.away_goals
+            else:
+                db.add(
+                    Prediction(
+                        user_id=current_user.id,
+                        match_id=pred_create.match_id,
+                        home_goals=pred_create.home_goals,
+                        away_goals=pred_create.away_goals,
+                    )
+                )
+            saved += 1
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
-    db.commit()
     return {"saved": saved}
 
 

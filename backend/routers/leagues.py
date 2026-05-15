@@ -4,10 +4,11 @@ League router: create, join, list, and view leagues.
 import random
 import string
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from database import get_db
+from errors import NotFoundError, ForbiddenError, ConflictError
 from models import League, LeagueMember, User
 from schemas import LeagueCreate, LeagueJoin, LeagueOut, LeagueDetailOut
 from security import fetch_current_user
@@ -70,10 +71,10 @@ def join_league(
     """Join a league using its invite code."""
     league = db.query(League).filter(League.id == league_id).first()
     if not league:
-        raise HTTPException(status_code=404, detail="league_not_found")
+        raise NotFoundError(detail="league_not_found", error_code="league_not_found")
 
     if league.invite_code != payload.invite_code:
-        raise HTTPException(status_code=403, detail="invalid_invite_code")
+        raise ForbiddenError(detail="invalid_invite_code", error_code="invalid_invite_code")
 
     # Check if already a member
     existing = (
@@ -85,7 +86,7 @@ def join_league(
         .first()
     )
     if existing:
-        raise HTTPException(status_code=409, detail="already_member")
+        raise ConflictError(detail="already_member", error_code="already_member")
 
     member = LeagueMember(league_id=league_id, user_id=current_user.id)
     db.add(member)
@@ -119,7 +120,7 @@ def get_league(
     """Get league details including member list. Only members can view."""
     league = db.query(League).filter(League.id == league_id).first()
     if not league:
-        raise HTTPException(status_code=404, detail="league_not_found")
+        raise NotFoundError(detail="league_not_found", error_code="league_not_found")
 
     # Check if user is a member
     is_member = (
@@ -131,7 +132,7 @@ def get_league(
         .first()
     )
     if not is_member:
-        raise HTTPException(status_code=403, detail="not_a_member")
+        raise ForbiddenError(detail="not_a_member", error_code="not_a_member")
 
     members = (
         db.query(User)
@@ -151,7 +152,6 @@ def get_league(
             {
                 "id": u.id,
                 "display_name": u.display_name,
-                "email": u.email,
             }
             for u in members
         ],
