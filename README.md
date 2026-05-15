@@ -7,7 +7,7 @@ A full-stack football prediction game for the FIFA World Cup 2026.
 
 ## Quick Start
 
-### Development
+### Development (no Docker)
 
 ```bash
 # Backend
@@ -23,8 +23,30 @@ npm run dev
 
 ### Docker Production
 
+Prerequisites: Docker and Docker Compose installed.
+
 ```bash
+# Start everything (single container on port 8000)
+./scripts/dev.sh up
+
+# Or with docker compose directly
 docker compose up --build
+```
+
+Then open **http://localhost:8000**
+
+### Environment Variables
+
+| Variable | Default | Required | Description |
+|----------|---------|----------|-------------|
+| `SECRET_KEY` | `change-me-in-production` | **Yes** | JWT signing secret — **change this** |
+| `CORS_ORIGINS` | `http://localhost:8000` | No | Comma-separated allowed origins |
+| `DATABASE_URL` | `sqlite:///app/data/vmtips.db` | No | SQLite database path |
+
+Set them in a `.env` file or pass directly:
+
+```bash
+SECRET_KEY=my-secret-key docker compose up --build
 ```
 
 ## Features
@@ -37,13 +59,25 @@ docker compose up --build
 - Admin panel for result entry and score recalculation
 - Dual themes (light/dark) and bilingual UI (Swedish/English)
 
+### Development Commands
+
+```bash
+./scripts/dev.sh up        # Start app
+./scripts/dev.sh down      # Stop app
+./scripts/dev.sh build     # Rebuild image
+./scripts/dev.sh logs      # View logs
+./scripts/dev.sh shell     # Shell into container
+./scripts/dev.sh seed      # Run database seed
+./scripts/dev.sh db-reset  # Reset database
+```
+
 ## Tech Stack
 
 | Layer | Tech |
 |-------|------|
 | Backend | Python 3.11, FastAPI, SQLAlchemy, PyJWT, pytest |
 | Frontend | React 19, TypeScript, Vite, MUI v9, react-i18next |
-| Infra | Docker, docker-compose |
+| Infra | Docker, docker-compose, GitHub Actions |
 
 ## Project Structure
 
@@ -59,15 +93,15 @@ vmtips/
 │   ├── src/locales/  i18n translations
 │   └── src/api/      Axios client
 ├── Dockerfile        Multi-stage build
-└── docker-compose.yml
+├── docker-compose.yml
+└── scripts/
+    └── dev.sh        Development helper
 ```
 
-## Deployment Checklist
+## CI/CD
 
-1. Set `SECRET_KEY` environment variable
-2. Configure `CORS_ORIGINS` for your domain
-3. Run `docker compose up --build`
-4. Visit `http://localhost:8000`
+- **CI:** Backend tests + frontend build on every push/PR
+- **Docker:** Image built and pushed to `ghcr.io/pexnet/vmtips` on version tags
 
 ## License
 

@@ -13,6 +13,9 @@ FROM python:3.11-slim AS production
 
 WORKDIR /app
 
+# Create data directory for SQLite
+RUN mkdir -p /app/data
+
 # Backend deps
 COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
@@ -23,9 +26,13 @@ COPY backend/ .
 # Frontend static files
 COPY --from=frontend-build /app/dist ./static
 
+# Make startup script executable
+RUN chmod +x start.sh
+
 EXPOSE 8000
 
 ENV PYTHONUNBUFFERED=1
 ENV STATIC_DIR=/app/static
+ENV DATABASE_URL=sqlite:///app/data/vmtips.db
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["./start.sh"]
