@@ -10,9 +10,11 @@ import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import MatchesPage from "./pages/MatchesPage";
 import PredictionsPage from "./pages/PredictionsPage";
+import KnockoutPage from "./pages/KnockoutPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import LeaguesPage from "./pages/LeaguesPage";
 import AdminPage from "./pages/AdminPage";
+import ProfilePage from "./pages/ProfilePage";
 
 import "./i18n";
 
@@ -45,10 +47,26 @@ export default function App() {
               }
             />
             <Route
+              path="/knockout"
+              element={
+                <ProtectedRoute>
+                  <KnockoutPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/leagues"
               element={
                 <ProtectedRoute>
                   <LeaguesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <ProfilePage />
                 </ProtectedRoute>
               }
             />

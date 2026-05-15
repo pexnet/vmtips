@@ -4,6 +4,7 @@
     "home": "Home",
     "matches": "Matches",
     "predictions": "Predictions",
+    "knockout": "Knockout",
     "leaderboard": "Leaderboard",
     "leagues": "Leagues",
     "login": "Login",
@@ -38,6 +39,22 @@
     "semi_final": "Semi-finals",
     "match_for_third_place": "3rd Place",
     "final": "Final"
+  },
+  "knockout": {
+    "title": "Knockout Bracket",
+    "subtitle": "Predict which teams advance through each round",
+    "round_of_32": "Round of 32",
+    "round_of_16": "Round of 16",
+    "quarter_final": "Quarter-finals",
+    "semi_final": "Semi-finals",
+    "final": "Final",
+    "select_team": "Select team",
+    "save_bracket": "Save bracket",
+    "bracket_saved": "Bracket saved!",
+    "points_value": "pts",
+    "drag_or_select": "Pick teams for each round",
+    "matches_tab": "Knockout Matches",
+    "bracket_tab": "Bracket Predictions"
   },
   "predictions": {
     "title": "Your Predictions",
@@ -79,6 +96,17 @@
     "code_label": "Code",
     "league_name": "League name",
     "no_members": "No members"
+  },
+  "profile": {
+    "title": "My Profile",
+    "login_required": "Please log in to view your profile.",
+    "rank": "Global Rank",
+    "match_points": "Match Points",
+    "bracket_points": "Bracket Points",
+    "accuracy": "Perfect Accuracy",
+    "team_id": "Team",
+    "match_breakdown": "Match-by-Match Breakdown",
+    "no_breakdown": "No matches have been scored yet."
   },
   "admin": {
     "title": "Admin Panel",

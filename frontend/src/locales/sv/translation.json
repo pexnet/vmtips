@@ -4,6 +4,7 @@
     "home": "Hem",
     "matches": "Matcher",
     "predictions": "Tips",
+    "knockout": "Slutspel",
     "leaderboard": "Topplista",
     "leagues": "Ligor",
     "login": "Logga in",
@@ -38,6 +39,22 @@
     "semi_final": "Semifinal",
     "match_for_third_place": "Bronsmatch",
     "final": "Final"
+  },
+  "knockout": {
+    "title": "Slutspelsbracket",
+    "subtitle": "Tippa vilka lag som går vidare i varje omgång",
+    "round_of_32": "Sextondelsfinal",
+    "round_of_16": "Åttondelsfinal",
+    "quarter_final": "Kvartsfinal",
+    "semi_final": "Semifinal",
+    "final": "Final",
+    "select_team": "Välj lag",
+    "save_bracket": "Spara bracket",
+    "bracket_saved": "Bracket sparad!",
+    "points_value": "p",
+    "drag_or_select": "Välj lag för varje omgång",
+    "matches_tab": "Slutspelsmatcher",
+    "bracket_tab": "Bracktips"
   },
   "predictions": {
     "title": "Dina tips",
@@ -79,6 +96,17 @@
     "code_label": "Kod",
     "league_name": "Liganamn",
     "no_members": "Inga medlemmar"
+  },
+  "profile": {
+    "title": "Min profil",
+    "login_required": "Logga in för att se din profil.",
+    "rank": "Global rankning",
+    "match_points": "Matchpoäng",
+    "bracket_points": "Slutspespoäng",
+    "accuracy": "Perfekt träff",
+    "team_id": "Lag",
+    "match_breakdown": "Matchför-match-genomgång",
+    "no_breakdown": "Inga matcher har poängsatts ännu."
   },
   "admin": {
     "title": "Adminpanel",

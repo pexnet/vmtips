@@ -63,6 +63,9 @@ export const predictionsApi = {
     top_assist_name?: string;
     total_goals?: number;
   }) => api.post("/predictions/tournament", data),
+  bracket: () => api.get("/predictions/bracket"),
+  saveBracket: (entries: Array<{ team_id: number; round: string }>) =>
+    api.post("/predictions/bracket", { entries }),
 };
 
 // Leagues

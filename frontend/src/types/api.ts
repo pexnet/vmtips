@@ -105,13 +105,22 @@ export interface ScoreBreakdown {
   perfect: boolean;
 }
 
+export interface BracketDetail {
+  team_id: number;
+  round: string;
+  points: number;
+}
+
 export interface PersonalScore {
   user_id: number;
   display_name: string;
   total_points: number;
+  match_points: number;
+  bracket_points: number;
   predictions_made: number;
   matches_scored: number;
   perfect_predictions: number;
+  bracket_details: BracketDetail[];
   breakdown: ScoreBreakdown[];
 }
 
@@ -128,6 +137,14 @@ export interface LeagueLeaderboardResponse {
 
 export interface UserLeaguesResponse {
   leagues: League[];
+}
+
+// ── Bracket Predictions ──────────────────────────────────────
+
+export interface BracketPredictionEntry {
+  id?: number;
+  team_id: number;
+  round: string;
 }
 
 // ── Helper: extract error detail from axios errors ───────────
