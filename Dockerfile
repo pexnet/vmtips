@@ -13,8 +13,8 @@ FROM python:3.11-slim AS production
 
 WORKDIR /app
 
-# Create data directory for SQLite
-RUN mkdir -p /app/data
+# Create non-root user and data directory
+RUN useradd --create-home appuser && mkdir -p /app/data && chown -R appuser:appuser /app
 
 # Backend deps
 COPY backend/requirements.txt ./
@@ -28,6 +28,9 @@ COPY --from=frontend-build /app/dist ./static
 
 # Make startup script executable
 RUN chmod +x start.sh
+
+# Switch to non-root user
+USER appuser
 
 EXPOSE 8000
 

@@ -39,14 +39,14 @@ Then open **http://localhost:8000**
 
 | Variable | Default | Required | Description |
 |----------|---------|----------|-------------|
-| `SECRET_KEY` | `change-me-in-production` | **Yes** | JWT signing secret — **change this** |
+| `JWT_SECRET_KEY` | `change-me-in-production` | **Yes** | JWT signing secret — **change this** |
 | `CORS_ORIGINS` | `http://localhost:8000` | No | Comma-separated allowed origins |
 | `DATABASE_URL` | `sqlite:///app/data/vmtips.db` | No | SQLite database path |
 
 Set them in a `.env` file or pass directly:
 
 ```bash
-SECRET_KEY=my-secret-key docker compose up --build
+JWT_SECRET_KEY=my-secret-key docker compose up --build
 ```
 
 ## Features
