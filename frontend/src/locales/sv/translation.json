@@ -12,25 +12,25 @@
   },
   "auth": {
     "email": "E-post",
-    "password": "Losenord",
+    "password": "Lösenord",
     "display_name": "Visningsnamn",
     "login": "Logga in",
     "register": "Registrera",
     "no_account": "Har du inget konto? Registrera dig",
     "has_account": "Har du redan ett konto? Logga in",
-    "logout_confirm": "Ar du saker pa att du vill logga ut?"
+    "logout_confirm": "Är du säker på att du vill logga ut?"
   },
   "matches": {
     "title": "VM 2026 Matcher",
     "group_stage": "Gruppspel",
     "knockout": "Slutspel",
-    "round": "Omgang",
+    "round": "Omgång",
     "group": "Grupp",
     "home": "Hemma",
     "away": "Borta",
     "predicted": "Ditt tips",
     "result": "Resultat",
-    "locked": "Las",
+    "locked": "Låst",
     "save_predictions": "Spara tips"
   },
   "predictions": {
@@ -38,11 +38,11 @@
     "save_success": "Tipsen sparade!",
     "all_matches_tipped": "Du har tippat alla matcher.",
     "missing_predictions": "Matcher utan tips",
-    "tournament_bonuses": "Bonusfragor",
+    "tournament_bonuses": "Bonusfrågor",
     "winner": "Vinnare",
     "top_scorer": "Skyttekung",
     "top_assist": "Assistkung",
-    "total_goals": "Totalt antal mal"
+    "total_goals": "Totalt antal mål"
   },
   "leaderboard": {
     "title": "Topplista",
@@ -50,15 +50,15 @@
     "league": "Liga",
     "rank": "Rank",
     "player": "Spelare",
-    "points": "Poang",
+    "points": "Poäng",
     "predictions": "Antal tips",
     "perfect": "Perfekta tips",
-    "no_data": "Inga resultat annu"
+    "no_data": "Inga resultat ännu"
   },
   "leagues": {
     "title": "Ligor",
     "create": "Skapa ny liga",
-    "join": "Ga med i liga",
+    "join": "Gå med i liga",
     "invite_code": "Inbjudningskod",
     "members": "Medlemmar",
     "admin": "Admin"
@@ -66,18 +66,18 @@
   "common": {
     "cancel": "Avbryt",
     "save": "Spara",
-    "close": "Stang",
+    "close": "Stäng",
     "loading": "Laddar...",
     "error": "Ett fel uppstod",
-    "retry": "Forsok igen",
+    "retry": "Försök igen",
     "success": "Klart!",
-    "confirm": "Bekrafta",
-    "dark_mode": "Morkt lage",
-    "light_mode": "Ljust lage",
-    "language": "Sprak"
+    "confirm": "Bekräfta",
+    "dark_mode": "Mörkt läge",
+    "light_mode": "Ljust läge",
+    "language": "Språk"
   },
   "wc2026": {
     "dates": "11 juni – 19 juli 2026",
-    "location": "USA, Kanada, Mexico"
+    "location": "USA, Kanada, Mexiko"
   }
 }
