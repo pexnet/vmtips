@@ -123,3 +123,10 @@ class LeagueOut(BaseModel):
 class LeagueDetailOut(LeagueOut):
     is_admin: bool
     members: list[LeagueMemberOut]
+
+
+# ── Admin ─────────────────────────────────────────────────────
+
+class MatchResultUpdate(BaseModel):
+    home_goals: int
+    away_goals: int
