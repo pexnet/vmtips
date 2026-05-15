@@ -2,6 +2,7 @@
 SQLAlchemy ORM models for the VMTips application.
 """
 import datetime
+from datetime import timezone
 from sqlalchemy import (
     Column,
     Integer,
@@ -17,6 +18,11 @@ from sqlalchemy.orm import relationship
 from database import Base
 
 
+def _utcnow():
+    """Return current UTC time as a timezone-aware datetime."""
+    return datetime.datetime.now(timezone.utc)
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -24,7 +30,7 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     display_name = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
 
     predictions = relationship("Prediction", back_populates="user", cascade="all, delete-orphan")
     tournament_bonuses = relationship("TournamentBonus", back_populates="user", uselist=False, cascade="all, delete-orphan")
@@ -78,8 +84,8 @@ class Prediction(Base):
     match_id = Column(Integer, ForeignKey("matches.id"), nullable=False)
     home_goals = Column(Integer, nullable=False)
     away_goals = Column(Integer, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     user = relationship("User", back_populates="predictions")
     match = relationship("Match", back_populates="predictions")
@@ -93,7 +99,7 @@ class League(Base):
     invite_code = Column(String(6), unique=True, nullable=False)
     is_public = Column(Boolean, default=False)
     admin_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
 
     admin = relationship("User")
     members = relationship("LeagueMember", back_populates="league", cascade="all, delete-orphan")
@@ -110,7 +116,7 @@ class LeagueMember(Base):
     id = Column(Integer, primary_key=True, index=True)
     league_id = Column(Integer, ForeignKey("leagues.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    joined_at = Column(DateTime, default=datetime.datetime.utcnow)
+    joined_at = Column(DateTime, default=_utcnow)
 
     league = relationship("League", back_populates="members")
     user = relationship("User", back_populates="league_memberships")
@@ -125,8 +131,8 @@ class TournamentBonus(Base):
     top_scorer_name = Column(String)
     top_assist_name = Column(String)
     total_goals = Column(Integer)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     user = relationship("User", back_populates="tournament_bonuses")
     winner_team = relationship("Team")
@@ -140,7 +146,7 @@ class LeagueBonusQuestion(Base):
     question_text = Column(String, nullable=False)
     points_value = Column(Integer, nullable=False)
     answer = Column(String)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
 
     league = relationship("League", back_populates="bonus_questions")
     answers = relationship("LeagueBonusAnswer", back_populates="question", cascade="all, delete-orphan")
@@ -170,7 +176,7 @@ class Score(Base):
     tournament_bonus_points = Column(Integer, default=0)
     league_bonus_points = Column(Integer, default=0)
     total_points = Column(Integer, default=0)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     user = relationship("User", back_populates="scores")
     league = relationship("League", back_populates="scores")

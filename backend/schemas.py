@@ -1,14 +1,36 @@
 """
 Pydantic schemas for request/response validation.
 """
+import math
+from typing import Generic, TypeVar
+
 from pydantic import BaseModel, EmailStr, Field
+
+T = TypeVar("T")
+
+
+# ── Pagination ─────────────────────────────────────────────
+
+class PaginationParams(BaseModel):
+    """Query parameters for paginated list endpoints."""
+    page: int = Field(default=1, ge=1, description="Page number (1-indexed)")
+    per_page: int = Field(default=50, ge=1, le=200, description="Items per page")
+
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    """Wrapper for paginated list responses."""
+    items: list[T]
+    total: int
+    page: int
+    per_page: int
+    total_pages: int
 
 
 # ── Auth ────────────────────────────────────────────────────
 
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str = Field(..., min_length=6)
+    password: str = Field(..., min_length=6, max_length=72)
     display_name: str = Field(..., min_length=1, max_length=50)
 
 
@@ -106,7 +128,6 @@ class LeagueJoin(BaseModel):
 class LeagueMemberOut(BaseModel):
     id: int
     display_name: str | None = None
-    email: str
 
 
 class LeagueOut(BaseModel):
@@ -128,5 +149,5 @@ class LeagueDetailOut(LeagueOut):
 # ── Admin ─────────────────────────────────────────────────────
 
 class MatchResultUpdate(BaseModel):
-    home_goals: int
-    away_goals: int
+    home_goals: int = Field(..., ge=0, le=30)
+    away_goals: int = Field(..., ge=0, le=30)

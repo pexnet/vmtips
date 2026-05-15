@@ -1,79 +1,184 @@
 """
 Seed script for the VMTips database.
-Populates teams, groups, and all 104 World Cup 2026 matches.
+Populates teams and all 104 World Cup 2026 matches from openfootball data.
+Source: https://github.com/openfootball/worldcup.json
 Run: cd backend && uv run python seed.py
 """
 import datetime
 from database import SessionLocal, engine, Base
 from models import Team, Match
 
-# ─────────────────────────────────────────────────────────────
-# 48 teams across 12 groups (A–L).
-# Update this list when qualification is fully known.
-# Each entry: (name, fifa_code, group, flag_emoji)
-# ─────────────────────────────────────────────────────────────
 TEAM_DATA = [
-    # Group A
-    ("Qatar", "QAT", "A", "🇶🇦"),
-    ("Ecuador", "ECU", "A", "🇪🇨"),
-    ("Senegal", "SEN", "A", "🇸🇳"),
-    ("Netherlands", "NED", "A", "🇳🇱"),
-    # Group B
-    ("England", "ENG", "B", "🏴󠁧󠁢󠁥󠁮󠁧󠁿"),
-    ("Iran", "IRN", "B", "🇮🇷"),
-    ("USA", "USA", "B", "🇺🇸"),
-    ("Wales", "WAL", "B", "🏴󠁧󠁢󠁷󠁬󠁳󠁿"),
-    # Group C
-    ("Argentina", "ARG", "C", "🇦🇷"),
-    ("Saudi Arabia", "KSA", "C", "🇸🇦"),
-    ("Mexico", "MEX", "C", "🇲🇽"),
-    ("Poland", "POL", "C", "🇵🇱"),
-    # Group D
-    ("France", "FRA", "D", "🇫🇷"),
+    ("Czech Republic", "CZE", "A", "🇨🇿"),
+    ("Mexico", "MEX", "A", "🇲🇽"),
+    ("South Africa", "RSA", "A", "🇿🇦"),
+    ("South Korea", "KOR", "A", "🇰🇷"),
+    ("Bosnia & Herzegovina", "BIH", "B", "🇧🇦"),
+    ("Canada", "CAN", "B", "🇨🇦"),
+    ("Qatar", "QAT", "B", "🇶🇦"),
+    ("Switzerland", "SUI", "B", "🇨🇭"),
+    ("Brazil", "BRA", "C", "🇧🇷"),
+    ("Haiti", "HAI", "C", "🇭🇹"),
+    ("Morocco", "MAR", "C", "🇲🇦"),
+    ("Scotland", "SCO", "C", "🏴󠁧󠁢󠁳󠁣󠁴󠁿"),
     ("Australia", "AUS", "D", "🇦🇺"),
-    ("Denmark", "DEN", "D", "🇩🇰"),
-    ("Tunisia", "TUN", "D", "🇹🇳"),
-    # Group E
-    ("Spain", "ESP", "E", "🇪🇸"),
-    ("Costa Rica", "CRC", "E", "🇨🇷"),
+    ("Paraguay", "PAR", "D", "🇵🇾"),
+    ("Turkey", "TUR", "D", "🇹🇷"),
+    ("USA", "USA", "D", "🇺🇸"),
+    ("Curaçao", "CUW", "E", "🇨🇼"),
+    ("Ecuador", "ECU", "E", "🇪🇨"),
     ("Germany", "GER", "E", "🇩🇪"),
-    ("Japan", "JPN", "E", "🇯🇵"),
-    # Group F
-    ("Belgium", "BEL", "F", "🇧🇪"),
-    ("Canada", "CAN", "F", "🇨🇦"),
-    ("Morocco", "MAR", "F", "🇲🇦"),
-    ("Croatia", "CRO", "F", "🇭🇷"),
-    # Group G
-    ("Brazil", "BRA", "G", "🇧🇷"),
-    ("Serbia", "SRB", "G", "🇷🇸"),
-    ("Switzerland", "SUI", "G", "🇨🇭"),
-    ("Cameroon", "CMR", "G", "🇨🇲"),
-    # Group H
-    ("Portugal", "POR", "H", "🇵🇹"),
-    ("Ghana", "GHA", "H", "🇬🇭"),
+    ("Ivory Coast", "CIV", "E", "🇨🇮"),
+    ("Japan", "JPN", "F", "🇯🇵"),
+    ("Netherlands", "NED", "F", "🇳🇱"),
+    ("Sweden", "SWE", "F", "🇸🇪"),
+    ("Tunisia", "TUN", "F", "🇹🇳"),
+    ("Belgium", "BEL", "G", "🇧🇪"),
+    ("Egypt", "EGY", "G", "🇪🇬"),
+    ("Iran", "IRN", "G", "🇮🇷"),
+    ("New Zealand", "NZL", "G", "🇳🇿"),
+    ("Cape Verde", "CPV", "H", "🇨🇻"),
+    ("Saudi Arabia", "KSA", "H", "🇸🇦"),
+    ("Spain", "ESP", "H", "🇪🇸"),
     ("Uruguay", "URU", "H", "🇺🇾"),
-    ("South Korea", "KOR", "H", "🇰🇷"),
-    # Group I
-    ("Italy", "ITA", "I", "🇮🇹"),
-    ("Ukraine", "UKR", "I", "🇺🇦"),
-    ("Scotland", "SCO", "I", "🏴󠁧󠁢󠁳󠁣󠁴󠁿"),
-    ("Turkey", "TUR", "I", "🇹🇷"),
-    # Group J
-    ("Sweden", "SWE", "J", "🇸🇪"),
-    ("Norway", "NOR", "J", "🇳🇴"),
-    ("Czech Republic", "CZE", "J", "🇨🇿"),
-    ("Hungary", "HUN", "J", "🇭🇺"),
-    # Group K
+    ("France", "FRA", "I", "🇫🇷"),
+    ("Iraq", "IRQ", "I", "🇮🇶"),
+    ("Norway", "NOR", "I", "🇳🇴"),
+    ("Senegal", "SEN", "I", "🇸🇳"),
+    ("Algeria", "ALG", "J", "🇩🇿"),
+    ("Argentina", "ARG", "J", "🇦🇷"),
+    ("Austria", "AUT", "J", "🇦🇹"),
+    ("Jordan", "JOR", "J", "🇯🇴"),
     ("Colombia", "COL", "K", "🇨🇴"),
-    ("Peru", "PER", "K", "🇵🇪"),
-    ("Chile", "CHI", "K", "🇨🇱"),
-    ("Paraguay", "PAR", "K", "🇵🇾"),
-    # Group L
-    ("Nigeria", "NGA", "L", "🇳🇬"),
-    ("Egypt", "EGY", "L", "🇪🇬"),
-    ("Algeria", "ALG", "L", "🇩🇿"),
-    ("Ivory Coast", "CIV", "L", "🇨🇮"),
+    ("DR Congo", "COD", "K", "🇨🇩"),
+    ("Portugal", "POR", "K", "🇵🇹"),
+    ("Uzbekistan", "UZB", "K", "🇺🇿"),
+    ("Croatia", "CRO", "L", "🇭🇷"),
+    ("England", "ENG", "L", "🏴󠁧󠁢󠁥󠁮󠁧󠁿"),
+    ("Ghana", "GHA", "L", "🇬🇭"),
+    ("Panama", "PAN", "L", "🇵🇦"),
 ]
+
+GROUP_MATCHES = [
+    (1, "A", "Mexico", "South Africa", datetime.datetime(2026, 6, 11, 19, 0)),
+    (2, "A", "South Korea", "Czech Republic", datetime.datetime(2026, 6, 12, 2, 0)),
+    (3, "A", "Czech Republic", "South Africa", datetime.datetime(2026, 6, 18, 16, 0)),
+    (4, "A", "Mexico", "South Korea", datetime.datetime(2026, 6, 19, 1, 0)),
+    (5, "A", "Czech Republic", "Mexico", datetime.datetime(2026, 6, 25, 1, 0)),
+    (6, "A", "South Africa", "South Korea", datetime.datetime(2026, 6, 25, 1, 0)),
+    (7, "B", "Canada", "Bosnia & Herzegovina", datetime.datetime(2026, 6, 12, 19, 0)),
+    (8, "B", "Qatar", "Switzerland", datetime.datetime(2026, 6, 13, 19, 0)),
+    (9, "B", "Switzerland", "Bosnia & Herzegovina", datetime.datetime(2026, 6, 18, 19, 0)),
+    (10, "B", "Canada", "Qatar", datetime.datetime(2026, 6, 18, 22, 0)),
+    (11, "B", "Switzerland", "Canada", datetime.datetime(2026, 6, 24, 19, 0)),
+    (12, "B", "Bosnia & Herzegovina", "Qatar", datetime.datetime(2026, 6, 24, 19, 0)),
+    (13, "C", "Brazil", "Morocco", datetime.datetime(2026, 6, 13, 22, 0)),
+    (14, "C", "Haiti", "Scotland", datetime.datetime(2026, 6, 14, 1, 0)),
+    (15, "C", "Scotland", "Morocco", datetime.datetime(2026, 6, 19, 22, 0)),
+    (16, "C", "Brazil", "Haiti", datetime.datetime(2026, 6, 20, 0, 30)),
+    (17, "C", "Scotland", "Brazil", datetime.datetime(2026, 6, 24, 22, 0)),
+    (18, "C", "Morocco", "Haiti", datetime.datetime(2026, 6, 24, 22, 0)),
+    (19, "D", "USA", "Paraguay", datetime.datetime(2026, 6, 13, 1, 0)),
+    (20, "D", "Australia", "Turkey", datetime.datetime(2026, 6, 14, 4, 0)),
+    (21, "D", "USA", "Australia", datetime.datetime(2026, 6, 19, 19, 0)),
+    (22, "D", "Turkey", "Paraguay", datetime.datetime(2026, 6, 20, 3, 0)),
+    (23, "D", "Turkey", "USA", datetime.datetime(2026, 6, 26, 2, 0)),
+    (24, "D", "Paraguay", "Australia", datetime.datetime(2026, 6, 26, 2, 0)),
+    (25, "E", "Germany", "Curaçao", datetime.datetime(2026, 6, 14, 17, 0)),
+    (26, "E", "Ivory Coast", "Ecuador", datetime.datetime(2026, 6, 14, 23, 0)),
+    (27, "E", "Germany", "Ivory Coast", datetime.datetime(2026, 6, 20, 20, 0)),
+    (28, "E", "Ecuador", "Curaçao", datetime.datetime(2026, 6, 21, 0, 0)),
+    (29, "E", "Curaçao", "Ivory Coast", datetime.datetime(2026, 6, 25, 20, 0)),
+    (30, "E", "Ecuador", "Germany", datetime.datetime(2026, 6, 25, 20, 0)),
+    (31, "F", "Netherlands", "Japan", datetime.datetime(2026, 6, 14, 20, 0)),
+    (32, "F", "Sweden", "Tunisia", datetime.datetime(2026, 6, 15, 2, 0)),
+    (33, "F", "Netherlands", "Sweden", datetime.datetime(2026, 6, 20, 17, 0)),
+    (34, "F", "Tunisia", "Japan", datetime.datetime(2026, 6, 21, 4, 0)),
+    (35, "F", "Japan", "Sweden", datetime.datetime(2026, 6, 25, 23, 0)),
+    (36, "F", "Tunisia", "Netherlands", datetime.datetime(2026, 6, 25, 23, 0)),
+    (37, "G", "Belgium", "Egypt", datetime.datetime(2026, 6, 15, 19, 0)),
+    (38, "G", "Iran", "New Zealand", datetime.datetime(2026, 6, 16, 1, 0)),
+    (39, "G", "Belgium", "Iran", datetime.datetime(2026, 6, 21, 19, 0)),
+    (40, "G", "New Zealand", "Egypt", datetime.datetime(2026, 6, 22, 1, 0)),
+    (41, "G", "Egypt", "Iran", datetime.datetime(2026, 6, 27, 3, 0)),
+    (42, "G", "New Zealand", "Belgium", datetime.datetime(2026, 6, 27, 3, 0)),
+    (43, "H", "Spain", "Cape Verde", datetime.datetime(2026, 6, 15, 16, 0)),
+    (44, "H", "Saudi Arabia", "Uruguay", datetime.datetime(2026, 6, 15, 22, 0)),
+    (45, "H", "Spain", "Saudi Arabia", datetime.datetime(2026, 6, 21, 16, 0)),
+    (46, "H", "Uruguay", "Cape Verde", datetime.datetime(2026, 6, 21, 22, 0)),
+    (47, "H", "Cape Verde", "Saudi Arabia", datetime.datetime(2026, 6, 27, 0, 0)),
+    (48, "H", "Uruguay", "Spain", datetime.datetime(2026, 6, 27, 0, 0)),
+    (49, "I", "France", "Senegal", datetime.datetime(2026, 6, 16, 19, 0)),
+    (50, "I", "Iraq", "Norway", datetime.datetime(2026, 6, 16, 22, 0)),
+    (51, "I", "France", "Iraq", datetime.datetime(2026, 6, 22, 21, 0)),
+    (52, "I", "Norway", "Senegal", datetime.datetime(2026, 6, 23, 0, 0)),
+    (53, "I", "Norway", "France", datetime.datetime(2026, 6, 26, 19, 0)),
+    (54, "I", "Senegal", "Iraq", datetime.datetime(2026, 6, 26, 19, 0)),
+    (55, "J", "Argentina", "Algeria", datetime.datetime(2026, 6, 17, 1, 0)),
+    (56, "J", "Austria", "Jordan", datetime.datetime(2026, 6, 17, 4, 0)),
+    (57, "J", "Argentina", "Austria", datetime.datetime(2026, 6, 22, 17, 0)),
+    (58, "J", "Jordan", "Algeria", datetime.datetime(2026, 6, 23, 3, 0)),
+    (59, "J", "Algeria", "Austria", datetime.datetime(2026, 6, 28, 2, 0)),
+    (60, "J", "Jordan", "Argentina", datetime.datetime(2026, 6, 28, 2, 0)),
+    (61, "K", "Portugal", "DR Congo", datetime.datetime(2026, 6, 17, 17, 0)),
+    (62, "K", "Uzbekistan", "Colombia", datetime.datetime(2026, 6, 18, 2, 0)),
+    (63, "K", "Portugal", "Uzbekistan", datetime.datetime(2026, 6, 23, 17, 0)),
+    (64, "K", "Colombia", "DR Congo", datetime.datetime(2026, 6, 24, 2, 0)),
+    (65, "K", "Colombia", "Portugal", datetime.datetime(2026, 6, 27, 23, 30)),
+    (66, "K", "DR Congo", "Uzbekistan", datetime.datetime(2026, 6, 27, 23, 30)),
+    (67, "L", "England", "Croatia", datetime.datetime(2026, 6, 17, 20, 0)),
+    (68, "L", "Ghana", "Panama", datetime.datetime(2026, 6, 17, 23, 0)),
+    (69, "L", "England", "Ghana", datetime.datetime(2026, 6, 23, 20, 0)),
+    (70, "L", "Panama", "Croatia", datetime.datetime(2026, 6, 23, 23, 0)),
+    (71, "L", "Panama", "England", datetime.datetime(2026, 6, 27, 21, 0)),
+    (72, "L", "Croatia", "Ghana", datetime.datetime(2026, 6, 27, 21, 0)),
+]
+
+KNOCKOUT_MATCHES = [
+    (73, "round_of_32", "2A", "2B", datetime.datetime(2026, 6, 28, 19, 0)),
+    (74, "round_of_32", "1E", "3A/B/C/D/F", datetime.datetime(2026, 6, 29, 20, 30)),
+    (75, "round_of_32", "1F", "2C", datetime.datetime(2026, 6, 30, 1, 0)),
+    (76, "round_of_32", "1C", "2F", datetime.datetime(2026, 6, 29, 17, 0)),
+    (77, "round_of_32", "1I", "3C/D/F/G/H", datetime.datetime(2026, 6, 30, 21, 0)),
+    (78, "round_of_32", "2E", "2I", datetime.datetime(2026, 6, 30, 17, 0)),
+    (79, "round_of_32", "1A", "3C/E/F/H/I", datetime.datetime(2026, 7, 1, 1, 0)),
+    (80, "round_of_32", "1L", "3E/H/I/J/K", datetime.datetime(2026, 7, 1, 16, 0)),
+    (81, "round_of_32", "1D", "3B/E/F/I/J", datetime.datetime(2026, 7, 2, 0, 0)),
+    (82, "round_of_32", "1G", "3A/E/H/I/J", datetime.datetime(2026, 7, 1, 20, 0)),
+    (83, "round_of_32", "2K", "2L", datetime.datetime(2026, 7, 2, 23, 0)),
+    (84, "round_of_32", "1H", "2J", datetime.datetime(2026, 7, 2, 19, 0)),
+    (85, "round_of_32", "1B", "3E/F/G/I/J", datetime.datetime(2026, 7, 3, 3, 0)),
+    (86, "round_of_32", "1J", "2H", datetime.datetime(2026, 7, 3, 22, 0)),
+    (87, "round_of_32", "1K", "3D/E/I/J/L", datetime.datetime(2026, 7, 4, 1, 30)),
+    (88, "round_of_32", "2D", "2G", datetime.datetime(2026, 7, 3, 18, 0)),
+    (89, "round_of_16", "W74", "W77", datetime.datetime(2026, 7, 4, 21, 0)),
+    (90, "round_of_16", "W73", "W75", datetime.datetime(2026, 7, 4, 17, 0)),
+    (91, "round_of_16", "W76", "W78", datetime.datetime(2026, 7, 5, 20, 0)),
+    (92, "round_of_16", "W79", "W80", datetime.datetime(2026, 7, 6, 0, 0)),
+    (93, "round_of_16", "W83", "W84", datetime.datetime(2026, 7, 6, 19, 0)),
+    (94, "round_of_16", "W81", "W82", datetime.datetime(2026, 7, 7, 0, 0)),
+    (95, "round_of_16", "W86", "W88", datetime.datetime(2026, 7, 7, 16, 0)),
+    (96, "round_of_16", "W85", "W87", datetime.datetime(2026, 7, 7, 20, 0)),
+    (97, "quarter_final", "W89", "W90", datetime.datetime(2026, 7, 9, 20, 0)),
+    (98, "quarter_final", "W93", "W94", datetime.datetime(2026, 7, 10, 19, 0)),
+    (99, "quarter_final", "W91", "W92", datetime.datetime(2026, 7, 11, 21, 0)),
+    (100, "quarter_final", "W95", "W96", datetime.datetime(2026, 7, 12, 1, 0)),
+    (101, "semi_final", "W97", "W98", datetime.datetime(2026, 7, 14, 19, 0)),
+    (102, "semi_final", "W99", "W100", datetime.datetime(2026, 7, 15, 19, 0)),
+    (103, "match_for_third_place", "L101", "L102", datetime.datetime(2026, 7, 18, 21, 0)),
+    (104, "final", "W101", "W102", datetime.datetime(2026, 7, 19, 19, 0)),
+]
+
+
+def _get_team_id(db, team_name):
+    """Look up a team by name. Returns None for placeholder names."""
+    if team_name.startswith(("1", "2", "3", "W", "L")):
+        return None
+    team = db.query(Team).filter(Team.name == team_name).first()
+    if team is None:
+        if len(team_name) == 3 and team_name.isupper():
+            team = db.query(Team).filter(Team.code == team_name).first()
+    return team.id if team else None
 
 
 def seed_teams(db):
@@ -87,95 +192,31 @@ def seed_teams(db):
 
 
 def seed_group_matches(db):
-    """Create all 72 group-stage matches with realistic FIFA dates."""
+    """Create all 72 group-stage matches."""
     existing = db.query(Match.match_number).filter(Match.round == "group").count()
     if existing == 72:
         print("[seed] Group matches already present, skipping")
         return
 
-    match_num = 1
     matches = []
-
-    group_dates = {
-        "A": [datetime.datetime(2026, 6, 11, 15, 0, 0),
-              datetime.datetime(2026, 6, 18, 12, 0, 0),
-              datetime.datetime(2026, 6, 24, 21, 0, 0)],
-        "B": [datetime.datetime(2026, 6, 12, 15, 0, 0),
-              datetime.datetime(2026, 6, 18, 15, 0, 0),
-              datetime.datetime(2026, 6, 24, 15, 0, 0)],
-        "C": [datetime.datetime(2026, 6, 13, 18, 0, 0),
-              datetime.datetime(2026, 6, 19, 18, 0, 0),
-              datetime.datetime(2026, 6, 24, 18, 0, 0)],
-        "D": [datetime.datetime(2026, 6, 12, 21, 0, 0),
-              datetime.datetime(2026, 6, 19, 15, 0, 0),
-              datetime.datetime(2026, 6, 25, 22, 0, 0)],
-        "E": [datetime.datetime(2026, 6, 14, 13, 0, 0),
-              datetime.datetime(2026, 6, 20, 16, 0, 0),
-              datetime.datetime(2026, 6, 25, 16, 0, 0)],
-        "F": [datetime.datetime(2026, 6, 14, 16, 0, 0),
-              datetime.datetime(2026, 6, 20, 13, 0, 0),
-              datetime.datetime(2026, 6, 25, 19, 0, 0)],
-        "G": [datetime.datetime(2026, 6, 15, 15, 0, 0),
-              datetime.datetime(2026, 6, 21, 15, 0, 0),
-              datetime.datetime(2026, 6, 26, 23, 0, 0)],
-        "H": [datetime.datetime(2026, 6, 15, 12, 0, 0),
-              datetime.datetime(2026, 6, 21, 12, 0, 0),
-              datetime.datetime(2026, 6, 26, 20, 0, 0)],
-        "I": [datetime.datetime(2026, 6, 16, 19, 0, 0),
-              datetime.datetime(2026, 6, 22, 20, 0, 0),
-              datetime.datetime(2026, 6, 27, 12, 0, 0)],
-        "J": [datetime.datetime(2026, 6, 16, 21, 0, 0),
-              datetime.datetime(2026, 6, 22, 15, 0, 0),
-              datetime.datetime(2026, 6, 27, 15, 0, 0)],
-        "K": [datetime.datetime(2026, 6, 17, 13, 0, 0),
-              datetime.datetime(2026, 6, 23, 15, 0, 0),
-              datetime.datetime(2026, 6, 27, 18, 0, 0)],
-        "L": [datetime.datetime(2026, 6, 17, 15, 0, 0),
-              datetime.datetime(2026, 6, 23, 21, 0, 0),
-              datetime.datetime(2026, 6, 27, 21, 0, 0)],
-    }
-
-    for group in ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"]:
-        teams = (
-            db.query(Team)
-            .filter(Team.group == group)
-            .order_by(Team.id)
-            .all()
-        )
-        t1, t2, t3, t4 = teams
-
-        dates = group_dates[group]
-        fixtures = [
-            (t1, t2, dates[0]),
-            (t3, t4, dates[0] + datetime.timedelta(hours=4)),
-            (t1, t3, dates[1]),
-            (t2, t4, dates[1] + datetime.timedelta(hours=4)),
-            (t1, t4, dates[2]),
-            (t2, t3, dates[2] + datetime.timedelta(hours=4)),
-        ]
-
-        for home, away, match_date in fixtures:
-            matches.append(
-                Match(
-                    match_number=match_num,
-                    group=group,
-                    round="group",
-                    home_team_id=home.id,
-                    away_team_id=away.id,
-                    match_date=match_date,
-                    status="scheduled",
-                )
+    for match_num, group, home_name, away_name, match_date in GROUP_MATCHES:
+        home_id = _get_team_id(db, home_name)
+        away_id = _get_team_id(db, away_name)
+        matches.append(
+            Match(
+                match_number=match_num,
+                group=group,
+                round="group",
+                home_team_id=home_id,
+                away_team_id=away_id,
+                match_date=match_date,
+                status="scheduled",
             )
-            match_num += 1
+        )
 
     db.add_all(matches)
     db.commit()
     print(f"[seed] Inserted {len(matches)} group-stage matches")
-
-
-def _group_matches(db, group: str, match_num_start: int, day_offset: int):
-    """DEPRECATED — kept for backwards compat during transition."""
-    return
 
 
 def seed_knockout_matches(db):
@@ -185,123 +226,44 @@ def seed_knockout_matches(db):
         print("[seed] Knockout matches already present, skipping")
         return
 
-    base_date = datetime.datetime(2026, 6, 28, 16, 0, 0)
-
-    match_num = 73
     matches = []
-    current_date = base_date
-
-    # Round of 32 — placeholders follow FIFA bracket format
-    ro32_fixtures = [
-        ("1A", "2B"), ("1C", "2D"), ("1E", "2F"), ("1G", "2H"),
-        ("1I", "2J"), ("1K", "2L"), ("1B", "2A"), ("1D", "2C"),
-        ("1F", "2E"), ("1H", "2G"), ("1J", "2I"), ("1L", "2K"),
-        ("1A", "3C"), ("1B", "3D"), ("1E", "3G"), ("1F", "3H"),
-    ]
-    for home_ph, away_ph in ro32_fixtures:
+    for match_num, round_name, home_name, away_name, match_date in KNOCKOUT_MATCHES:
+        home_id = _get_team_id(db, home_name)
+        away_id = _get_team_id(db, away_name)
         matches.append(
             Match(
                 match_number=match_num,
-                round="ro32",
-                home_team_placeholder=home_ph,
-                away_team_placeholder=away_ph,
-                match_date=current_date,
+                group=None,
+                round=round_name,
+                home_team_id=home_id,
+                away_team_id=away_id,
+                home_team_placeholder=home_name if home_id is None else None,
+                away_team_placeholder=away_name if away_id is None else None,
+                match_date=match_date,
                 status="scheduled",
             )
         )
-        match_num += 1
-        current_date += datetime.timedelta(hours=4)
-
-    # Round of 16 — 4 July - 7 July
-    current_date = datetime.datetime(2026, 7, 4, 12, 0, 0)
-    for i in range(8):
-        matches.append(
-            Match(
-                match_number=match_num,
-                round="ro16",
-                home_team_placeholder=f"W{i*2+89}",
-                away_team_placeholder=f"W{i*2+90}",
-                match_date=current_date,
-                status="scheduled",
-            )
-        )
-        match_num += 1
-        current_date += datetime.timedelta(hours=8)
-
-    # Quarterfinals — 9-10 July
-    current_date = datetime.datetime(2026, 7, 9, 16, 0, 0)
-    for i in range(4):
-        matches.append(
-            Match(
-                match_number=match_num,
-                round="qf",
-                home_team_placeholder=f"W{i*2+105}",
-                away_team_placeholder=f"W{i*2+106}",
-                match_date=current_date,
-                status="scheduled",
-            )
-        )
-        match_num += 1
-        current_date += datetime.timedelta(hours=16)
-
-    # Semifinals — 14-15 July
-    current_date = datetime.datetime(2026, 7, 14, 16, 0, 0)
-    for i in range(2):
-        matches.append(
-            Match(
-                match_number=match_num,
-                round="sf",
-                home_team_placeholder=f"W{i*2+113}",
-                away_team_placeholder=f"W{i*2+114}",
-                match_date=current_date,
-                status="scheduled",
-            )
-        )
-        match_num += 1
-        current_date += datetime.timedelta(hours=24)
-
-    # 3rd place — 18 July
-    matches.append(
-        Match(
-            match_number=match_num,
-            round="3rd",
-            home_team_placeholder="L117",
-            away_team_placeholder="L118",
-            match_date=datetime.datetime(2026, 7, 18, 16, 0, 0),
-            status="scheduled",
-        )
-    )
-    match_num += 1
-
-    # Final — 19 July
-    matches.append(
-        Match(
-            match_number=match_num,
-            round="final",
-            home_team_placeholder="W117",
-            away_team_placeholder="W118",
-            match_date=datetime.datetime(2026, 7, 19, 16, 0, 0),
-            status="scheduled",
-        )
-    )
 
     db.add_all(matches)
     db.commit()
     print(f"[seed] Inserted {len(matches)} knockout matches")
 
 
-def main():
-    # Ensure tables exist
-    Base.metadata.create_all(bind=engine)
-
-    db = SessionLocal()
+def main(session=None):
+    """Seed the database. If a session is provided, use it (for testing)."""
+    if session is None:
+        Base.metadata.create_all(bind=engine)
+        db = SessionLocal()
+    else:
+        db = session
     try:
         seed_teams(db)
         seed_group_matches(db)
         seed_knockout_matches(db)
-        print("[seed] Done")
+        print("[seed] Database seeded successfully")
     finally:
-        db.close()
+        if session is None:
+            db.close()
 
 
 if __name__ == "__main__":
