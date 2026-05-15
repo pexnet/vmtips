@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Suspense, lazy } from "react";
 import { AppThemeProvider } from "./contexts/ThemeContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { AppQueryClientProvider } from "./contexts/QueryClientProvider";
@@ -13,8 +14,10 @@ import PredictionsPage from "./pages/PredictionsPage";
 import KnockoutPage from "./pages/KnockoutPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import LeaguesPage from "./pages/LeaguesPage";
-import AdminPage from "./pages/AdminPage";
 import ProfilePage from "./pages/ProfilePage";
+import LeagueBonusQuestionsPage from "./pages/LeagueBonusQuestionsPage";
+
+const AdminPage = lazy(() => import("./pages/AdminPage"));
 
 import "./i18n";
 
@@ -63,6 +66,14 @@ export default function App() {
               }
             />
             <Route
+              path="/leagues/:leagueId/bonus-questions"
+              element={
+                <ProtectedRoute>
+                  <LeagueBonusQuestionsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/profile"
               element={
                 <ProtectedRoute>
@@ -74,7 +85,9 @@ export default function App() {
               path="/admin"
               element={
                 <AdminRoute>
-                  <AdminPage />
+                  <Suspense fallback={<div style={{padding: 40, textAlign: 'center'}}>Loading...</div>}>
+                    <AdminPage />
+                  </Suspense>
                 </AdminRoute>
               }
             />

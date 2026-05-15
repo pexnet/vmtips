@@ -1,4 +1,5 @@
 import { useState } from "react";
+
 import { useTranslation } from "react-i18next";
 import {
   Container,
@@ -17,8 +18,44 @@ import {
   CircularProgress,
   Chip,
 } from "@mui/material";
-import { useGlobalLeaderboard, usePersonalScore } from "../hooks/useLeaderboard";
-import type { LeaderboardEntry, ScoreBreakdown } from "../types/api";
+
+import { useGlobalLeaderboard, usePersonalScore, useLeagueLeaderboard } from "../hooks/useLeaderboard";
+import { useLeagues } from "../hooks/useLeagues";
+import type { LeaderboardEntry, ScoreBreakdown, League } from "../types/api";
+
+function LeagueLeaderboardSection() {
+  const { t } = useTranslation();
+  const { data: leagues = [] } = useLeagues();
+  const [selectedLeagueId, setSelectedLeagueId] = useState<number | null>(null);
+  const { data: leagueData, isLoading } = useLeagueLeaderboard(selectedLeagueId);
+
+  return (
+    <Box>
+      <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap" }}>
+        {leagues.map((l: League) => (
+          <Chip
+            key={l.id}
+            label={l.name}
+            onClick={() => setSelectedLeagueId(l.id)}
+            color={selectedLeagueId === l.id ? "primary" : "default"}
+            clickable
+          />
+        ))}
+        {leagues.length === 0 && (
+          <Alert severity="info">{t("leagues.no_leagues")}</Alert>
+        )}
+      </Box>
+      {selectedLeagueId && isLoading ? (
+        <CircularProgress />
+      ) : selectedLeagueId && leagueData && leagueData.leaderboard ? (
+        <Box>
+          <Typography variant="h6" gutterBottom>{leagueData.league_name}</Typography>
+          <LeaderTable data={leagueData.leaderboard} />
+        </Box>
+      ) : null}
+    </Box>
+  );
+}
 
 function LeaderTable({ data }: { data: LeaderboardEntry[] }) {
   const { t } = useTranslation();
@@ -84,9 +121,7 @@ export default function LeaderboardPage() {
       {tab === 0 && <LeaderTable data={global} />}
 
       {tab === 1 && (
-        <Alert severity="info">
-          {t("leaderboard.select_league")}
-        </Alert>
+        <LeagueLeaderboardSection />
       )}
 
       {tab === 2 && personal && (

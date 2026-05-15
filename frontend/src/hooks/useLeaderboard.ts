@@ -24,13 +24,12 @@ export function usePersonalScore() {
 }
 
 export function useLeagueLeaderboard(leagueId: number | null) {
-  return useQuery<LeaderboardEntry[]>({
+  return useQuery<{ leaderboard: LeaderboardEntry[]; league_name: string }>({
     queryKey: ["leaderboard", "league", leagueId],
     queryFn: async () => {
-      if (!leagueId) return [];
+      if (!leagueId) return { leaderboard: [], league_name: "" };
       const res = await leaderboardApi.league(leagueId);
-      const data = res.data as { leaderboard: LeaderboardEntry[] };
-      return data.leaderboard;
+      return res.data as { leaderboard: LeaderboardEntry[]; league_name: string };
     },
     enabled: !!leagueId,
   });

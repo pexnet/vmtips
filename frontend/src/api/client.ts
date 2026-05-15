@@ -75,6 +75,15 @@ export const leaguesApi = {
   detail: (id: number) => api.get(`/leagues/${id}`),
   join: (id: number, invite_code: string) =>
     api.post(`/leagues/${id}/join`, { invite_code }),
+  public: () => api.get("/leagues/public"),
+  listBonusQuestions: (league_id: number) =>
+    api.get(`/leagues/${league_id}/bonus-questions`),
+  createBonusQuestion: (league_id: number, payload: { question_text: string; points_value: number; answer?: string }) =>
+    api.post(`/leagues/${league_id}/bonus-questions`, payload),
+  updateBonusQuestion: (league_id: number, question_id: number, payload: { question_text?: string; points_value?: number; answer?: string }) =>
+    api.patch(`/leagues/${league_id}/bonus-questions/${question_id}`, payload),
+  deleteBonusQuestion: (league_id: number, question_id: number) =>
+    api.delete(`/leagues/${league_id}/bonus-questions/${question_id}`),
 };
 
 // Leaderboard
@@ -90,6 +99,19 @@ export const adminApi = {
     api.post(`/admin/matches/${id}/result`, data),
   sync: () => api.post("/admin/sync-results"),
   recalc: () => api.post("/admin/scores/recalculate"),
+  tournamentResult: () => api.get("/admin/tournament-result"),
+  setTournamentResult: (data: {
+    winner_team_id?: number;
+    top_scorer_name?: string;
+    top_assist_name?: string;
+    total_goals?: number;
+  }) => api.post("/admin/tournament-result", data),
+  syncConfig: () => api.get("/admin/sync-config"),
+  updateSyncConfig: (data: {
+    source?: string;
+    auto_sync_enabled?: boolean;
+    auto_sync_interval_minutes?: number;
+  }) => api.post("/admin/sync-config", data),
 };
 
 export default api;

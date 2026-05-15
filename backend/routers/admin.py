@@ -4,12 +4,14 @@ All endpoints require admin status (checked via user_id against env ADMIN_USER_I
 """
 import os
 
-from fastapi import APIRouter, Depends, status
+from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from config import settings
 from database import get_db
 from errors import NotFoundError, ForbiddenError
-from models import Match, User, Prediction, Score, BracketPrediction
+from models import Match, User, Prediction, Score, BracketPrediction, TournamentResult
 from schemas import MatchResultUpdate
 from security import fetch_current_user
 from scoring import calculate_match_points, calculate_bracket_points, BRACKET_ROUND_POINTS
@@ -19,6 +21,8 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 def _is_admin(current_user: User) -> bool:
     """Check if current user is the designated admin."""
+    if current_user.is_admin:
+        return True
     admin_id_env = os.environ.get("ADMIN_USER_ID")
     if admin_id_env:
         return str(current_user.id) == admin_id_env
@@ -31,6 +35,66 @@ def require_admin(current_user: User = Depends(fetch_current_user)) -> User:
     if not _is_admin(current_user):
         raise ForbiddenError(detail="admin_only", error_code="admin_only")
     return current_user
+
+
+class TournamentResultUpdate(BaseModel):
+    winner_team_id: int | None = None
+    top_scorer_name: str | None = None
+    top_assist_name: str | None = None
+    total_goals: int | None = None
+
+
+@router.get("/tournament-result")
+def get_tournament_result(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Get the currently set actual tournament results."""
+    result = db.query(TournamentResult).first()
+    if not result:
+        return {
+            "winner_team_id": None,
+            "top_scorer_name": None,
+            "top_assist_name": None,
+            "total_goals": None,
+            "updated_at": None,
+        }
+    return {
+        "winner_team_id": result.winner_team_id,
+        "top_scorer_name": result.top_scorer_name,
+        "top_assist_name": result.top_assist_name,
+        "total_goals": result.total_goals,
+        "updated_at": result.updated_at.isoformat() if result.updated_at else None,
+    }
+
+
+@router.post("/tournament-result")
+def set_tournament_result(
+    payload: TournamentResultUpdate,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Set the actual tournament results (for bonus scoring). Admin only."""
+    result = db.query(TournamentResult).first()
+    if result:
+        if payload.winner_team_id is not None:
+            result.winner_team_id = payload.winner_team_id
+        if payload.top_scorer_name is not None:
+            result.top_scorer_name = payload.top_scorer_name
+        if payload.top_assist_name is not None:
+            result.top_assist_name = payload.top_assist_name
+        if payload.total_goals is not None:
+            result.total_goals = payload.total_goals
+    else:
+        result = TournamentResult(
+            winner_team_id=payload.winner_team_id,
+            top_scorer_name=payload.top_scorer_name,
+            top_assist_name=payload.top_assist_name,
+            total_goals=payload.total_goals,
+        )
+        db.add(result)
+    db.commit()
+    return {"saved": True}
 
 
 @router.post("/matches/{match_id}/result")
@@ -63,8 +127,9 @@ def sync_results(
     db: Session = Depends(get_db),
 ):
     """
-    Trigger a sync of match results from external API (worldcupjson.net).
+    Trigger a sync of match results from external API.
 
+    Uses the source configured in SYNC_SOURCE (worldcupjson or openfootball).
     Fetches all match data, updates local Match rows with new goals/status,
     and resolves placeholder teams where the actual teams are now known.
 
@@ -84,6 +149,50 @@ def sync_results(
         }
 
     return result
+
+
+@router.get("/sync-config")
+def get_sync_config(admin: User = Depends(require_admin)):
+    """Return current sync configuration (read-only for admin)."""
+    return {
+        "source": settings.sync_source,
+        "auto_sync_enabled": settings.auto_sync_enabled,
+        "auto_sync_interval_minutes": settings.auto_sync_interval_minutes,
+        "world_cup_json_url": settings.world_cup_json_url,
+        "openfootball_url": settings.openfootball_url,
+    }
+
+
+class SyncConfigUpdate(BaseModel):
+    source: str | None = None
+    auto_sync_enabled: bool | None = None
+    auto_sync_interval_minutes: int | None = None
+
+
+@router.post("/sync-config")
+def update_sync_config(
+    payload: SyncConfigUpdate,
+    admin: User = Depends(require_admin),
+):
+    """Update sync configuration. Admin only. Requires restart to take full effect."""
+    # Note: these are in-memory changes only; for persistence update .env file
+    if payload.source is not None:
+        if payload.source not in ("worldcupjson", "openfootball"):
+            raise HTTPException(status_code=422, detail="source must be 'worldcupjson' or 'openfootball'")
+        settings.sync_source = payload.source
+    if payload.auto_sync_enabled is not None:
+        settings.auto_sync_enabled = payload.auto_sync_enabled
+    if payload.auto_sync_interval_minutes is not None:
+        if payload.auto_sync_interval_minutes < 1:
+            raise HTTPException(status_code=422, detail="interval must be >= 1")
+        settings.auto_sync_interval_minutes = payload.auto_sync_interval_minutes
+
+    return {
+        "saved": True,
+        "source": settings.sync_source,
+        "auto_sync_enabled": settings.auto_sync_enabled,
+        "auto_sync_interval_minutes": settings.auto_sync_interval_minutes,
+    }
 
 
 @router.post("/scores/recalculate")
@@ -137,17 +246,23 @@ def recalculate_scores(
     # ── 3. Tournament bonus points ──────────────────────────────────
     from models import TournamentBonus
     bonuses = db.query(TournamentBonus).all()
+    actual_result = db.query(TournamentResult).first()
+    actual_winner_id = actual_result.winner_team_id if actual_result else None
+    actual_top_scorer = actual_result.top_scorer_name if actual_result else None
+    actual_top_assist = actual_result.top_assist_name if actual_result else None
+    actual_total_goals = actual_result.total_goals if actual_result else None
+
     user_bonus_points = {}
     for bonus in bonuses:
         result = calculate_tournament_bonus_points(
             pred_winner_id=bonus.winner_team_id,
-            actual_winner_id=None,  # Not yet tracked by a separate table
+            actual_winner_id=actual_winner_id,
             pred_top_scorer=bonus.top_scorer_name,
-            actual_top_scorer=None,
+            actual_top_scorer=actual_top_scorer,
             pred_top_assist=bonus.top_assist_name,
-            actual_top_assist=None,
+            actual_top_assist=actual_top_assist,
             pred_total_goals=bonus.total_goals,
-            actual_total_goals=None,
+            actual_total_goals=actual_total_goals,
         )
         user_bonus_points[bonus.user_id] = result["points"]
 

@@ -62,6 +62,7 @@ export const BRACKET_ROUNDS = [
   "quarter_final",
   "semi_final",
   "final",
+    "match_for_third_place",
 ] as const;
 
 export type BracketRound = (typeof BRACKET_ROUNDS)[number];
@@ -73,4 +74,5 @@ export const BRACKET_ROUND_POINTS: Record<BracketRound, number> = {
   quarter_final: 8,
   semi_final: 10,
   final: 15,
+  match_for_third_place: 3,
 };

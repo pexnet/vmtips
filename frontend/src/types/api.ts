@@ -71,10 +71,11 @@ export interface LeagueMember {
 export interface League {
   id: number;
   name: string;
-  invite_code: string;
+  invite_code?: string;
   created_at: string | null;
-  admin_user_id: number;
+  admin_user_id?: number;
   is_admin?: boolean;
+  member_count?: number;
 }
 
 export interface LeagueDetail extends League {
@@ -120,6 +121,13 @@ export interface PersonalScore {
   predictions_made: number;
   matches_scored: number;
   perfect_predictions: number;
+  tournament_bonus_points: number;
+  tournament_bonus_details?: {
+    winner_correct: boolean;
+    top_scorer_correct: boolean;
+    top_assist_correct: boolean;
+    total_goals_correct: boolean;
+  };
   bracket_details: BracketDetail[];
   breakdown: ScoreBreakdown[];
 }

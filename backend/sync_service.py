@@ -1,66 +1,57 @@
 """
-Sync service: fetch match results from the external World Cup API
-(worldcupjson.net) and update the local database.
+Sync service: fetch match results from external World Cup APIs and update
+the local database.
 
-Uses only the standard library (urllib) so no extra dependency is needed.
+Supports two sources:
+  1. worldcupjson.net  — live scores, status, real-time during tournament
+  2. openfootball.json  — static GitHub-hosted JSON, updated during tournament
+
+Toggle the source via config.sync_source and auto-sync via config.auto_sync_enabled.
 """
 import json
 import logging
 import urllib.request
 import urllib.error
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from config import settings
 
 logger = logging.getLogger("vmtips.sync")
 
-# How long to wait for the external API (seconds)
 REQUEST_TIMEOUT = 15
-
-# The API endpoint is configurable via the WORLD_CUP_JSON_URL setting
 DEFAULT_API_URL = "https://worldcupjson.net/matches"
+DEFAULT_OPENFOOTBALL_URL = (
+    "https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json"
+)
 
 
-def _fetch_matches(api_url: Optional[str] = None) -> list[dict]:
-    """
-    Fetch match data from the external API.
+class SyncError(Exception):
+    """Raised when the external sync fails."""
+    pass
 
-    Returns a list of dicts; each dict has at least:
-        - match_number (int)
-        - home_team (str, team code or name)
-        - away_team (str, team code or name)
-        - home_goals (int or None)
-        - away_goals (int or None)
-        - status (str: "scheduled", "in_play", "finished", etc.)
-        - match_date (ISO-8601 str)
-    """
-    url = api_url or settings.world_cup_json_url
-    logger.info("Fetching match results from %s", url)
 
+# ───────────────────────────────────────────────────────────────
+# High-level helpers
+# ───────────────────────────────────────────────────────────────
+
+def _fetch_json(url: str) -> dict | list:
+    """Fetch raw JSON from a URL."""
+    logger.info("Fetching from %s", url)
     req = urllib.request.Request(url, headers={"User-Agent": "VMTips/1.0"})
     try:
         with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
             body = resp.read().decode("utf-8")
-            data = json.loads(body)
+            return json.loads(body)
     except urllib.error.HTTPError as exc:
-        logger.error("External API returned HTTP %s", exc.code)
-        raise SyncError(f"External API HTTP error: {exc.code}") from exc
+        logger.error("HTTP %s from %s", exc.code, url)
+        raise SyncError(f"HTTP error {exc.code}") from exc
     except urllib.error.URLError as exc:
-        logger.error("Cannot reach external API: %s", exc.reason)
-        raise SyncError(f"Cannot reach external API: {exc.reason}") from exc
+        logger.error("Cannot reach %s: %s", url, exc.reason)
+        raise SyncError(f"Cannot reach {url}: {exc.reason}") from exc
     except json.JSONDecodeError as exc:
-        logger.error("Invalid JSON from external API: %s", exc)
-        raise SyncError("Invalid JSON from external API") from exc
-
-    if not isinstance(data, list):
-        # Some APIs wrap data in a top-level key
-        if isinstance(data, dict) and "matches" in data:
-            data = data["matches"]
-        else:
-            raise SyncError("Unexpected API response structure")
-
-    return data
+        logger.error("Invalid JSON from %s: %s", url, exc)
+        raise SyncError("Invalid JSON") from exc
 
 
 def _normalize_status(api_status: str) -> str:
@@ -78,8 +69,7 @@ def _normalize_status(api_status: str) -> str:
         "completed_after_extra_time": "finished",
         "completed_after_penalties": "finished",
     }
-    normalized = status_map.get(api_status.lower(), "scheduled")
-    return normalized
+    return status_map.get(api_status.lower(), "scheduled")
 
 
 def _parse_goals(score_data) -> Optional[int]:
@@ -89,7 +79,6 @@ def _parse_goals(score_data) -> Optional[int]:
     if isinstance(score_data, int):
         return score_data
     if isinstance(score_data, dict):
-        # Some APIs use {"full_time": 2, "half_time": 1}
         return score_data.get("full_time", score_data.get("goals", None))
     try:
         return int(score_data)
@@ -97,27 +86,21 @@ def _parse_goals(score_data) -> Optional[int]:
         return None
 
 
-def _parse_api_match(raw: dict) -> Optional[dict]:
-    """
-    Parse a raw API match object into a normalised dict.
+# ───────────────────────────────────────────────────────────────
+# Source parsers
+# ───────────────────────────────────────────────────────────────
 
-    Handles both the worldcupjson.net format and common variations.
-
-    Returns None if the match can't be parsed.
-    """
-    # ── match number ──
+def _parse_worldcupjson_match(raw: dict) -> Optional[dict]:
+    """Parse a worldcupjson.net match entry into normalised form."""
     match_number = raw.get("match_number") or raw.get("matchNumber") or raw.get("fifa_id")
     if match_number is not None:
         match_number = int(match_number)
 
-    # ── teams ──
     home_raw = raw.get("home_team") or raw.get("homeTeam") or {}
     away_raw = raw.get("away_team") or raw.get("awayTeam") or {}
 
-    # Teams may be strings (names) or dicts with "name"/"code"
     if isinstance(home_raw, str):
-        home_code = home_raw
-        home_name = home_raw
+        home_code, home_name = home_raw, home_raw
     elif isinstance(home_raw, dict):
         home_code = home_raw.get("code", home_raw.get("country", ""))
         home_name = home_raw.get("name", home_raw.get("country", home_code))
@@ -125,25 +108,25 @@ def _parse_api_match(raw: dict) -> Optional[dict]:
         return None
 
     if isinstance(away_raw, str):
-        away_code = away_raw
-        away_name = away_raw
+        away_code, away_name = away_raw, away_raw
     elif isinstance(away_raw, dict):
         away_code = away_raw.get("code", away_raw.get("country", ""))
         away_name = away_raw.get("name", away_raw.get("country", away_code))
     else:
         return None
 
-    # ── goals ──
-    home_goals = _parse_goals(raw.get("home_goals", raw.get("homeGoals", home_raw.get("goals") if isinstance(home_raw, dict) else None)))
-    away_goals = _parse_goals(raw.get("away_goals", raw.get("awayGoals", away_raw.get("goals") if isinstance(away_raw, dict) else None)))
+    home_goals = _parse_goals(
+        raw.get("home_goals", raw.get("homeGoals", home_raw.get("goals") if isinstance(home_raw, dict) else None))
+    )
+    away_goals = _parse_goals(
+        raw.get("away_goals", raw.get("awayGoals", away_raw.get("goals") if isinstance(away_raw, dict) else None))
+    )
 
-    # ── status ──
     raw_status = raw.get("status", raw.get("match_status", "scheduled"))
     if isinstance(raw_status, dict):
         raw_status = raw_status.get("code", "scheduled")
     status = _normalize_status(str(raw_status))
 
-    # ── match date ──
     match_date = raw.get("match_date") or raw.get("matchDate") or raw.get("datetime")
     if match_date and isinstance(match_date, str):
         match_date = match_date.replace("Z", "+00:00")
@@ -161,29 +144,121 @@ def _parse_api_match(raw: dict) -> Optional[dict]:
     }
 
 
-def sync_match_results(db) -> dict:
+def _parse_openfootball_match(raw: dict) -> Optional[dict]:
+    """Parse an openfootball JSON match entry into normalised form."""
+    # openfootball uses 'num' for match number and 'team1'/'team2' for team names
+    match_number = raw.get("num") or raw.get("match_number")
+    if match_number is not None:
+        try:
+            match_number = int(match_number)
+        except (ValueError, TypeError):
+            match_number = None
+
+    # If there's no match_number this is likely a group-stage match we cannot map
+    if match_number is None:
+        return None
+
+    home_name = raw.get("team1") or raw.get("home_team") or raw.get("homeTeam") or ""
+    away_name = raw.get("team2") or raw.get("away_team") or raw.get("awayTeam") or ""
+
+    # Goals in openfootball usually appear as top-level keys during/after the match
+    home_goals = _parse_goals(raw.get("goals1") or raw.get("home_goals") or raw.get("score1"))
+    away_goals = _parse_goals(raw.get("goals2") or raw.get("away_goals") or raw.get("score2"))
+
+    # Status detection: if goals are present → finished; if date is in the past → likely finished
+    # openfootball does not always include status, so we infer:
+    status = "scheduled"
+    if home_goals is not None and away_goals is not None:
+        status = "finished"
+    else:
+        raw_date = raw.get("date")
+        if raw_date:
+            try:
+                match_dt = datetime.strptime(raw_date, "%Y-%m-%d")
+                # If the match date + 3 hours is in the past, assume finished
+                if match_dt + timedelta(hours=3) < datetime.now(timezone.utc).replace(tzinfo=None):
+                    status = "finished"
+            except ValueError:
+                pass
+
+    match_date = raw.get("date") or raw.get("match_date") or raw.get("datetime")
+    if match_date and isinstance(match_date, str):
+        match_date = match_date.replace("Z", "+00:00")
+
+    return {
+        "match_number": match_number,
+        "home_code": "",
+        "home_name": home_name,
+        "away_code": "",
+        "away_name": away_name,
+        "home_goals": home_goals,
+        "away_goals": away_goals,
+        "status": status,
+        "match_date": match_date,
+    }
+
+
+# ───────────────────────────────────────────────────────────────
+# Fetch pipeline
+# ───────────────────────────────────────────────────────────────
+
+def _fetch_worldcupjson(api_url: str | None = None) -> list[dict]:
+    """Fetch matches from worldcupjson.net format."""
+    url = api_url or settings.world_cup_json_url or DEFAULT_API_URL
+    data = _fetch_json(url)
+    if isinstance(data, dict) and "matches" in data:
+        data = data["matches"]
+    if not isinstance(data, list):
+        raise SyncError("Unexpected worldcupjson response structure")
+    parsed = [_parse_worldcupjson_match(m) for m in data]
+    return [m for m in parsed if m is not None]
+
+
+def _fetch_openfootball(url: str | None = None) -> list[dict]:
+    """Fetch matches from openfootball GitHub JSON format."""
+    fetch_url = url or settings.openfootball_url or DEFAULT_OPENFOOTBALL_URL
+    data = _fetch_json(fetch_url)
+    if not isinstance(data, dict):
+        raise SyncError("Unexpected openfootball response structure")
+    matches = data.get("matches", [])
+    if not isinstance(matches, list):
+        raise SyncError("Unexpected openfootball matches structure")
+    parsed = [_parse_openfootball_match(m) for m in matches]
+    return [m for m in parsed if m is not None]
+
+
+def _fetch_matches(source: str | None = None) -> list[dict]:
+    """Fetch matches from the configured source."""
+    src = source or settings.sync_source or "worldcupjson"
+    if src == "openfootball":
+        return _fetch_openfootball()
+    return _fetch_worldcupjson()
+
+
+# Backward-compatible alias used by tests
+_parse_api_match = _parse_worldcupjson_match
+
+
+# ───────────────────────────────────────────────────────────────
+# Apply updates to database
+# ───────────────────────────────────────────────────────────────
+
+def sync_match_results(db, source: str | None = None) -> dict:
     """
     Fetch results from the external API and update local Match rows.
 
     Args:
         db: SQLAlchemy session
+        source: optional override of config.sync_source
 
     Returns:
-        {
-            "synced": bool,
-            "updated": int,        # number of matches whose result changed
-            "total_finished": int,  # finished matches from API
-            "errors": list[str],    # non-fatal parse errors
-        }
+        {"synced": bool, "updated": int, "total_finished": int, "errors": list[str]}
     """
     from models import Match, Team
 
-    raw_matches = _fetch_matches()
+    raw_matches = _fetch_matches(source)
 
-    # Load local matches keyed by match_number for efficient lookup
     local_matches = {m.match_number: m for m in db.query(Match).all()}
-
-    # Load team code → team_id mapping
     team_by_code = {t.code: t for t in db.query(Team).all()}
     team_by_name = {t.name: t for t in db.query(Team).all()}
 
@@ -191,18 +266,14 @@ def sync_match_results(db) -> dict:
     total_finished = 0
     errors = []
 
-    for raw in raw_matches:
-        parsed = _parse_api_match(raw)
-        if parsed is None:
-            continue
-
+    for parsed in raw_matches:
         match_number = parsed["match_number"]
         if match_number is None or match_number not in local_matches:
             continue
 
         local = local_matches[match_number]
 
-        # ── Resolve team IDs for placeholder matches ──
+        # Resolve team IDs for placeholder matches
         if local.home_team_id is None and parsed["home_code"]:
             home_team = team_by_code.get(parsed["home_code"]) or team_by_name.get(parsed["home_name"])
             if home_team:
@@ -215,7 +286,6 @@ def sync_match_results(db) -> dict:
                 local.away_team_id = away_team.id
                 local.away_team_placeholder = None
 
-        # ── Update status ──
         new_status = parsed["status"]
         changed = False
 
@@ -223,7 +293,7 @@ def sync_match_results(db) -> dict:
             local.status = new_status
             changed = True
 
-        # ── Update goals (only for ongoing/finished) ──
+        # Update goals (only for ongoing/finished)
         if new_status in ("ongoing", "finished"):
             new_home = parsed["home_goals"]
             new_away = parsed["away_goals"]
@@ -234,7 +304,6 @@ def sync_match_results(db) -> dict:
 
             if new_status == "finished":
                 total_finished += 1
-                # Ensure status is "finished"
                 if local.status != "finished":
                     local.status = "finished"
                     changed = True
@@ -245,7 +314,8 @@ def sync_match_results(db) -> dict:
     db.commit()
 
     logger.info(
-        "Sync complete: %d matches updated, %d finished from API",
+        "Sync complete (%s): %d matches updated, %d finished from API",
+        settings.sync_source,
         updated,
         total_finished,
     )
@@ -255,9 +325,5 @@ def sync_match_results(db) -> dict:
         "updated": updated,
         "total_finished": total_finished,
         "errors": errors,
+        "source": settings.sync_source,
     }
-
-
-class SyncError(Exception):
-    """Raised when the external sync fails."""
-    pass

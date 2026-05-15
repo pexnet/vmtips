@@ -66,7 +66,8 @@
     "top_scorer": "Top Scorer",
     "top_assist": "Top Assist",
     "total_goals": "Total Goals",
-    "no_predictions": "No predictions saved yet. Go to Matches to start predicting!"
+    "no_predictions": "No predictions saved yet. Go to Matches to start predicting!",
+    "tournament_bonus_points": "Bonus Points"
   },
   "leaderboard": {
     "title": "Leaderboard",
@@ -95,7 +96,19 @@
     "copy_invite_code": "Copy invite code",
     "code_label": "Code",
     "league_name": "League name",
-    "no_members": "No members"
+    "no_members": "No members",
+    "bonus_questions": "Bonus Questions",
+    "my_leagues": "My Leagues",
+    "public_leagues": "Public Leagues",
+    "no_public_leagues": "No public leagues available.",
+    "member_count": "Members",
+    "add_question": "Add Question",
+    "edit_question": "Edit Question",
+    "question_text": "Question",
+    "points_value": "Points",
+    "answer": "Answer",
+    "no_bonus_questions": "No bonus questions in this league yet.",
+    "confirm_delete_question": "Are you sure you want to delete this question?"
   },
   "profile": {
     "title": "My Profile",
@@ -106,7 +119,8 @@
     "accuracy": "Perfect Accuracy",
     "team_id": "Team",
     "match_breakdown": "Match-by-Match Breakdown",
-    "no_breakdown": "No matches have been scored yet."
+    "no_breakdown": "No matches have been scored yet.",
+    "tournament_bonus_points": "Bonus Points"
   },
   "admin": {
     "title": "Admin Panel",
@@ -117,9 +131,23 @@
     "score_management": "Score Management",
     "sync_results": "Sync Results",
     "recalculate_scores": "Recalculate Scores",
-    "result_updated": "Result updated!",
+    "result_updated": "Tournament result updated!",
     "results_synced": "Results synced!",
-    "scores_recalculated": "Scores recalculated!"
+    "scores_recalculated": "Scores recalculated!",
+    "tournament_result": "Tournament Result",
+    "winner": "Winner",
+    "top_scorer": "Top Scorer",
+    "top_assist": "Top Assist",
+    "total_goals": "Total Goals",
+    "update_result": "Update Result",
+    "sync_config": "Sync Configuration",
+    "sync_source": "Data Source",
+    "auto_sync": "Auto Sync",
+    "auto_sync_on": "On",
+    "auto_sync_off": "Off",
+    "sync_interval": "Interval (minutes)",
+    "save_sync_config": "Save Configuration",
+    "sync_config_saved": "Configuration saved!"
   },
   "common": {
     "cancel": "Cancel",
@@ -133,7 +161,9 @@
     "confirm": "Confirm",
     "dark_mode": "Dark mode",
     "light_mode": "Light mode",
-    "language": "Language"
+    "language": "Language",
+    "delete": "Delete",
+    "edit": "Edit"
   },
   "wc2026": {
     "dates": "June 11 – July 19, 2026",

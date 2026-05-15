@@ -147,7 +147,8 @@ cd vmtips
 | `DATABASE_URL` | `sqlite:////data/vmtips.db` | SQLite path |
 | `JWT_SECRET_KEY` | *(required in prod)* | HMAC key for JWT |
 | `JWT_EXPIRATION_HOURS` | `168` (7 days) | JWT lifetime |
-| `ADMIN_EMAIL` | `admin@example.com` | Admin user |
+| `ADMIN_EMAIL` | `admin@example.com` | Admin user email |
+| `ADMIN_PASSWORD` | `admin` (change me!) | Admin password |
 | `WORLD_CUP_JSON_URL` | `https://worldcupjson.net/matches` | Match result API |
 | `CORS_ORIGINS` | *(empty in prod)* | Allowed frontend origins |
 

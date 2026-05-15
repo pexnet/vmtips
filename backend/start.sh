@@ -30,5 +30,36 @@ finally:
     db.close()
 "
 
+# Create default admin user if it doesn't exist
+python -c "
+from database import SessionLocal
+from models import User
+from config import settings
+from security import get_password_hash
+
+db = SessionLocal()
+try:
+    existing = db.query(User).filter(User.email == settings.admin_email).first()
+    if not existing:
+        print('[startup] Creating default admin user...')
+        admin = User(
+            email=settings.admin_email,
+            password_hash=get_password_hash(settings.admin_password),
+            display_name='Admin',
+            is_admin=True,
+        )
+        db.add(admin)
+        db.commit()
+        print('[startup] Default admin created.')
+    else:
+        if not existing.is_admin:
+            print('[startup] Updating existing user to admin...')
+            existing.is_admin = True
+            db.commit()
+        print('[startup] Admin user already exists.')
+finally:
+    db.close()
+"
+
 # Start the application
 exec uvicorn main:app --host 0.0.0.0 --port 8000

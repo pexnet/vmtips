@@ -134,6 +134,47 @@ export default function ProfilePage() {
         </Box>
       </Paper>
 
+      {/* ── Tournament bonus points ─────────────────────────────── */}
+      <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
+        <Typography variant="h6" gutterBottom>
+          {t("profile.tournament_bonus_points")}
+        </Typography>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
+          <Chip
+            label={`${t("profile.tournament_bonus_points")}: ${personal.tournament_bonus_points ?? 0}`}
+            color={personal.tournament_bonus_points && personal.tournament_bonus_points > 0 ? "success" : "default"}
+          />
+          {personal.tournament_bonus_details && (
+            <>
+              <Chip
+                size="small"
+                label={`${t("predictions.winner")}: ${personal.tournament_bonus_details.winner_correct ? "✅" : "❌"}`}
+                color={personal.tournament_bonus_details.winner_correct ? "success" : "default"}
+                variant="outlined"
+              />
+              <Chip
+                size="small"
+                label={`${t("predictions.top_scorer")}: ${personal.tournament_bonus_details.top_scorer_correct ? "✅" : "❌"}`}
+                color={personal.tournament_bonus_details.top_scorer_correct ? "success" : "default"}
+                variant="outlined"
+              />
+              <Chip
+                size="small"
+                label={`${t("predictions.top_assist")}: ${personal.tournament_bonus_details.top_assist_correct ? "✅" : "❌"}`}
+                color={personal.tournament_bonus_details.top_assist_correct ? "success" : "default"}
+                variant="outlined"
+              />
+              <Chip
+                size="small"
+                label={`${t("predictions.total_goals")}: ${personal.tournament_bonus_details.total_goals_correct ? "✅" : "❌"}`}
+                color={personal.tournament_bonus_details.total_goals_correct ? "success" : "default"}
+                variant="outlined"
+              />
+            </>
+          )}
+        </Box>
+      </Paper>
+
       {/* ── Bracket points breakdown ─────────────────────────────── */}
       {personal.bracket_details && personal.bracket_details.length > 0 && (
         <Paper elevation={2} sx={{ p: 3, mb: 3 }}>

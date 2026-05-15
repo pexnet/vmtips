@@ -1,6 +1,6 @@
 services:
   app:
-    image: pexnet/vmtips:latest
+    image: ghcr.io/pexnet/vmtips:latest
     container_name: vmtips
     ports:
       - "8000:8000"
@@ -12,6 +12,7 @@ services:
       - JWT_ALGORITHM=HS256
       - JWT_EXPIRATION_HOURS=168
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
       - WORLD_CUP_JSON_URL=https://worldcupjson.net/matches
       - CORS_ORIGINS=${CORS_ORIGINS:-}
       - STATIC_DIR=/app/static

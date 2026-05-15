@@ -9,9 +9,9 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from errors import NotFoundError, ForbiddenError
-from models import User, Prediction, Match, League, LeagueMember, Score, BracketPrediction
+from models import User, Prediction, Match, League, LeagueMember, Score, BracketPrediction, TournamentResult, TournamentBonus
 from security import fetch_current_user
-from scoring import calculate_match_points, calculate_bracket_points, BRACKET_ROUND_POINTS
+from scoring import calculate_match_points, calculate_bracket_points, calculate_tournament_bonus_points, BRACKET_ROUND_POINTS
 
 router = APIRouter(prefix="/leaderboard", tags=["leaderboard"])
 
@@ -73,12 +73,48 @@ def _calculate_user_score(user_id: int, db: Session) -> dict:
     )
     total_bracket_points = bracket_result["points"]
 
-    total_points = total_match_points + total_bracket_points
+    # Tournament bonus points
+    actual_result = db.query(TournamentResult).first()
+    actual_winner_id = actual_result.winner_team_id if actual_result else None
+    actual_top_scorer = actual_result.top_scorer_name if actual_result else None
+    actual_top_assist = actual_result.top_assist_name if actual_result else None
+    actual_total_goals = actual_result.total_goals if actual_result else None
+
+    tb = db.query(TournamentBonus).filter(TournamentBonus.user_id == user_id).first()
+    tournament_bonus_points = 0
+    tournament_bonus_details = {
+        "winner_correct": False,
+        "top_scorer_correct": False,
+        "top_assist_correct": False,
+        "total_goals_correct": False,
+    }
+    if tb:
+        tb_result = calculate_tournament_bonus_points(
+            pred_winner_id=tb.winner_team_id,
+            actual_winner_id=actual_winner_id,
+            pred_top_scorer=tb.top_scorer_name,
+            actual_top_scorer=actual_top_scorer,
+            pred_top_assist=tb.top_assist_name,
+            actual_top_assist=actual_top_assist,
+            pred_total_goals=tb.total_goals,
+            actual_total_goals=actual_total_goals,
+        )
+        tournament_bonus_points = tb_result["points"]
+        tournament_bonus_details = {
+            "winner_correct": tb_result["winner_correct"],
+            "top_scorer_correct": tb_result["top_scorer_correct"],
+            "top_assist_correct": tb_result["top_assist_correct"],
+            "total_goals_correct": tb_result["total_goals_correct"],
+        }
+
+    total_points = total_match_points + total_bracket_points + tournament_bonus_points
 
     return {
         "total_points": total_points,
         "match_points": total_match_points,
         "bracket_points": total_bracket_points,
+        "tournament_bonus_points": tournament_bonus_points,
+        "tournament_bonus_details": tournament_bonus_details,
         "predictions_made": len(predictions),
         "matches_scored": len(match_points),
         "perfect_predictions": perfect_count,
@@ -224,6 +260,8 @@ def my_scores(
         "total_points": score["total_points"],
         "match_points": score["match_points"],
         "bracket_points": score["bracket_points"],
+        "tournament_bonus_points": score["tournament_bonus_points"],
+        "tournament_bonus_details": score["tournament_bonus_details"],
         "predictions_made": score["predictions_made"],
         "matches_scored": score["matches_scored"],
         "perfect_predictions": score["perfect_predictions"],

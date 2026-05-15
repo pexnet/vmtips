@@ -66,7 +66,8 @@
     "top_scorer": "Skyttekung",
     "top_assist": "Assistkung",
     "total_goals": "Totalt antal mål",
-    "no_predictions": "Inga tips sparade ännu. Gå till Matcher för att tippa!"
+    "no_predictions": "Inga tips sparade ännu. Gå till Matcher för att tippa!",
+    "tournament_bonus_points": "Bonuspoäng"
   },
   "leaderboard": {
     "title": "Topplista",
@@ -95,7 +96,19 @@
     "copy_invite_code": "Kopiera inbjudningskod",
     "code_label": "Kod",
     "league_name": "Liganamn",
-    "no_members": "Inga medlemmar"
+    "no_members": "Inga medlemmar",
+    "bonus_questions": "Bonusfrågor",
+    "my_leagues": "Mina ligor",
+    "public_leagues": "Offentliga ligor",
+    "no_public_leagues": "Inga offentliga ligor tillgängliga.",
+    "member_count": "Medlemmar",
+    "add_question": "Lägg till fråga",
+    "edit_question": "Redigera fråga",
+    "question_text": "Fråga",
+    "points_value": "Poängvärde",
+    "answer": "Svar",
+    "no_bonus_questions": "Inga bonusfrågor i denna liga än.",
+    "confirm_delete_question": "Är du säker på att du vill ta bort denna fråga?"
   },
   "profile": {
     "title": "Min profil",
@@ -106,7 +119,8 @@
     "accuracy": "Perfekt träff",
     "team_id": "Lag",
     "match_breakdown": "Matchför-match-genomgång",
-    "no_breakdown": "Inga matcher har poängsatts ännu."
+    "no_breakdown": "Inga matcher har poängsatts ännu.",
+    "tournament_bonus_points": "Bonuspoäng"
   },
   "admin": {
     "title": "Adminpanel",
@@ -117,9 +131,23 @@
     "score_management": "Poänghantering",
     "sync_results": "Synka resultat",
     "recalculate_scores": "Beräkna om poäng",
-    "result_updated": "Resultat uppdaterat!",
+    "result_updated": "Turneringsresultat uppdaterat!",
     "results_synced": "Resultat synkade!",
-    "scores_recalculated": "Poäng omberäknade!"
+    "scores_recalculated": "Poäng omberäknade!",
+    "tournament_result": "Turneringsresultat",
+    "winner": "Vinnare",
+    "top_scorer": "Skyttekung",
+    "top_assist": "Assistkung",
+    "total_goals": "Totalt antal mål",
+    "update_result": "Uppdatera resultat",
+    "sync_config": "Synk-konfiguration",
+    "sync_source": "Datakälla",
+    "auto_sync": "Autosynk",
+    "auto_sync_on": "På",
+    "auto_sync_off": "Av",
+    "sync_interval": "Intervall (minuter)",
+    "save_sync_config": "Spara konfiguration",
+    "sync_config_saved": "Konfiguration sparad!"
   },
   "common": {
     "cancel": "Avbryt",
@@ -133,7 +161,9 @@
     "confirm": "Bekräfta",
     "dark_mode": "Mörkt läge",
     "light_mode": "Ljust läge",
-    "language": "Språk"
+    "language": "Språk",
+    "delete": "Ta bort",
+    "edit": "Redigera"
   },
   "wc2026": {
     "dates": "11 juni – 19 juli 2026",

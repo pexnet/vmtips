@@ -40,6 +40,8 @@ Then open **http://localhost:8000**
 | Variable | Default | Required | Description |
 |----------|---------|----------|-------------|
 | `JWT_SECRET_KEY` | `change-me-in-production` | **Yes** | JWT signing secret — **change this** |
+| `ADMIN_EMAIL` | `admin@example.com` | No | Default admin email |
+| `ADMIN_PASSWORD` | `admin` | No | Default admin password — **change this** |
 | `CORS_ORIGINS` | `http://localhost:8000` | No | Comma-separated allowed origins |
 | `DATABASE_URL` | `sqlite:///app/data/vmtips.db` | No | SQLite database path |
 

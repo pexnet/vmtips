@@ -162,7 +162,7 @@ class TestSyncServiceFetch:
             assert result[0]["match_number"] == 3
 
     def test_fetch_matches_http_error(self):
-        from sync_service import _fetch_matches, SyncError
+        from sync_service import _fetch_json, SyncError
         import urllib.error
 
         with patch("sync_service.urllib.request.urlopen") as mock_urlopen:
@@ -173,17 +173,17 @@ class TestSyncServiceFetch:
                 hdrs={},
                 fp=None,
             )
-            with pytest.raises(SyncError, match="HTTP 500|External API HTTP error"):
-                _fetch_matches("http://test.local/api")
+            with pytest.raises(SyncError, match="HTTP 500|HTTP error 500"):
+                _fetch_json("http://test.local/api")
 
     def test_fetch_matches_url_error(self):
-        from sync_service import _fetch_matches, SyncError
+        from sync_service import _fetch_json, SyncError
         import urllib.error
 
         with patch("sync_service.urllib.request.urlopen") as mock_urlopen:
             mock_urlopen.side_effect = urllib.error.URLError("Connection refused")
             with pytest.raises(SyncError, match="Cannot reach"):
-                _fetch_matches("http://test.local/api")
+                _fetch_json("http://test.local/api")
 
 
 class TestSyncMatchResults:
@@ -197,9 +197,11 @@ class TestSyncMatchResults:
         mock_api_data = [
             {
                 "match_number": 1,
-                "home_team": {"code": "MEX", "name": "Mexico"},
-                "away_team": {"code": "RSA", "name": "South Africa"},
-                "status": "completed",
+                "home_code": "MEX",
+                "home_name": "Mexico",
+                "away_code": "RSA",
+                "away_name": "South Africa",
+                "status": "finished",
                 "home_goals": 2,
                 "away_goals": 0,
             }
@@ -227,9 +229,13 @@ class TestSyncMatchResults:
         mock_api_data = [
             {
                 "match_number": 1,
-                "home_team": {"code": "MEX"},
-                "away_team": {"code": "RSA"},
+                "home_code": "MEX",
+                "home_name": "Mexico",
+                "away_code": "RSA",
+                "away_name": "South Africa",
                 "status": "scheduled",
+                "home_goals": None,
+                "away_goals": None,
             }
         ]
 
@@ -249,9 +255,11 @@ class TestSyncMatchResults:
         mock_api_data = [
             {
                 "match_number": 73,
-                "home_team": {"code": "MEX", "name": "Mexico"},
-                "away_team": {"code": "SUI", "name": "Switzerland"},
-                "status": "completed",
+                "home_code": "MEX",
+                "home_name": "Mexico",
+                "away_code": "SUI",
+                "away_name": "Switzerland",
+                "status": "finished",
                 "home_goals": 1,
                 "away_goals": 0,
             }
@@ -273,9 +281,11 @@ class TestSyncMatchResults:
         mock_api_data = [
             {
                 "match_number": 9999,  # doesn't exist locally
-                "home_team": {"code": "TST"},
-                "away_team": {"code": "TST2"},
-                "status": "completed",
+                "home_code": "TST",
+                "home_name": "Testland",
+                "away_code": "TST2",
+                "away_name": "Testland2",
+                "status": "finished",
                 "home_goals": 3,
                 "away_goals": 2,
             }
@@ -307,9 +317,13 @@ class TestAdminSyncEndpoint:
         mock_api_data = [
             {
                 "match_number": 1,
-                "home_team": {"code": "MEX"},
-                "away_team": {"code": "RSA"},
+                "home_code": "MEX",
+                "home_name": "Mexico",
+                "away_code": "RSA",
+                "away_name": "South Africa",
                 "status": "scheduled",
+                "home_goals": None,
+                "away_goals": None,
             }
         ]
 

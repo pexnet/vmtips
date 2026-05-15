@@ -12,6 +12,7 @@ BRACKET_ROUND_POINTS = {
     "quarter_final": 8,
     "semi_final": 10,
     "final": 15,
+    "match_for_third_place": 3,
 }
 
 

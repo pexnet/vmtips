@@ -13,11 +13,10 @@ import {
   Chip,
   Alert,
   CircularProgress,
-  Autocomplete,
 } from "@mui/material";
 import { predictionsApi } from "../api/client";
 import { useMatches } from "../hooks/useMatches";
-import { useTournamentBonuses, useTeamsFromMatches } from "../hooks/usePredictions";
+
 import type { Match } from "../types/api";
 
 function MatchCard({
@@ -122,91 +121,6 @@ function MatchCard({
   );
 }
 
-function BonusTab() {
-  const { t } = useTranslation();
-  const { data: teams = [] } = useTeamsFromMatches();
-  const { data: bonusesData } = useTournamentBonuses();
-  const [bonuses, setBonuses] = useState({
-    winner_team_id: null as number | null,
-    top_scorer_name: "",
-    top_assist_name: "",
-    total_goals: "",
-  });
-  const [saved, setSaved] = useState(false);
-
-  // Populate form when tournament bonuses are loaded
-  if (bonusesData && !bonuses.top_scorer_name && !bonuses.top_assist_name && !bonuses.total_goals && bonuses.winner_team_id === null) {
-    const b = bonusesData;
-    setBonuses({
-      winner_team_id: b.winner_team_id || null,
-      top_scorer_name: b.top_scorer_name || "",
-      top_assist_name: b.top_assist_name || "",
-      total_goals: b.total_goals != null ? String(b.total_goals) : "",
-    });
-  }
-
-  const handleSave = () => {
-    predictionsApi
-      .saveTournament({
-        winner_team_id: bonuses.winner_team_id || undefined,
-        top_scorer_name: bonuses.top_scorer_name || undefined,
-        top_assist_name: bonuses.top_assist_name || undefined,
-        total_goals: bonuses.total_goals ? Number(bonuses.total_goals) : undefined,
-      })
-      .then(() => setSaved(true))
-      .catch(() => setSaved(false));
-  };
-
-  return (
-    <Box sx={{ maxWidth: 600, mx: "auto", mt: 2 }}>
-      <Typography variant="h6" gutterBottom>
-        {t("predictions.bonus_questions")}
-      </Typography>
-
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <Autocomplete
-          options={teams}
-          getOptionLabel={(o) => `${o.flag_emoji ?? ""} ${o.name}`}
-          value={teams.find((t) => t.id === bonuses.winner_team_id) || null}
-          onChange={(_, v) => setBonuses((b) => ({ ...b, winner_team_id: v?.id || null }))}
-          renderInput={(params) => (
-            <TextField {...params} label={t("predictions.winner")} />
-          )}
-        />
-
-        <TextField
-          label={t("predictions.top_scorer")}
-          value={bonuses.top_scorer_name}
-          onChange={(e) => setBonuses((b) => ({ ...b, top_scorer_name: e.target.value }))}
-        />
-
-        <TextField
-          label={t("predictions.top_assist")}
-          value={bonuses.top_assist_name}
-          onChange={(e) => setBonuses((b) => ({ ...b, top_assist_name: e.target.value }))}
-        />
-
-        <TextField
-          label={t("predictions.total_goals")}
-          type="number"
-          value={bonuses.total_goals}
-          onChange={(e) => {
-            const val = e.target.value;
-            if (val === "" || Number(val) >= 0) setBonuses((b) => ({ ...b, total_goals: val }));
-          }}
-          slotProps={{ htmlInput: { min: 0 } }}
-        />
-
-        <Button variant="contained" onClick={handleSave}>
-          {t("matches.save_predictions")}
-        </Button>
-
-        {saved && <Alert severity="success">{t("common.saved")}</Alert>}
-      </Box>
-    </Box>
-  );
-}
-
 // Flexbox wrapper: 2 per rad på sm+
 function TwoColumnGrid({ children }: { children: React.ReactNode }) {
   return (
@@ -290,7 +204,6 @@ export default function MatchesPage() {
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
         <Tab label={t("matches.group_stage")} />
         <Tab label={t("matches.knockout")} />
-        <Tab label={t("predictions.bonus_questions")} />
       </Tabs>
 
       {/* GROUP STAGE */}
@@ -321,13 +234,13 @@ export default function MatchesPage() {
       {/* KNOCKOUT */}
       {tab === 1 && (
         <Box>
-          {["ro32", "ro16", "qf", "sf", "3p", "final"].map((round) => {
+          {["round_of_32","round_of_16","quarter_final","semi_final","match_for_third_place","final"].map((round) => {
             const roundMatches = knockoutMatches.filter((m) => m.round === round);
             if (roundMatches.length === 0) return null;
             return (
               <Box key={round} sx={{ mb: 3 }}>
                 <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>
-                  {round === "ro32" ? "Round of 32" : round === "ro16" ? "Round of 16" : round === "qf" ? "Quarter-finals" : round === "sf" ? "Semi-finals" : round === "3p" ? "3rd Place" : "Final"}
+                  {round === "round_of_32" ? "Round of 32" : round === "round_of_16" ? "Round of 16" : round === "quarter_final" ? "Quarter-finals" : round === "semi_final" ? "Semi-finals" : round === "match_for_third_place" ? "3rd Place" : "Final"}
                 </Typography>
                 <TwoColumnGrid>
                   {roundMatches.map((m) => (
@@ -345,12 +258,9 @@ export default function MatchesPage() {
         </Box>
       )}
 
-      {/* BONUS */}
-      {tab === 2 && <BonusTab />}
 
       {/* Save button */}
-      {tab !== 2 && (
-        <Box sx={{ position: "sticky", bottom: 16, textAlign: "center", bgcolor: "background.default", p: 1 }}>
+      <Box sx={{ position: "sticky", bottom: 16, textAlign: "center", bgcolor: "background.default", p: 1 }}>
           <Button
             variant="contained"
             size="large"
@@ -367,7 +277,6 @@ export default function MatchesPage() {
             {t("matches.save_predictions")}
           </Button>
         </Box>
-      )}
     </Container>
   );
 }

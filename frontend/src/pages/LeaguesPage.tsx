@@ -18,15 +18,19 @@ import {
   CircularProgress,
   Chip,
   IconButton,
+  Tabs,
+  Tab,
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { leaguesApi } from "../api/client";
-import { useLeagues, useLeagueDetail, useInvalidateLeagues } from "../hooks/useLeagues";
+import { useLeagues, useLeagueDetail, useInvalidateLeagues, usePublicLeagues } from "../hooks/useLeagues";
 import type { League } from "../types/api";
 import { getErrorDetail } from "../types/api";
+import { useNavigate } from "react-router-dom";
 
 export default function LeaguesPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [error, setError] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
@@ -34,8 +38,10 @@ export default function LeaguesPage() {
   const [joinCode, setJoinCode] = useState("");
   const [joinLeagueId, setJoinLeagueId] = useState<number | null>(null);
   const [detailLeagueId, setDetailLeagueId] = useState<number | null>(null);
+  const [tab, setTab] = useState(0);
 
   const { data: leagues = [], isLoading, error: queryError } = useLeagues();
+  const { data: publicLeagues = [], isLoading: publicLoading } = usePublicLeagues();
   const { data: detailLeague } = useLeagueDetail(detailLeagueId);
   const invalidateLeagues = useInvalidateLeagues();
 
@@ -93,6 +99,13 @@ export default function LeaguesPage() {
         <Button variant="contained" onClick={() => setCreateOpen(true)}>{t("leagues.create")}</Button>
       </Box>
 
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
+        <Tab label={t("leagues.my_leagues")} />
+        <Tab label={t("leagues.public_leagues")} />
+      </Tabs>
+      {tab === 0 && (
+<>
+
       {leagues.length === 0 ? (
         <Alert severity="info">{t("leagues.no_leagues")}</Alert>
       ) : (
@@ -106,7 +119,7 @@ export default function LeaguesPage() {
                       <Chip size="small" label={t("leagues.admin")} color="primary" />
                       <IconButton
                         size="small"
-                        onClick={() => navigator.clipboard.writeText(l.invite_code)}
+                        onClick={() => navigator.clipboard.writeText(l.invite_code || "")}
                         title={t("leagues.copy_invite_code")}
                       >
                         <ContentCopyIcon fontSize="small" />
@@ -135,6 +148,30 @@ export default function LeaguesPage() {
         </List>
       )}
 
+      </>
+      )}
+      {tab === 1 && (
+        <Box>
+          {publicLoading ? (
+            <CircularProgress />
+          ) : publicLeagues.length === 0 ? (
+            <Alert severity="info">{t("leagues.no_public_leagues")}</Alert>
+          ) : (
+            <List>
+              {publicLeagues.map((l) => (
+                <Paper key={l.id} elevation={2} sx={{ mb: 2 }}>
+                  <ListItem>
+                    <ListItemText
+                      primary={l.name}
+                      secondary={`${t("leagues.member_count")}: ${l.member_count}`}
+                    />
+                  </ListItem>
+                </Paper>
+              ))}
+            </List>
+          )}
+        </Box>
+      )}
       {/* Create dialog */}
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)}>
         <DialogTitle>{t("leagues.create")}</DialogTitle>
@@ -187,6 +224,7 @@ export default function LeaguesPage() {
           </List>
         </DialogContent>
         <DialogActions>
+          <Button onClick={() => { setDetailLeagueId(null); navigate(`/leagues/${detailLeagueId}/bonus-questions`); }}>{t("leagues.bonus_questions")}</Button>
           <Button onClick={() => setDetailLeagueId(null)}>{t("common.close")}</Button>
         </DialogActions>
       </Dialog>

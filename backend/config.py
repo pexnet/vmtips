@@ -11,7 +11,14 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expiration_hours: int = 168
     admin_email: str = "admin@example.com"
+    admin_password: str = "admin"
     world_cup_json_url: str = "https://worldcupjson.net/matches"
+    openfootball_url: str = (
+        "https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json"
+    )
+    sync_source: str = "worldcupjson"   # "worldcupjson" | "openfootball"
+    auto_sync_enabled: bool = False       # toggled manually by admin once tournament starts
+    auto_sync_interval_minutes: int = 5   # how often auto-sync runs when enabled
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")

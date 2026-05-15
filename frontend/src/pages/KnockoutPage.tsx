@@ -57,11 +57,11 @@ function KnockoutMatchCard({
 
   const roundLabel = (round: string) => {
     switch (round) {
-      case "ro32": return t("matches.round_of_32");
-      case "ro16": return t("matches.round_of_16");
-      case "qf": return t("matches.quarter_final");
-      case "sf": return t("matches.semi_final");
-      case "3p": return t("matches.match_for_third_place");
+      case "round_of_32": return t("matches.round_of_32");
+      case "round_of_16": return t("matches.round_of_16");
+      case "quarter_final": return t("matches.quarter_final");
+      case "semi_final": return t("matches.semi_final");
+      case "match_for_third_place": return t("matches.match_for_third_place");
       case "final": return t("matches.final");
       default: return round;
     }
@@ -160,6 +160,7 @@ function BracketRoundColumn({
     round_of_16: 16,
     quarter_final: 8,
     semi_final: 4,
+    match_for_third_place: 2,
     final: 2,
   };
   const slotCount = slotsPerRound[round];
@@ -268,6 +269,7 @@ export default function KnockoutPage() {
     quarter_final: [],
     semi_final: [],
     final: [],
+    match_for_third_place: [],
   });
 
   // Populate bracket selections from saved entries on first load
@@ -278,6 +280,7 @@ export default function KnockoutPage() {
       quarter_final: [],
       semi_final: [],
       final: [],
+      match_for_third_place: [],
     };
     for (const entry of bracketEntries) {
       const r = entry.round as BracketRound;
@@ -379,7 +382,7 @@ export default function KnockoutPage() {
   }
 
   // Group knockout matches by round
-  const roundOrder = ["ro32", "ro16", "qf", "sf", "3p", "final"];
+  const roundOrder = ["round_of_32", "round_of_16", "quarter_final", "semi_final", "match_for_third_place", "final"];
   const matchesByRound = roundOrder
     .map((round) => ({
       round,

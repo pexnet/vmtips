@@ -16,7 +16,7 @@ from slowapi import _rate_limit_exceeded_handler
 from database import engine, Base
 from config import settings
 from rate_limit import limiter
-from routers import auth, matches, predictions, leagues, leaderboard, admin, league_bonus_questions
+from routers import auth, matches, predictions, leagues, leaderboard, admin, league_bonus_questions, teams
 from errors import AppError
 from logging_config import setup_logging, request_id_ctx
 
@@ -145,11 +145,12 @@ app.include_router(leagues.router)
 app.include_router(leaderboard.router)
 app.include_router(admin.router)
 app.include_router(league_bonus_questions.router)
+app.include_router(teams.router)
 
 # Static files — served only for non-API paths
 API_PREFIXES = (
     "/auth", "/matches", "/predictions", "/leagues",
-    "/leaderboard", "/admin", "/health",
+    "/leaderboard", "/admin", "/health", "/teams",
 )
 
 static_dir = os.getenv("STATIC_DIR", "../frontend/dist")

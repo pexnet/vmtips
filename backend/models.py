@@ -30,6 +30,7 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     display_name = Column(String, nullable=False)
+    is_admin = Column(Boolean, default=False)
     created_at = Column(DateTime, default=_utcnow)
 
     predictions = relationship("Prediction", back_populates="user", cascade="all, delete-orphan")
@@ -59,7 +60,7 @@ class Match(Base):
     id = Column(Integer, primary_key=True, index=True)
     match_number = Column(Integer, unique=True, nullable=False)
     group = Column(String(1))
-    round = Column(String, nullable=False)  # group / ro32 / ro16 / qf / sf / final / 3rd
+    round = Column(String, nullable=False)  # group / round_of_32 / round_of_16 / quarter_final / semi_final / match_for_third_place / final
     home_team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
     away_team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
     home_team_placeholder = Column(String)
@@ -182,6 +183,20 @@ class BracketPrediction(Base):
     user = relationship("User", back_populates="bracket_predictions")
     team = relationship("Team")
 
+
+
+
+class TournamentResult(Base):
+    __tablename__ = "tournament_results"
+
+    id = Column(Integer, primary_key=True, index=True)
+    winner_team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
+    top_scorer_name = Column(String)
+    top_assist_name = Column(String)
+    total_goals = Column(Integer)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+    winner_team = relationship("Team")
 
 class Score(Base):
     __tablename__ = "scores"
