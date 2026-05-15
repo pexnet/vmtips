@@ -86,43 +86,8 @@ def seed_teams(db):
     print(f"[seed] Inserted/updated {len(TEAM_DATA)} teams")
 
 
-def _group_matches(db, group: str, match_num_start: int, day_offset: int):
-    """Create the 6 round-robin matches for a single group."""
-    teams = (
-        db.query(Team)
-        .filter(Team.group == group)
-        .order_by(Team.id)
-        .all()
-    )
-    if len(teams) != 4:
-        raise ValueError(f"Group {group} must contain 4 teams")
-
-    t1, t2, t3, t4 = teams
-    base_date = datetime.datetime(2026, 6, 12) + datetime.timedelta(days=day_offset)
-
-    fixtures = [
-        (t1, t2), (t3, t4),
-        (t1, t3), (t2, t4),
-        (t1, t4), (t2, t3),
-    ]
-    matches = []
-    for idx, (home, away) in enumerate(fixtures, start=match_num_start):
-        matches.append(
-            Match(
-                match_number=idx,
-                group=group,
-                round="group",
-                home_team_id=home.id,
-                away_team_id=away.id,
-                match_date=base_date + datetime.timedelta(hours=idx % 3 * 4),
-                status="scheduled",
-            )
-        )
-    return matches, match_num_start + len(fixtures)
-
-
 def seed_group_matches(db):
-    """Create all 72 group-stage matches."""
+    """Create all 72 group-stage matches with realistic FIFA dates."""
     existing = db.query(Match.match_number).filter(Match.round == "group").count()
     if existing == 72:
         print("[seed] Group matches already present, skipping")
@@ -130,18 +95,87 @@ def seed_group_matches(db):
 
     match_num = 1
     matches = []
-    day_offsets = {
-        "A": 0, "B": 0, "C": 1, "D": 1,
-        "E": 2, "F": 2, "G": 3, "H": 3,
-        "I": 4, "J": 4, "K": 5, "L": 5,
+
+    group_dates = {
+        "A": [datetime.datetime(2026, 6, 11, 15, 0, 0),
+              datetime.datetime(2026, 6, 18, 12, 0, 0),
+              datetime.datetime(2026, 6, 24, 21, 0, 0)],
+        "B": [datetime.datetime(2026, 6, 12, 15, 0, 0),
+              datetime.datetime(2026, 6, 18, 15, 0, 0),
+              datetime.datetime(2026, 6, 24, 15, 0, 0)],
+        "C": [datetime.datetime(2026, 6, 13, 18, 0, 0),
+              datetime.datetime(2026, 6, 19, 18, 0, 0),
+              datetime.datetime(2026, 6, 24, 18, 0, 0)],
+        "D": [datetime.datetime(2026, 6, 12, 21, 0, 0),
+              datetime.datetime(2026, 6, 19, 15, 0, 0),
+              datetime.datetime(2026, 6, 25, 22, 0, 0)],
+        "E": [datetime.datetime(2026, 6, 14, 13, 0, 0),
+              datetime.datetime(2026, 6, 20, 16, 0, 0),
+              datetime.datetime(2026, 6, 25, 16, 0, 0)],
+        "F": [datetime.datetime(2026, 6, 14, 16, 0, 0),
+              datetime.datetime(2026, 6, 20, 13, 0, 0),
+              datetime.datetime(2026, 6, 25, 19, 0, 0)],
+        "G": [datetime.datetime(2026, 6, 15, 15, 0, 0),
+              datetime.datetime(2026, 6, 21, 15, 0, 0),
+              datetime.datetime(2026, 6, 26, 23, 0, 0)],
+        "H": [datetime.datetime(2026, 6, 15, 12, 0, 0),
+              datetime.datetime(2026, 6, 21, 12, 0, 0),
+              datetime.datetime(2026, 6, 26, 20, 0, 0)],
+        "I": [datetime.datetime(2026, 6, 16, 19, 0, 0),
+              datetime.datetime(2026, 6, 22, 20, 0, 0),
+              datetime.datetime(2026, 6, 27, 12, 0, 0)],
+        "J": [datetime.datetime(2026, 6, 16, 21, 0, 0),
+              datetime.datetime(2026, 6, 22, 15, 0, 0),
+              datetime.datetime(2026, 6, 27, 15, 0, 0)],
+        "K": [datetime.datetime(2026, 6, 17, 13, 0, 0),
+              datetime.datetime(2026, 6, 23, 15, 0, 0),
+              datetime.datetime(2026, 6, 27, 18, 0, 0)],
+        "L": [datetime.datetime(2026, 6, 17, 15, 0, 0),
+              datetime.datetime(2026, 6, 23, 21, 0, 0),
+              datetime.datetime(2026, 6, 27, 21, 0, 0)],
     }
+
     for group in ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"]:
-        group_matches, match_num = _group_matches(db, group, match_num, day_offsets[group])
-        matches.extend(group_matches)
+        teams = (
+            db.query(Team)
+            .filter(Team.group == group)
+            .order_by(Team.id)
+            .all()
+        )
+        t1, t2, t3, t4 = teams
+
+        dates = group_dates[group]
+        fixtures = [
+            (t1, t2, dates[0]),
+            (t3, t4, dates[0] + datetime.timedelta(hours=4)),
+            (t1, t3, dates[1]),
+            (t2, t4, dates[1] + datetime.timedelta(hours=4)),
+            (t1, t4, dates[2]),
+            (t2, t3, dates[2] + datetime.timedelta(hours=4)),
+        ]
+
+        for home, away, match_date in fixtures:
+            matches.append(
+                Match(
+                    match_number=match_num,
+                    group=group,
+                    round="group",
+                    home_team_id=home.id,
+                    away_team_id=away.id,
+                    match_date=match_date,
+                    status="scheduled",
+                )
+            )
+            match_num += 1
 
     db.add_all(matches)
     db.commit()
     print(f"[seed] Inserted {len(matches)} group-stage matches")
+
+
+def _group_matches(db, group: str, match_num_start: int, day_offset: int):
+    """DEPRECATED — kept for backwards compat during transition."""
+    return
 
 
 def seed_knockout_matches(db):
@@ -152,15 +186,6 @@ def seed_knockout_matches(db):
         return
 
     base_date = datetime.datetime(2026, 6, 28, 16, 0, 0)
-    round_schedule = [
-        # (round_name, match_count, hours_between)
-        ("ro32", 16, 4),
-        ("ro16", 8, 8),
-        ("qf", 4, 24),
-        ("sf", 2, 48),
-        ("3rd", 1, 24),
-        ("final", 1, 48),
-    ]
 
     match_num = 73
     matches = []
@@ -187,8 +212,8 @@ def seed_knockout_matches(db):
         match_num += 1
         current_date += datetime.timedelta(hours=4)
 
-    # Round of 16
-    current_date += datetime.timedelta(hours=8)
+    # Round of 16 — 4 July - 7 July
+    current_date = datetime.datetime(2026, 7, 4, 12, 0, 0)
     for i in range(8):
         matches.append(
             Match(
@@ -203,8 +228,8 @@ def seed_knockout_matches(db):
         match_num += 1
         current_date += datetime.timedelta(hours=8)
 
-    # Quarterfinals
-    current_date += datetime.timedelta(hours=24)
+    # Quarterfinals — 9-10 July
+    current_date = datetime.datetime(2026, 7, 9, 16, 0, 0)
     for i in range(4):
         matches.append(
             Match(
@@ -217,10 +242,10 @@ def seed_knockout_matches(db):
             )
         )
         match_num += 1
-        current_date += datetime.timedelta(hours=24)
+        current_date += datetime.timedelta(hours=16)
 
-    # Semifinals
-    current_date += datetime.timedelta(hours=48)
+    # Semifinals — 14-15 July
+    current_date = datetime.datetime(2026, 7, 14, 16, 0, 0)
     for i in range(2):
         matches.append(
             Match(
@@ -233,30 +258,29 @@ def seed_knockout_matches(db):
             )
         )
         match_num += 1
-        current_date += datetime.timedelta(hours=48)
+        current_date += datetime.timedelta(hours=24)
 
-    # 3rd place
+    # 3rd place — 18 July
     matches.append(
         Match(
             match_number=match_num,
             round="3rd",
             home_team_placeholder="L117",
             away_team_placeholder="L118",
-            match_date=current_date,
+            match_date=datetime.datetime(2026, 7, 18, 16, 0, 0),
             status="scheduled",
         )
     )
     match_num += 1
-    current_date += datetime.timedelta(hours=24)
 
-    # Final
+    # Final — 19 July
     matches.append(
         Match(
             match_number=match_num,
             round="final",
             home_team_placeholder="W117",
             away_team_placeholder="W118",
-            match_date=current_date,
+            match_date=datetime.datetime(2026, 7, 19, 16, 0, 0),
             status="scheduled",
         )
     )
