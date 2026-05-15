@@ -29,7 +29,7 @@ interface Match {
   away_goals: number | null;
 }
 
-function MatchCard({
+function MatchRow({
   match,
   predictions,
   onChange,
@@ -55,59 +55,79 @@ function MatchCard({
   });
 
   return (
-    <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
-        <Typography variant="caption" color="text.secondary">
+    <Paper
+      elevation={1}
+      sx={{
+        p: 1,
+        mb: 0.5,
+        display: "flex",
+        alignItems: "center",
+        gap: 1,
+        flexWrap: "nowrap",
+        overflow: "hidden",
+      }}
+    >
+      <Box sx={{ minWidth: 120, maxWidth: 160 }}>
+        <Typography variant="caption" color="text.secondary" noWrap>
           {match.group ? `${match.group} · ` : ""}
           {match.match_number} · {kickoff}
         </Typography>
-        <Chip
+      </Box>
+
+      <Box sx={{ flex: "1 1 auto", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5 }}>
+        <Typography variant="body2" noWrap sx={{ fontWeight: 500, textAlign: "right" }}>
+          {home.name}
+        </Typography>
+        <Typography variant="body2" sx={{ fontSize: "1.2rem" }}>
+          {home.flag || "🌍"}
+        </Typography>
+      </Box>
+
+      <Box sx={{ display: "flex", gap: 0.5 }}>
+        <TextField
           size="small"
-          label={isFinished ? t("matches.result") : isLocked ? t("matches.locked") : match.status}
-          color={isFinished ? "success" : isLocked ? "error" : "default"}
+          type="number"
+          placeholder="-"
+          value={pred.home}
+          onChange={(e) => {
+            const val = e.target.value;
+            if (val === "" || Number(val) >= 0) onChange(match.id, "home", val);
+          }}
+          disabled={disabled}
+          sx={{ width: 56 }}
+          slotProps={{ htmlInput: { min: 0 } }}
+        />
+        <TextField
+          size="small"
+          type="number"
+          placeholder="-"
+          value={pred.away}
+          onChange={(e) => {
+            const val = e.target.value;
+            if (val === "" || Number(val) >= 0) onChange(match.id, "away", val);
+          }}
+          disabled={disabled}
+          sx={{ width: 56 }}
+          slotProps={{ htmlInput: { min: 0 } }}
         />
       </Box>
 
-      <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-        <Box sx={{ flex: "1 1 auto", textAlign: "right" }}>
-          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-            {(home.flag?.length || 0) <= 6 ? home.flag : "🌍"} {home.name}
-          </Typography>
-        </Box>
-        <Box sx={{ width: 80 }}>
-          <TextField
-            size="small"
-            type="number"
-            placeholder="-"
-            value={pred.home}
-            onChange={(e) => onChange(match.id, "home", e.target.value)}
-            disabled={disabled}
-            fullWidth
-          />
-        </Box>
-        <Box sx={{ width: 80 }}>
-          <TextField
-            size="small"
-            type="number"
-            placeholder="-"
-            value={pred.away}
-            onChange={(e) => onChange(match.id, "away", e.target.value)}
-            disabled={disabled}
-            fullWidth
-          />
-        </Box>
-        <Box sx={{ flex: "1 1 auto", textAlign: "left" }}>
-          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-            {away.name} {(away.flag?.length || 0) <= 6 ? away.flag : "🌍"}
-          </Typography>
-        </Box>
+      <Box sx={{ flex: "1 1 auto", display: "flex", alignItems: "center", gap: 0.5 }}>
+        <Typography variant="body2" sx={{ fontSize: "1.2rem" }}>
+          {away.flag || "🌍"}
+        </Typography>
+        <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
+          {away.name}
+        </Typography>
       </Box>
 
-      {isFinished && match.home_goals !== null && (
-        <Typography variant="body2" color="text.secondary" align="center" sx={{ mt: 1 }}>
-          {t("matches.result")}: {match.home_goals} - {match.away_goals}
-        </Typography>
-      )}
+      <Box sx={{ minWidth: 70 }}>
+        {isFinished ? (
+          <Chip size="small" label={t("matches.result")} color="success" />
+        ) : isLocked ? (
+          <Chip size="small" label={t("matches.locked")} color="error" />
+        ) : null}
+      </Box>
     </Paper>
   );
 }
@@ -183,12 +203,12 @@ export default function MatchesPage() {
   }
 
   return (
-    <Container sx={{ mt: 4, mb: 8 }}>
+    <Container sx={{ mt: 2, mb: 8, maxWidth: "lg" }}>
       <Typography variant="h4" gutterBottom>{t("matches.title")}</Typography>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 1 }}>
         <Tab label={t("matches.group_stage")} />
         <Tab label={t("matches.knockout")} />
       </Tabs>
@@ -196,12 +216,14 @@ export default function MatchesPage() {
       {tab === 0 && (
         <Box>
           {groups.map((group) => (
-            <Box key={group} sx={{ mb: 3 }}>
-              <Typography variant="h6" sx={{ mb: 1 }}>{group}</Typography>
+            <Box key={group} sx={{ mb: 2 }}>
+              <Typography variant="subtitle1" sx={{ mb: 0.5, fontWeight: 600 }}>
+                {group}
+              </Typography>
               {groupMatches
                 .filter((m) => m.group === group)
                 .map((m) => (
-                  <MatchCard
+                  <MatchRow
                     key={m.id}
                     match={m}
                     predictions={predictions}
@@ -216,7 +238,7 @@ export default function MatchesPage() {
       {tab === 1 && (
         <Box>
           {knockoutMatches.map((m) => (
-            <MatchCard
+            <MatchRow
               key={m.id}
               match={m}
               predictions={predictions}
@@ -226,7 +248,7 @@ export default function MatchesPage() {
         </Box>
       )}
 
-      <Box sx={{ position: "sticky", bottom: 16, textAlign: "center" }}>
+      <Box sx={{ position: "sticky", bottom: 16, textAlign: "center", bgcolor: "background.default", p: 1 }}>
         <Button
           variant="contained"
           size="large"
