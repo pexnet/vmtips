@@ -1,0 +1,82 @@
+{
+  "brand": "⚽ VMTips",
+  "nav": {
+    "home": "Hem",
+    "matches": "Matcher",
+    "predictions": "Tips",
+    "leaderboard": "Topplista",
+    "leagues": "Ligor",
+    "login": "Logga in",
+    "logout": "Logga ut",
+    "profile": "Min profil"
+  },
+  "auth": {
+    "email": "E-post",
+    "password": "Losenord",
+    "display_name": "Visningsnamn",
+    "login": "Logga in",
+    "register": "Registrera",
+    "no_account": "Har du inget konto? Registrera dig",
+    "has_account": "Har du redan ett konto? Logga in",
+    "logout_confirm": "Ar du saker pa att du vill logga ut?"
+  },
+  "matches": {
+    "title": "VM 2026 Matcher",
+    "group_stage": "Gruppspel",
+    "knockout": "Slutspel",
+    "round": "Omgang",
+    "group": "Grupp",
+    "home": "Hemma",
+    "away": "Borta",
+    "predicted": "Ditt tips",
+    "result": "Resultat",
+    "save_predictions": "Spara tips"
+  },
+  "predictions": {
+    "title": "Dina tips",
+    "save_success": "Tipsen sparade!",
+    "all_matches_tipped": "Du har tippat alla matcher.",
+    "missing_predictions": "Matcher utan tips",
+    "tournament_bonuses": "Bonusfragor",
+    "winner": "Vinnare",
+    "top_scorer": "Skyttekung",
+    "top_assist": "Assistkung",
+    "total_goals": "Totalt antal mal"
+  },
+  "leaderboard": {
+    "title": "Topplista",
+    "global": "Global",
+    "league": "Liga",
+    "rank": "Rank",
+    "player": "Spelare",
+    "points": "Poang",
+    "predictions": "Antal tips",
+    "perfect": "Perfekta tips",
+    "no_data": "Inga resultat annu"
+  },
+  "leagues": {
+    "title": "Ligor",
+    "create": "Skapa ny liga",
+    "join": "Ga med i liga",
+    "invite_code": "Inbjudningskod",
+    "members": "Medlemmar",
+    "admin": "Admin"
+  },
+  "common": {
+    "cancel": "Avbryt",
+    "save": "Spara",
+    "close": "Stang",
+    "loading": "Laddar...",
+    "error": "Ett fel uppstod",
+    "retry": "Forsok igen",
+    "success": "Klart!",
+    "confirm": "Bekrafta",
+    "dark_mode": "Morkt lage",
+    "light_mode": "Ljust lage",
+    "language": "Sprak"
+  },
+  "wc2026": {
+    "dates": "11 juni – 19 juli 2026",
+    "location": "USA, Kanada, Mexico"
+  }
+}

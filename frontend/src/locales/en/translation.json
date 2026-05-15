@@ -1,0 +1,82 @@
+{
+  "brand": "⚽ VMTips",
+  "nav": {
+    "home": "Home",
+    "matches": "Matches",
+    "predictions": "Predictions",
+    "leaderboard": "Leaderboard",
+    "leagues": "Leagues",
+    "login": "Login",
+    "logout": "Logout",
+    "profile": "My Profile"
+  },
+  "auth": {
+    "email": "Email",
+    "password": "Password",
+    "display_name": "Display Name",
+    "login": "Login",
+    "register": "Register",
+    "no_account": "Don't have an account? Register",
+    "has_account": "Already have an account? Login",
+    "logout_confirm": "Are you sure you want to log out?"
+  },
+  "matches": {
+    "title": "WC 2026 Matches",
+    "group_stage": "Group Stage",
+    "knockout": "Knockout",
+    "round": "Round",
+    "group": "Group",
+    "home": "Home",
+    "away": "Away",
+    "predicted": "Your prediction",
+    "result": "Result",
+    "save_predictions": "Save predictions"
+  },
+  "predictions": {
+    "title": "Your Predictions",
+    "save_success": "Predictions saved!",
+    "all_matches_tipped": "You have predicted all matches.",
+    "missing_predictions": "Matches without predictions",
+    "tournament_bonuses": "Bonus Questions",
+    "winner": "Winner",
+    "top_scorer": "Top Scorer",
+    "top_assist": "Top Assist",
+    "total_goals": "Total Goals"
+  },
+  "leaderboard": {
+    "title": "Leaderboard",
+    "global": "Global",
+    "league": "League",
+    "rank": "Rank",
+    "player": "Player",
+    "points": "Points",
+    "predictions": "Predictions",
+    "perfect": "Perfect predictions",
+    "no_data": "No results yet"
+  },
+  "leagues": {
+    "title": "Leagues",
+    "create": "Create new league",
+    "join": "Join league",
+    "invite_code": "Invite code",
+    "members": "Members",
+    "admin": "Admin"
+  },
+  "common": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "close": "Close",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "retry": "Retry",
+    "success": "Done!",
+    "confirm": "Confirm",
+    "dark_mode": "Dark mode",
+    "light_mode": "Light mode",
+    "language": "Language"
+  },
+  "wc2026": {
+    "dates": "June 11 – July 19, 2026",
+    "location": "USA, Canada, Mexico"
+  }
+}
