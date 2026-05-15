@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from database import engine, Base
 from config import settings
-from routers import auth, matches, predictions, leagues
+from routers import auth, matches, predictions, leagues, leaderboard
 
 # Create tables on startup
 Base.metadata.create_all(bind=engine)
@@ -37,6 +37,7 @@ app.include_router(auth.router)
 app.include_router(matches.router)
 app.include_router(predictions.router)
 app.include_router(leagues.router)
+app.include_router(leaderboard.router)
 
 
 @app.get("/health")
