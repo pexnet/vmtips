@@ -29,7 +29,7 @@ export default function LoginPage() {
     try {
       const res = await authApi.login({ email, password });
       login(res.data.access_token);
-      navigate("/");
+      navigate("/leaderboard");
     } catch (err: any) {
       setError(err.response?.data?.detail || t("common.error"));
     } finally {

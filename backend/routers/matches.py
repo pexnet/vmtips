@@ -12,28 +12,40 @@ router = APIRouter(prefix="/matches", tags=["matches"])
 
 
 def _match_to_dict(match: Match) -> dict:
-    """Serialize a Match ORM row into a dict matching MatchOut."""
+    """Serialize a Match ORM row into a dict."""
+    home = match.home_team
+    away = match.away_team
     return {
         "id": match.id,
         "match_number": match.match_number,
         "group": match.group,
         "round": match.round,
         "home_team": {
-            "id": match.home_team.id,
-            "name": match.home_team.name,
-            "code": match.home_team.code,
-            "group": match.home_team.group,
-            "flag_emoji": match.home_team.flag_emoji,
-        } if match.home_team else None,
+            "id": home.id,
+            "name": home.name,
+            "code": home.code,
+            "group": home.group,
+            "flag_emoji": home.flag_emoji,
+        } if home else {
+            "id": 0,
+            "name": match.home_team_placeholder or "TBD",
+            "code": "",
+            "group": "",
+            "flag_emoji": "❓",
+        },
         "away_team": {
-            "id": match.away_team.id,
-            "name": match.away_team.name,
-            "code": match.away_team.code,
-            "group": match.away_team.group,
-            "flag_emoji": match.away_team.flag_emoji,
-        } if match.away_team else None,
-        "home_team_placeholder": match.home_team_placeholder,
-        "away_team_placeholder": match.away_team_placeholder,
+            "id": away.id,
+            "name": away.name,
+            "code": away.code,
+            "group": away.group,
+            "flag_emoji": away.flag_emoji,
+        } if away else {
+            "id": 0,
+            "name": match.away_team_placeholder or "TBD",
+            "code": "",
+            "group": "",
+            "flag_emoji": "❓",
+        },
         "home_goals": match.home_goals,
         "away_goals": match.away_goals,
         "match_date": match.match_date.isoformat() if match.match_date else None,

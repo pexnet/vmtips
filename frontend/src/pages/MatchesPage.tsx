@@ -13,23 +13,30 @@ import {
   Chip,
   Alert,
   CircularProgress,
+  Autocomplete,
 } from "@mui/material";
-import { matchesApi } from "../api/client";
+import { matchesApi, predictionsApi } from "../api/client";
 
 interface Match {
   id: number;
   match_number: number;
   round: string;
   group?: string;
-  home_team: { name: string; flag: string };
-  away_team: { name: string; flag: string };
+  home_team: { name: string; flag_emoji: string };
+  away_team: { name: string; flag_emoji: string };
   match_date: string;
   status: string;
   home_goals: number | null;
   away_goals: number | null;
 }
 
-function MatchRow({
+interface Team {
+  id: number;
+  name: string;
+  flag_emoji: string;
+}
+
+function MatchCard({
   match,
   predictions,
   onChange,
@@ -58,77 +65,187 @@ function MatchRow({
     <Paper
       elevation={1}
       sx={{
-        p: 1,
-        mb: 0.5,
+        p: 1.5,
         display: "flex",
-        alignItems: "center",
+        flexDirection: "column",
         gap: 1,
-        flexWrap: "nowrap",
-        overflow: "hidden",
+        minHeight: 120,
       }}
     >
-      <Box sx={{ minWidth: 120, maxWidth: 160 }}>
-        <Typography variant="caption" color="text.secondary" noWrap>
-          {match.group ? `${match.group} · ` : ""}
-          {match.match_number} · {kickoff}
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <Typography variant="caption" color="text.secondary">
+          {match.group || match.round.toUpperCase()} · {kickoff}
         </Typography>
-      </Box>
-
-      <Box sx={{ flex: "1 1 auto", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5 }}>
-        <Typography variant="body2" noWrap sx={{ fontWeight: 500, textAlign: "right" }}>
-          {home.name}
-        </Typography>
-        <Typography variant="body2" sx={{ fontSize: "1.2rem" }}>
-          {home.flag || "🌍"}
-        </Typography>
-      </Box>
-
-      <Box sx={{ display: "flex", gap: 0.5 }}>
-        <TextField
-          size="small"
-          type="number"
-          placeholder="-"
-          value={pred.home}
-          onChange={(e) => {
-            const val = e.target.value;
-            if (val === "" || Number(val) >= 0) onChange(match.id, "home", val);
-          }}
-          disabled={disabled}
-          sx={{ width: 56 }}
-          slotProps={{ htmlInput: { min: 0 } }}
-        />
-        <TextField
-          size="small"
-          type="number"
-          placeholder="-"
-          value={pred.away}
-          onChange={(e) => {
-            const val = e.target.value;
-            if (val === "" || Number(val) >= 0) onChange(match.id, "away", val);
-          }}
-          disabled={disabled}
-          sx={{ width: 56 }}
-          slotProps={{ htmlInput: { min: 0 } }}
-        />
-      </Box>
-
-      <Box sx={{ flex: "1 1 auto", display: "flex", alignItems: "center", gap: 0.5 }}>
-        <Typography variant="body2" sx={{ fontSize: "1.2rem" }}>
-          {away.flag || "🌍"}
-        </Typography>
-        <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
-          {away.name}
-        </Typography>
-      </Box>
-
-      <Box sx={{ minWidth: 70 }}>
         {isFinished ? (
           <Chip size="small" label={t("matches.result")} color="success" />
         ) : isLocked ? (
           <Chip size="small" label={t("matches.locked")} color="error" />
         ) : null}
       </Box>
+
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+        <Typography variant="body2" sx={{ fontSize: "1.1rem" }}>{home.flag_emoji}</Typography>
+        <Typography variant="body2" sx={{ fontWeight: 500, flex: 1 }} noWrap>
+          {home.name}
+        </Typography>
+        <TextField
+          size="small"
+          type="text"
+          placeholder="-"
+          value={pred.home}
+          onChange={(e) => {
+            const val = e.target.value;
+            if (val === "" || (/^\d*$/.test(val) && Number(val) <= 15)) {
+              onChange(match.id, "home", val);
+            }
+          }}
+          disabled={disabled}
+          sx={{ width: 60, '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': { WebkitAppearance: 'none' } }}
+        />
+      </Box>
+
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+        <Typography variant="body2" sx={{ fontSize: "1.1rem" }}>{away.flag_emoji}</Typography>
+        <Typography variant="body2" sx={{ fontWeight: 500, flex: 1 }} noWrap>
+          {away.name}
+        </Typography>
+        <TextField
+          size="small"
+          type="text"
+          placeholder="-"
+          value={pred.away}
+          onChange={(e) => {
+            const val = e.target.value;
+            if (val === "" || (/^\d*$/.test(val) && Number(val) <= 15)) {
+              onChange(match.id, "away", val);
+            }
+          }}
+          disabled={disabled}
+          sx={{ width: 60, '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': { WebkitAppearance: 'none' } }}
+        />
+      </Box>
+
+      {isFinished && match.home_goals !== null && (
+        <Typography variant="caption" color="text.secondary" align="center">
+          {t("matches.result")}: {match.home_goals} - {match.away_goals}
+        </Typography>
+      )}
     </Paper>
+  );
+}
+
+function BonusTab() {
+  const { t } = useTranslation();
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [bonuses, setBonuses] = useState({
+    winner_team_id: null as number | null,
+    top_scorer_name: "",
+    top_assist_name: "",
+    total_goals: "",
+  });
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    predictionsApi.tournament().then((res) => {
+      const b = res.data || {};
+      setBonuses({
+        winner_team_id: b.winner_team_id || null,
+        top_scorer_name: b.top_scorer_name || "",
+        top_assist_name: b.top_assist_name || "",
+        total_goals: b.total_goals != null ? String(b.total_goals) : "",
+      });
+    });
+    matchesApi.list().then((res) => {
+      const all = res.data;
+      const teamMap = new Map<number, Team>();
+      all.forEach((m: any) => {
+        if (m.home_team?.id) teamMap.set(m.home_team.id, m.home_team);
+        if (m.away_team?.id) teamMap.set(m.away_team.id, m.away_team);
+      });
+      setTeams(Array.from(teamMap.values()));
+    });
+  }, []);
+
+  const handleSave = () => {
+    predictionsApi
+      .saveTournament({
+        winner_team_id: bonuses.winner_team_id || undefined,
+        top_scorer_name: bonuses.top_scorer_name || undefined,
+        top_assist_name: bonuses.top_assist_name || undefined,
+        total_goals: bonuses.total_goals ? Number(bonuses.total_goals) : undefined,
+      })
+      .then(() => setSaved(true))
+      .catch(() => setSaved(false));
+  };
+
+  return (
+    <Box sx={{ maxWidth: 600, mx: "auto", mt: 2 }}>
+      <Typography variant="h6" gutterBottom>
+        {t("predictions.bonus_questions")}
+      </Typography>
+
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <Autocomplete
+          options={teams}
+          getOptionLabel={(o) => `${o.flag_emoji} ${o.name}`}
+          value={teams.find((t) => t.id === bonuses.winner_team_id) || null}
+          onChange={(_, v) => setBonuses((b) => ({ ...b, winner_team_id: v?.id || null }))}
+          renderInput={(params) => (
+            <TextField {...params} label={t("predictions.winner")} />
+          )}
+        />
+
+        <TextField
+          label={t("predictions.top_scorer")}
+          value={bonuses.top_scorer_name}
+          onChange={(e) => setBonuses((b) => ({ ...b, top_scorer_name: e.target.value }))}
+        />
+
+        <TextField
+          label={t("predictions.top_assist")}
+          value={bonuses.top_assist_name}
+          onChange={(e) => setBonuses((b) => ({ ...b, top_assist_name: e.target.value }))}
+        />
+
+        <TextField
+          label={t("predictions.total_goals")}
+          type="number"
+          value={bonuses.total_goals}
+          onChange={(e) => {
+            const val = e.target.value;
+            if (val === "" || Number(val) >= 0) setBonuses((b) => ({ ...b, total_goals: val }));
+          }}
+          slotProps={{ htmlInput: { min: 0 } }}
+        />
+
+        <Button variant="contained" onClick={handleSave}>
+          {t("matches.save_predictions")}
+        </Button>
+
+        {saved && <Alert severity="success">{t("common.saved")}</Alert>}
+      </Box>
+    </Box>
+  );
+}
+
+// Flexbox wrapper: 2 per rad på sm+
+function TwoColumnGrid({ children }: { children: React.ReactNode }) {
+  return (
+    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
+      {Array.isArray(children)
+        ? children.map((child, i) => (
+            <Box
+              key={i}
+              sx={{
+                flexBasis: { xs: "100%", sm: "calc(50% - 8px)" },
+                flexGrow: 1,
+              }}
+            >
+              {child}
+            </Box>
+          ))
+        : children}
+    </Box>
   );
 }
 
@@ -204,64 +321,90 @@ export default function MatchesPage() {
 
   return (
     <Container sx={{ mt: 2, mb: 8, maxWidth: "lg" }}>
-      <Typography variant="h4" gutterBottom>{t("matches.title")}</Typography>
+      <Typography variant="h4" gutterBottom>
+        {t("matches.title")}
+      </Typography>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 1 }}>
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
         <Tab label={t("matches.group_stage")} />
         <Tab label={t("matches.knockout")} />
+        <Tab label={t("predictions.bonus_questions")} />
       </Tabs>
 
+      {/* GROUP STAGE */}
       {tab === 0 && (
         <Box>
           {groups.map((group) => (
-            <Box key={group} sx={{ mb: 2 }}>
-              <Typography variant="subtitle1" sx={{ mb: 0.5, fontWeight: 600 }}>
+            <Box key={group} sx={{ mb: 3 }}>
+              <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>
                 {group}
               </Typography>
-              {groupMatches
-                .filter((m) => m.group === group)
-                .map((m) => (
-                  <MatchRow
-                    key={m.id}
-                    match={m}
-                    predictions={predictions}
-                    onChange={handleChange}
-                  />
-                ))}
+              <TwoColumnGrid>
+                {groupMatches
+                  .filter((m) => m.group === group)
+                  .map((m) => (
+                    <MatchCard
+                      key={m.id}
+                      match={m}
+                      predictions={predictions}
+                      onChange={handleChange}
+                    />
+                  ))}
+              </TwoColumnGrid>
             </Box>
           ))}
         </Box>
       )}
 
+      {/* KNOCKOUT */}
       {tab === 1 && (
         <Box>
-          {knockoutMatches.map((m) => (
-            <MatchRow
-              key={m.id}
-              match={m}
-              predictions={predictions}
-              onChange={handleChange}
-            />
-          ))}
+          {["ro32", "ro16", "qf", "sf", "3p", "final"].map((round) => {
+            const roundMatches = knockoutMatches.filter((m) => m.round === round);
+            if (roundMatches.length === 0) return null;
+            return (
+              <Box key={round} sx={{ mb: 3 }}>
+                <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>
+                  {round === "ro32" ? "Round of 32" : round === "ro16" ? "Round of 16" : round === "qf" ? "Quarter-finals" : round === "sf" ? "Semi-finals" : round === "3p" ? "3rd Place" : "Final"}
+                </Typography>
+                <TwoColumnGrid>
+                  {roundMatches.map((m) => (
+                    <MatchCard
+                      key={m.id}
+                      match={m}
+                      predictions={predictions}
+                      onChange={handleChange}
+                    />
+                  ))}
+                </TwoColumnGrid>
+              </Box>
+            );
+          })}
         </Box>
       )}
 
-      <Box sx={{ position: "sticky", bottom: 16, textAlign: "center", bgcolor: "background.default", p: 1 }}>
-        <Button
-          variant="contained"
-          size="large"
-          onClick={() => {
-            const token = localStorage.getItem("token");
-            if (!token) navigate("/login");
-            else handleSave();
-          }}
-          disabled={Object.keys(predictions).length === 0}
-        >
-          {t("matches.save_predictions")}
-        </Button>
-      </Box>
+      {/* BONUS */}
+      {tab === 2 && <BonusTab />}
+
+      {/* Save button */}
+      {tab !== 2 && (
+        <Box sx={{ position: "sticky", bottom: 16, textAlign: "center", bgcolor: "background.default", p: 1 }}>
+          <Button
+            variant="contained"
+            size="large"
+            onClick={() => {
+              const token = localStorage.getItem("token");
+              if (!token) navigate("/login");
+              else handleSave();
+            }}
+            disabled={Object.keys(predictions).length === 0}
+          >
+            {t("matches.save_predictions")}
+          </Button>
+        </Box>
+      )}
     </Container>
   );
 }
