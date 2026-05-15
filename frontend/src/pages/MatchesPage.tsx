@@ -23,6 +23,7 @@ interface Match {
   group?: string;
   home_team: { name: string; flag: string };
   away_team: { name: string; flag: string };
+  match_date: string;
   status: string;
   home_goals: number | null;
   away_goals: number | null;
@@ -37,23 +38,33 @@ function MatchCard({
   predictions: Record<number, { home: string; away: string }>;
   onChange: (id: number, side: "home" | "away", val: string) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const home = match.home_team;
   const away = match.away_team;
   const pred = predictions[match.id] || { home: "", away: "" };
   const isFinished = match.status === "finished";
+  const isLocked = new Date(match.match_date) <= new Date();
+  const disabled = isFinished || isLocked;
+
+  const kickoff = new Date(match.match_date).toLocaleString(i18n.language, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
   return (
     <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
         <Typography variant="caption" color="text.secondary">
           {match.group ? `${match.group} · ` : ""}
-          {match.match_number}
+          {match.match_number} · {kickoff}
         </Typography>
         <Chip
           size="small"
-          label={isFinished ? t("matches.result") : match.status}
-          color={isFinished ? "success" : "default"}
+          label={isFinished ? t("matches.result") : isLocked ? t("matches.locked") : match.status}
+          color={isFinished ? "success" : isLocked ? "error" : "default"}
         />
       </Box>
 
@@ -70,7 +81,7 @@ function MatchCard({
             placeholder="-"
             value={pred.home}
             onChange={(e) => onChange(match.id, "home", e.target.value)}
-            disabled={isFinished}
+            disabled={disabled}
             fullWidth
           />
         </Box>
@@ -81,7 +92,7 @@ function MatchCard({
             placeholder="-"
             value={pred.away}
             onChange={(e) => onChange(match.id, "away", e.target.value)}
-            disabled={isFinished}
+            disabled={disabled}
             fullWidth
           />
         </Box>

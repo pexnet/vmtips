@@ -30,6 +30,7 @@
     "away": "Away",
     "predicted": "Your prediction",
     "result": "Result",
+    "locked": "Locked",
     "save_predictions": "Save predictions"
   },
   "predictions": {

@@ -1,6 +1,7 @@
 """
 Predictions router: save batch predictions and tournament bonuses.
 """
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -19,8 +20,15 @@ def _pred_to_dict(pred: Prediction) -> dict:
         "match_id": pred.match_id,
         "home_goals": pred.home_goals,
         "away_goals": pred.away_goals,
-        "created_at": pred.created_at.isoformat() if pred.created_at else None,
-        "updated_at": pred.updated_at.isoformat() if pred.updated_at else None,
+        "created_at": pred.created_at,
+        "updated_at": pred.updated_at,
+        "match": {
+            "match_number": pred.match.match_number,
+            "round": pred.match.round,
+            "group": pred.match.group,
+            "home_team": {"name": pred.match.home_team.name, "flag": pred.match.home_team.flag_emoji},
+            "away_team": {"name": pred.match.away_team.name, "flag": pred.match.away_team.flag_emoji},
+        },
     }
 
 
@@ -39,16 +47,29 @@ def save_batch(
 ):
     """Upsert a batch of match predictions for the authenticated user."""
     match_ids = {p.match_id for p in payload.predictions}
-    existing_matches = {m.id for m in db.query(Match).filter(Match.id.in_(match_ids)).all()}
-    missing = match_ids - existing_matches
+    matches = {m.id: m for m in db.query(Match).filter(Match.id.in_(match_ids)).all()}
+    missing = match_ids - set(matches.keys())
     if missing:
         raise HTTPException(
             status_code=400,
             detail={"error": "invalid_match_ids", "ids": list(missing)},
         )
 
+    now = datetime.utcnow()
     saved = 0
     for pred_create in payload.predictions:
+        match = matches[pred_create.match_id]
+        # Reject prediction if match has already started
+        if match.match_date <= now:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error": "match_locked",
+                    "match_id": match.id,
+                    "kickoff": match.match_date.isoformat(),
+                },
+            )
+
         existing = (
             db.query(Prediction)
             .filter(
