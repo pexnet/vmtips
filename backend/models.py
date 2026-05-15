@@ -36,6 +36,7 @@ class User(Base):
     tournament_bonuses = relationship("TournamentBonus", back_populates="user", uselist=False, cascade="all, delete-orphan")
     league_memberships = relationship("LeagueMember", back_populates="user", cascade="all, delete-orphan")
     scores = relationship("Score", back_populates="user", cascade="all, delete-orphan")
+    bracket_predictions = relationship("BracketPrediction", back_populates="user", cascade="all, delete-orphan")
 
 
 class Team(Base):
@@ -163,6 +164,23 @@ class LeagueBonusAnswer(Base):
     points_awarded = Column(Integer)
 
     question = relationship("LeagueBonusQuestion", back_populates="answers")
+
+
+class BracketPrediction(Base):
+    __tablename__ = "bracket_predictions"
+    __table_args__ = (
+        UniqueConstraint("user_id", "team_id", "round", name="uq_user_team_round"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
+    round = Column(String, nullable=False)  # round_of_32 / round_of_16 / quarter_final / semi_final / final
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+    user = relationship("User", back_populates="bracket_predictions")
+    team = relationship("Team")
 
 
 class Score(Base):

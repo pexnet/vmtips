@@ -119,6 +119,7 @@ class PredictionBatchCreate(BaseModel):
 
 class LeagueCreate(BaseModel):
     name: str
+    is_public: bool = False
 
 
 class LeagueJoin(BaseModel):
@@ -146,8 +147,68 @@ class LeagueDetailOut(LeagueOut):
     members: list[LeagueMemberOut]
 
 
+class LeaguePublicOut(BaseModel):
+    """Public league info returned to unauthenticated users (no invite_code)."""
+    id: int
+    name: str
+    member_count: int
+    created_at: str | None = None
+
+    class Config:
+        from_attributes = True
+
+
+# ── League Bonus Questions ────────────────────────────────────
+
+class LeagueBonusQuestionCreate(BaseModel):
+    question_text: str = Field(..., min_length=1, max_length=500)
+    points_value: int = Field(..., ge=1)
+
+
+class LeagueBonusQuestionUpdate(BaseModel):
+    question_text: str | None = Field(None, min_length=1, max_length=500)
+    points_value: int | None = Field(None, ge=1)
+    answer: str | None = None
+
+
+class LeagueBonusQuestionOut(BaseModel):
+    id: int
+    league_id: int
+    question_text: str
+    points_value: int
+    answer: str | None = None
+    created_at: str | None = None
+
+    class Config:
+        from_attributes = True
+
+
 # ── Admin ─────────────────────────────────────────────────────
 
 class MatchResultUpdate(BaseModel):
     home_goals: int = Field(..., ge=0, le=30)
     away_goals: int = Field(..., ge=0, le=30)
+
+
+# ── Bracket Predictions ───────────────────────────────────────
+
+class BracketPredictionEntry(BaseModel):
+    """Single team placement in a knockout round."""
+    team_id: int
+    round: str  # round_of_32 / round_of_16 / quarter_final / semi_final / final
+
+
+class BracketPredictionBatch(BaseModel):
+    """Batch of bracket predictions for the authenticated user."""
+    entries: list[BracketPredictionEntry]
+
+
+class BracketPredictionOut(BaseModel):
+    id: int
+    team_id: int
+    round: str
+    created_at: str
+    updated_at: str
+
+    class Config:
+        from_attributes = True

@@ -9,15 +9,15 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from errors import NotFoundError, ForbiddenError
-from models import User, Prediction, Match, League, LeagueMember, Score
+from models import User, Prediction, Match, League, LeagueMember, Score, BracketPrediction
 from security import fetch_current_user
-from scoring import calculate_match_points
+from scoring import calculate_match_points, calculate_bracket_points, BRACKET_ROUND_POINTS
 
 router = APIRouter(prefix="/leaderboard", tags=["leaderboard"])
 
 
 def _calculate_user_score(user_id: int, db: Session) -> dict:
-    """Calculate a user's total score and breakdown from predictions + match results."""
+    """Calculate a user's total score and breakdown from predictions + match results + bracket."""
     predictions = (
         db.query(Prediction)
         .filter(
@@ -29,7 +29,7 @@ def _calculate_user_score(user_id: int, db: Session) -> dict:
     )
 
     match_points = []
-    total_points = 0
+    total_match_points = 0
     perfect_count = 0
 
     for pred in predictions:
@@ -43,7 +43,7 @@ def _calculate_user_score(user_id: int, db: Session) -> dict:
             match.home_goals,
             match.away_goals,
         )
-        total_points += score["points"]
+        total_match_points += score["points"]
         if score["perfect"]:
             perfect_count += 1
 
@@ -59,13 +59,61 @@ def _calculate_user_score(user_id: int, db: Session) -> dict:
             "perfect": score["perfect"],
         })
 
+    # ── Bracket points ──
+    # Build actual advancements from finished knockout matches
+    actual_advancements = _build_actual_advancements(db)
+    bracket_preds = (
+        db.query(BracketPrediction)
+        .filter(BracketPrediction.user_id == user_id)
+        .all()
+    )
+    bracket_result = calculate_bracket_points(
+        predictions=[{"team_id": bp.team_id, "round": bp.round} for bp in bracket_preds],
+        actual_advancements=list(actual_advancements),
+    )
+    total_bracket_points = bracket_result["points"]
+
+    total_points = total_match_points + total_bracket_points
+
     return {
         "total_points": total_points,
+        "match_points": total_match_points,
+        "bracket_points": total_bracket_points,
         "predictions_made": len(predictions),
         "matches_scored": len(match_points),
         "perfect_predictions": perfect_count,
+        "bracket_details": bracket_result["details"],
         "breakdown": match_points,
     }
+
+
+def _build_actual_advancements(db) -> list[dict]:
+    """
+    Build a list of actual team advancements from the database.
+
+    A team is considered to have reached a knockout round if there is a
+    finished match in that round where the team is listed.
+    """
+    finished_knockout = (
+        db.query(Match)
+        .filter(
+            Match.status == "finished",
+            Match.round != "group",
+        )
+        .all()
+    )
+
+    advancements = []
+    seen = set()
+    for match in finished_knockout:
+        if match.home_team_id is not None and (match.home_team_id, match.round) not in seen:
+            advancements.append({"team_id": match.home_team_id, "round": match.round})
+            seen.add((match.home_team_id, match.round))
+        if match.away_team_id is not None and (match.away_team_id, match.round) not in seen:
+            advancements.append({"team_id": match.away_team_id, "round": match.round})
+            seen.add((match.away_team_id, match.round))
+
+    return advancements
 
 
 @router.get("/global")
@@ -174,8 +222,11 @@ def my_scores(
         "user_id": current_user.id,
         "display_name": current_user.display_name or current_user.email,
         "total_points": score["total_points"],
+        "match_points": score["match_points"],
+        "bracket_points": score["bracket_points"],
         "predictions_made": score["predictions_made"],
         "matches_scored": score["matches_scored"],
         "perfect_predictions": score["perfect_predictions"],
+        "bracket_details": score["bracket_details"],
         "breakdown": score["breakdown"],
     }

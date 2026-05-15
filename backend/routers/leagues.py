@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from errors import NotFoundError, ForbiddenError, ConflictError
 from models import League, LeagueMember, User
-from schemas import LeagueCreate, LeagueJoin, LeagueOut, LeagueDetailOut
+from schemas import LeagueCreate, LeagueJoin, LeagueOut, LeagueDetailOut, LeaguePublicOut
 from security import fetch_current_user
 
 router = APIRouter(prefix="/leagues", tags=["leagues"])
@@ -47,6 +47,7 @@ def create_league(
     league = League(
         name=payload.name,
         invite_code=code,
+        is_public=payload.is_public,
         admin_user_id=current_user.id,
     )
     db.add(league)
@@ -109,6 +110,27 @@ def list_my_leagues(
     league_ids = [m.league_id for m in memberships]
     leagues = db.query(League).filter(League.id.in_(league_ids)).all()
     return [_league_to_dict(l) for l in leagues]
+
+
+@router.get("/public", response_model=list[LeaguePublicOut])
+def list_public_leagues(db: Session = Depends(get_db)):
+    """List all public leagues. No authentication required.
+    Returns league name, id, member count, and creation date (no invite_code)."""
+    public_leagues = db.query(League).filter(League.is_public == True).all()
+    result = []
+    for league in public_leagues:
+        member_count = (
+            db.query(LeagueMember)
+            .filter(LeagueMember.league_id == league.id)
+            .count()
+        )
+        result.append({
+            "id": league.id,
+            "name": league.name,
+            "member_count": member_count,
+            "created_at": league.created_at.isoformat() if league.created_at else None,
+        })
+    return result
 
 
 @router.get("/{league_id}", response_model=LeagueDetailOut)

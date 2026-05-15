@@ -1,8 +1,18 @@
 """
 Scoring engine for the VMTips application.
-Calculates points for a single match prediction against actual result.
+Calculates points for match predictions, bracket predictions, and tournament bonuses.
 """
 from typing import Optional
+
+
+# ── Bracket round point values (Section 3 of SCORING_RULES.md) ────────
+BRACKET_ROUND_POINTS = {
+    "round_of_32": 4,
+    "round_of_16": 6,
+    "quarter_final": 8,
+    "semi_final": 10,
+    "final": 15,
+}
 
 
 def _determine_outcome(home_goals: int, away_goals: int) -> str:
@@ -62,6 +72,49 @@ def calculate_match_points(
         "total_goals_correct": total_goals_correct,
         "margin_correct": margin_correct,
         "perfect": perfect,
+    }
+
+
+def calculate_bracket_points(
+    predictions: list[dict],
+    actual_advancements: list[dict],
+) -> dict:
+    """
+    Calculate bracket (knockout team placement) points.
+
+    Each prediction and advancement entry is a dict:
+        {"team_id": int, "round": str}
+
+    A team earns points when it appears in both the user's predictions and
+    the actual advancements for the same round.  Points per round are defined
+    in BRACKET_ROUND_POINTS.
+
+    Returns:
+        {
+            "points": int,
+            "details": [{"team_id": int, "round": str, "points": int}, ...],
+        }
+    """
+    # Build a set of (team_id, round) from actual advancements for fast lookup
+    actual_set = {(a["team_id"], a["round"]) for a in actual_advancements}
+
+    total_points = 0
+    details = []
+
+    for pred in predictions:
+        key = (pred["team_id"], pred["round"])
+        if key in actual_set:
+            round_pts = BRACKET_ROUND_POINTS.get(pred["round"], 0)
+            total_points += round_pts
+            details.append({
+                "team_id": pred["team_id"],
+                "round": pred["round"],
+                "points": round_pts,
+            })
+
+    return {
+        "points": total_points,
+        "details": details,
     }
 
 

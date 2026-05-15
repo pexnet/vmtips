@@ -1,5 +1,5 @@
 """
-Predictions router: save batch predictions and tournament bonuses.
+Predictions router: save batch predictions, bracket predictions, and tournament bonuses.
 """
 import math
 from datetime import datetime, timezone
@@ -10,9 +10,10 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from errors import ForbiddenError, ValidationError
-from models import Prediction, Match, TournamentBonus
-from schemas import PredictionBatchCreate, TournamentBonusCreate
+from models import Prediction, Match, TournamentBonus, BracketPrediction
+from schemas import PredictionBatchCreate, TournamentBonusCreate, BracketPredictionBatch
 from routers.auth import fetch_current_user
+from scoring import BRACKET_ROUND_POINTS
 
 router = APIRouter(prefix="/predictions", tags=["predictions"])
 
@@ -180,3 +181,74 @@ def save_tournament_bonuses(
         db.add(bonus)
     db.commit()
     return {"saved": True}
+
+
+# ── Bracket Predictions ─────────────────────────────────────────
+
+
+@router.get("/bracket")
+def get_bracket_predictions(
+    current_user=Depends(fetch_current_user), db: Session = Depends(get_db)
+):
+    """Return the authenticated user's bracket (knockout) predictions."""
+    entries = (
+        db.query(BracketPrediction)
+        .filter(BracketPrediction.user_id == current_user.id)
+        .all()
+    )
+    return [
+        {
+            "id": e.id,
+            "team_id": e.team_id,
+            "round": e.round,
+            "created_at": e.created_at,
+            "updated_at": e.updated_at,
+        }
+        for e in entries
+    ]
+
+
+@router.post("/bracket")
+def save_bracket_predictions(
+    payload: BracketPredictionBatch,
+    current_user=Depends(fetch_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Save or update bracket predictions for the authenticated user.
+
+    Each entry places a team in a specific knockout round.  If a
+    (user, team, round) prediction already exists it is replaced.
+    """
+    valid_rounds = set(BRACKET_ROUND_POINTS.keys())
+    for entry in payload.entries:
+        if entry.round not in valid_rounds:
+            raise ValidationError(
+                detail=f"invalid_round: {entry.round}",
+                error_code="invalid_round",
+            )
+
+    saved = 0
+    for entry in payload.entries:
+        existing = (
+            db.query(BracketPrediction)
+            .filter(
+                BracketPrediction.user_id == current_user.id,
+                BracketPrediction.team_id == entry.team_id,
+                BracketPrediction.round == entry.round,
+            )
+            .first()
+        )
+        if existing:
+            # Already exists; nothing to change
+            pass
+        else:
+            db.add(BracketPrediction(
+                user_id=current_user.id,
+                team_id=entry.team_id,
+                round=entry.round,
+            ))
+        saved += 1
+
+    db.commit()
+    return {"saved": saved}
