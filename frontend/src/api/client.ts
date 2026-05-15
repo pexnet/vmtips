@@ -79,8 +79,8 @@ export const leaderboardApi = {
 
 // Admin
 export const adminApi = {
-  setResult: (id: number, home: number, away: number) =>
-    api.post(`/admin/matches/${id}/result`, { home_goals: home, away_goals: away }),
+  setResult: (id: number, data: { home_goals: number; away_goals: number }) =>
+    api.post(`/admin/matches/${id}/result`, data),
   sync: () => api.post("/admin/sync-results"),
   recalc: () => api.post("/admin/scores/recalculate"),
 };

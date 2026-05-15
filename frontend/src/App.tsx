@@ -9,6 +9,7 @@ import MatchesPage from "./pages/MatchesPage";
 import PredictionsPage from "./pages/PredictionsPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import LeaguesPage from "./pages/LeaguesPage";
+import AdminPage from "./pages/AdminPage";
 
 import "./i18n";
 
@@ -26,6 +27,7 @@ export default function App() {
             <Route path="/predictions" element={<PredictionsPage />} />
             <Route path="/leaderboard" element={<LeaderboardPage />} />
             <Route path="/leagues" element={<LeaguesPage />} />
+            <Route path="/admin" element={<AdminPage />} />
           </Routes>
         </AuthProvider>
       </AppThemeProvider>

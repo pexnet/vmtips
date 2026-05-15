@@ -1,36 +1,22 @@
 services:
-  backend:
+  app:
     build:
       context: .
-      dockerfile: Dockerfile.backend
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
-    volumes:
-      - ./backend:/app
-      - ./data:/data
     environment:
-      - DATABASE_URL=sqlite:////data/vmtips.db
-      - JWT_SECRET_KEY=dev-secret-change-in-prod
-      - JWT_ALGORITHM=HS256
-      - JWT_EXPIRATION_HOURS=168
-      - ADMIN_EMAIL=admin@example.com
-      - WORLD_CUP_JSON_URL=https://worldcupjson.net/matches
-      - CORS_ORIGINS=http://localhost:5173
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-    working_dir: /app
+      - DATABASE_URL=sqlite:///app/data/vmtips.db
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:8000}
+    volumes:
+      - db:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend.dev
-    ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    environment:
-      - VITE_API_BASE_URL=http://localhost:8000
-    command: npm run dev -- --host 0.0.0.0
-    working_dir: /app
-    depends_on:
-      - backend
+volumes:
+  db:

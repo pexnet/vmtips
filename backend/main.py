@@ -2,8 +2,10 @@
 VMTips backend entrypoint.
 Provides a FastAPI application with health check, CORS, and modular routers.
 """
-from fastapi import FastAPI
+import os
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
 
 from database import engine, Base
 from config import settings
@@ -18,21 +20,21 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# CORS — parse comma-separated origins
-def _parse_origins(raw: str) -> list[str]:
-    """Split a comma-separated string of origins into a list."""
-    return [origin.strip() for origin in raw.split(",") if origin.strip()]
-
-
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_parse_origins(settings.cors_origins),
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Routers
+# Health check
+@app.get("/health")
+def health():
+    return {"status": "ok", "version": "0.1.0"}
+
+# API Routers
 app.include_router(auth.router)
 app.include_router(matches.router)
 app.include_router(predictions.router)
@@ -40,18 +42,23 @@ app.include_router(leagues.router)
 app.include_router(leaderboard.router)
 app.include_router(admin.router)
 
+# Static files — served only for non-API paths
+API_PREFIXES = (
+    "/auth", "/matches", "/predictions", "/leagues",
+    "/leaderboard", "/admin", "/health",
+)
 
-@app.get("/health")
-def health_check() -> dict:
-    """Health endpoint used by Docker and load balancers."""
-    return {"status": "ok"}
+static_dir = os.getenv("STATIC_DIR", "../frontend/dist")
 
-
-@app.get("/")
-def root() -> dict:
-    """API root redirecting to documentation."""
-    return {
-        "message": "Welcome to VMTips API",
-        "docs": "/docs",
-        "health": "/health",
-    }
+if os.path.isdir(static_dir):
+    @app.get("/{path:path}")
+    async def serve_static(path: str):
+        if any(path.startswith(p.lstrip("/")) for p in API_PREFIXES):
+            raise HTTPException(status_code=404, detail="Not found")
+        file_path = os.path.join(static_dir, path)
+        if os.path.exists(file_path) and os.path.isfile(file_path):
+            return FileResponse(file_path)
+        index_path = os.path.join(static_dir, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+        raise HTTPException(status_code=404, detail="Not found")
