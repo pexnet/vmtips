@@ -4,23 +4,7 @@ Tests verifying the seed script inserts the expected WC 2026 data.
 import pytest
 from sqlalchemy import inspect
 
-from database import engine, Base, SessionLocal
 from models import Team, Match
-from seed import main as seed_main
-
-
-@pytest.fixture(scope="function")
-def seeded_db():
-    """Drop all tables, recreate, run seed, yield session, then cleanup."""
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
-    seed_main()
-    session = SessionLocal()
-    try:
-        yield session
-    finally:
-        session.close()
-        Base.metadata.drop_all(bind=engine)
 
 
 def test_seed_creates_48_teams(seeded_db):
@@ -36,7 +20,7 @@ def test_seed_creates_72_group_matches(seeded_db):
 
 
 def test_seed_creates_32_knockout_matches(seeded_db):
-    knockout = ["ro32", "ro16", "qf", "sf", "3rd", "final"]
+    knockout = ["round_of_32", "round_of_16", "quarter_final", "semi_final", "match_for_third_place", "final"]
     assert seeded_db.query(Match).filter(Match.round.in_(knockout)).count() == 32
 
 
@@ -60,7 +44,7 @@ def test_group_matches_reference_real_teams(seeded_db):
 def test_knockout_matches_use_placeholders(seeded_db):
     ko = (
         seeded_db.query(Match)
-        .filter(Match.round == "ro32")
+        .filter(Match.round == "round_of_32")
         .first()
     )
     assert ko.home_team_id is None

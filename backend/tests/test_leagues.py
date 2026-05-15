@@ -1,21 +1,6 @@
 """
 Tests for the leagues endpoints.
 """
-import pytest
-from fastapi.testclient import TestClient
-
-from main import app
-from database import engine, Base
-from seed import main as seed_main
-
-
-@pytest.fixture(scope="function")
-def client():
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
-    seed_main()
-    yield TestClient(app)
-    Base.metadata.drop_all(bind=engine)
 
 
 def _register_and_login(client, email, password, name):
@@ -49,7 +34,6 @@ def test_list_my_leagues(client):
     """GET /leagues returns leagues the user is a member of."""
     token = _register_and_login(client, "bob@example.com", "secret123", "Bob")
 
-    # Create a league
     create_r = client.post(
         "/leagues",
         json={"name": "Bob's League"},
@@ -57,7 +41,6 @@ def test_list_my_leagues(client):
     )
     assert create_r.status_code == 201
 
-    # List leagues
     list_r = client.get("/leagues", headers={"Authorization": f"Bearer {token}"})
     assert list_r.status_code == 200
     data = list_r.json()
@@ -67,7 +50,6 @@ def test_list_my_leagues(client):
 
 def test_join_league(client):
     """A user can join a league with the correct invite code."""
-    # Admin creates league
     admin_token = _register_and_login(client, "admin@example.com", "secret123", "Admin")
     create_r = client.post(
         "/leagues",
@@ -77,7 +59,6 @@ def test_join_league(client):
     league_id = create_r.json()["id"]
     invite_code = create_r.json()["invite_code"]
 
-    # Another user joins
     user_token = _register_and_login(client, "user@example.com", "secret123", "User")
     join_r = client.post(
         f"/leagues/{league_id}/join",
@@ -119,7 +100,6 @@ def test_join_already_member(client):
     league_id = create_r.json()["id"]
     invite_code = create_r.json()["invite_code"]
 
-    # Try to join again
     join_r = client.post(
         f"/leagues/{league_id}/join",
         json={"invite_code": invite_code},

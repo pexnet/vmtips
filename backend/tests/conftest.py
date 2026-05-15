@@ -1,0 +1,143 @@
+"""
+Shared test configuration for VMTips backend tests.
+Uses an in-memory SQLite database so tests never touch production data.
+Rate limiting is bypassed by patching the shared limiter instance.
+"""
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.pool import StaticPool
+from sqlalchemy.orm import sessionmaker
+
+from database import Base, get_db
+from rate_limit import limiter
+
+# In-memory SQLite with StaticPool so all connections share the same DB.
+# Without StaticPool, each new connection creates a fresh in-memory DB,
+# causing "no such table" errors when the router gets a different connection
+# than the one where tables were created.
+TEST_DATABASE_URL = "sqlite:///:memory:"
+test_engine = create_engine(
+    TEST_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+    echo=False,
+)
+TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+
+
+def _override_get_db():
+    """Yield a test session and close it after the request."""
+    db = TestSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+def _rate_limit_noop(*args, **kwargs):
+    """No-op replacement for limiter._check_request_limit (disables rate limiting)."""
+    pass
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _bypass_rate_limit():
+    """Bypass all rate limiting for the entire test session.
+
+    We patch the shared limiter's _check_request_limit to a no-op so that
+    no request is ever rate-limited, regardless of how many calls are made.
+    This works because all routers now import the same limiter from rate_limit.py.
+    """
+    limiter._check_request_limit = _rate_limit_noop
+    limiter.enabled = False
+    yield
+    limiter.enabled = True
+
+
+# Import app AFTER fixtures are defined so that the dependency override
+# and rate limit bypass are in place before the app is fully loaded.
+from main import app
+
+# Override the app's get_db dependency so all routers use the test DB
+app.dependency_overrides[get_db] = _override_get_db
+
+
+@pytest.fixture(scope="function")
+def db():
+    """Create all tables, yield a session, then drop everything."""
+    Base.metadata.create_all(bind=test_engine)
+    session = TestSessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
+        Base.metadata.drop_all(bind=test_engine)
+
+
+@pytest.fixture(scope="function")
+def client():
+    """Yield a TestClient with fresh tables for each test."""
+    from fastapi.testclient import TestClient
+    from seed import main as seed_main
+
+    Base.metadata.drop_all(bind=test_engine)
+    Base.metadata.create_all(bind=test_engine)
+
+    # Seed using the test session so data lands in the in-memory DB
+    test_session = TestSessionLocal()
+    try:
+        seed_main(session=test_session)
+    finally:
+        test_session.close()
+
+    # Ensure rate limiting stays disabled after TestClient startup
+    limiter._check_request_limit = _rate_limit_noop
+    limiter.enabled = False
+
+    yield TestClient(app)
+    Base.metadata.drop_all(bind=test_engine)
+
+
+@pytest.fixture(scope="function")
+def seeded_db():
+    """Drop all tables, recreate, run seed, yield session, then cleanup."""
+    from seed import main as seed_main
+    Base.metadata.drop_all(bind=test_engine)
+    Base.metadata.create_all(bind=test_engine)
+
+    test_session = TestSessionLocal()
+    try:
+        seed_main(session=test_session)
+    finally:
+        test_session.close()
+
+    session = TestSessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
+        Base.metadata.drop_all(bind=test_engine)
+
+
+@pytest.fixture(scope="function")
+def set_match_result():
+    """Fixture that returns a function to set match results in the test DB."""
+    def _set_match_result(match_id, home, away):
+        from models import Match
+        db = TestSessionLocal()
+        try:
+            m = db.query(Match).filter(Match.id == match_id).first()
+            if m is None:
+                raise ValueError(f"Match {match_id} not found")
+            m.home_goals = home
+            m.away_goals = away
+            m.status = "finished"
+            db.commit()
+        finally:
+            db.close()
+    return _set_match_result
+
+
+@pytest.fixture(scope="session")
+def test_engine_fixture():
+    """Expose the test engine for tests that need to inspect tables."""
+    return test_engine

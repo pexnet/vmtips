@@ -5,17 +5,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from main import app
-from database import engine, Base, SessionLocal
+from database import Base
 from models import User
-
-
-@pytest.fixture(scope="function")
-def client():
-    """Yield a TestClient with fresh tables for each test."""
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
-    yield TestClient(app)
-    Base.metadata.drop_all(bind=engine)
 
 
 def test_register_user(client):

@@ -6,7 +6,7 @@ import datetime
 import pytest
 from sqlalchemy import inspect
 
-from database import engine, Base, SessionLocal
+from database import Base
 from models import (
     User,
     Team,
@@ -21,21 +21,9 @@ from models import (
 )
 
 
-@pytest.fixture(scope="function")
-def db():
-    """Create all tables, yield a session, then drop everything."""
-    Base.metadata.create_all(bind=engine)
-    session = SessionLocal()
-    try:
-        yield session
-    finally:
-        session.close()
-        Base.metadata.drop_all(bind=engine)
-
-
-def test_all_tables_exist(db):
+def test_all_tables_exist(db, test_engine_fixture):
     """Ensure every expected table is present in the SQLite database."""
-    inspector = inspect(engine)
+    inspector = inspect(test_engine_fixture)
     expected = {
         "users",
         "teams",
