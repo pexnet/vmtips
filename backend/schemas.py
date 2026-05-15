@@ -91,3 +91,35 @@ class TournamentBonusCreate(BaseModel):
 
 class PredictionBatchCreate(BaseModel):
     predictions: list[PredictionCreate]
+
+
+# ── Leagues ─────────────────────────────────────────────────
+
+class LeagueCreate(BaseModel):
+    name: str
+
+
+class LeagueJoin(BaseModel):
+    invite_code: str
+
+
+class LeagueMemberOut(BaseModel):
+    id: int
+    display_name: str | None = None
+    email: str
+
+
+class LeagueOut(BaseModel):
+    id: int
+    name: str
+    invite_code: str
+    created_at: str | None = None
+    admin_user_id: int
+
+    class Config:
+        from_attributes = True
+
+
+class LeagueDetailOut(LeagueOut):
+    is_admin: bool
+    members: list[LeagueMemberOut]
