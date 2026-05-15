@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Container,
@@ -21,39 +21,23 @@ import {
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { leaguesApi } from "../api/client";
-
-interface League {
-  id: number;
-  name: string;
-  invite_code: string;
-  admin_user_id: number;
-  is_admin?: boolean;
-}
+import { useLeagues, useLeagueDetail, useInvalidateLeagues } from "../hooks/useLeagues";
+import type { League } from "../types/api";
+import { getErrorDetail } from "../types/api";
 
 export default function LeaguesPage() {
   const { t } = useTranslation();
-  const [leagues, setLeagues] = useState<League[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
   const [newLeagueName, setNewLeagueName] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [joinLeagueId, setJoinLeagueId] = useState<number | null>(null);
-  const [detailLeague, setDetailLeague] = useState<any>(null);
+  const [detailLeagueId, setDetailLeagueId] = useState<number | null>(null);
 
-  const refresh = () => {
-    setLoading(true);
-    leaguesApi
-      .list()
-      .then((res) => setLeagues(res.data.leagues || []))
-      .catch(() => setError(t("common.error")))
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    refresh();
-  }, [t]);
+  const { data: leagues = [], isLoading, error: queryError } = useLeagues();
+  const { data: detailLeague } = useLeagueDetail(detailLeagueId);
+  const invalidateLeagues = useInvalidateLeagues();
 
   const handleCreate = () => {
     if (!newLeagueName.trim()) return;
@@ -62,7 +46,7 @@ export default function LeaguesPage() {
       .then(() => {
         setCreateOpen(false);
         setNewLeagueName("");
-        refresh();
+        invalidateLeagues();
       })
       .catch(() => setError(t("common.error")));
   };
@@ -74,10 +58,10 @@ export default function LeaguesPage() {
       .then(() => {
         setJoinOpen(false);
         setJoinCode("");
-        refresh();
+        invalidateLeagues();
       })
-      .catch((err: any) => {
-        setError(err.response?.data?.detail || t("common.error"));
+      .catch((err: unknown) => {
+        setError(getErrorDetail(err) || t("common.error"));
       });
   };
 
@@ -87,13 +71,12 @@ export default function LeaguesPage() {
   };
 
   const viewDetail = (id: number) => {
-    leaguesApi
-      .detail(id)
-      .then((res) => setDetailLeague(res.data))
-      .catch(() => setError(t("common.error")));
+    setDetailLeagueId(id);
   };
 
-  if (loading) {
+  const combinedError = error || (queryError ? t("common.error") : "");
+
+  if (isLoading) {
     return (
       <Container sx={{ mt: 8, textAlign: "center" }}>
         <CircularProgress />
@@ -104,14 +87,14 @@ export default function LeaguesPage() {
   return (
     <Container sx={{ mt: 4, mb: 8 }}>
       <Typography variant="h4" gutterBottom>{t("leagues.title")}</Typography>
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {combinedError && <Alert severity="error" sx={{ mb: 2 }}>{combinedError}</Alert>}
 
       <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
         <Button variant="contained" onClick={() => setCreateOpen(true)}>{t("leagues.create")}</Button>
       </Box>
 
       {leagues.length === 0 ? (
-        <Alert severity="info">Du ar inte med i nagon liga an. Skapa en eller be om en inbjudningskod!</Alert>
+        <Alert severity="info">{t("leagues.no_leagues")}</Alert>
       ) : (
         <List>
           {leagues.map((l) => (
@@ -124,7 +107,7 @@ export default function LeaguesPage() {
                       <IconButton
                         size="small"
                         onClick={() => navigator.clipboard.writeText(l.invite_code)}
-                        title="Kopiera inbjudningskod"
+                        title={t("leagues.copy_invite_code")}
                       >
                         <ContentCopyIcon fontSize="small" />
                       </IconButton>
@@ -144,7 +127,7 @@ export default function LeaguesPage() {
                       </Button>
                     </Typography>
                   }
-                  secondary={l.is_admin ? `Kod: ${l.invite_code}` : ""}
+                  secondary={l.is_admin ? `${t("leagues.code_label")}: ${l.invite_code}` : ""}
                 />
               </ListItem>
             </Paper>
@@ -159,7 +142,7 @@ export default function LeaguesPage() {
           <TextField
             autoFocus
             margin="dense"
-            label="Liganamn"
+            label={t("leagues.league_name")}
             fullWidth
             value={newLeagueName}
             onChange={(e) => setNewLeagueName(e.target.value)}
@@ -191,20 +174,20 @@ export default function LeaguesPage() {
       </Dialog>
 
       {/* Detail dialog */}
-      <Dialog open={!!detailLeague} onClose={() => setDetailLeague(null)} maxWidth="sm" fullWidth>
+      <Dialog open={!!detailLeagueId} onClose={() => setDetailLeagueId(null)} maxWidth="sm" fullWidth>
         <DialogTitle>{detailLeague?.name}</DialogTitle>
         <DialogContent>
           <Typography variant="subtitle1" gutterBottom>{t("leagues.members")}:</Typography>
           <List>
-            {detailLeague?.members?.map((m: any) => (
+            {detailLeague?.members?.map((m) => (
               <ListItem key={m.id}>
-                <ListItemText primary={m.display_name || m.email} />
+                <ListItemText primary={m.display_name} />
               </ListItem>
-            )) || <Typography color="text.secondary">Inga medlemmar</Typography>}
+            )) || <Typography color="text.secondary">{t("leagues.no_members")}</Typography>}
           </List>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDetailLeague(null)}>{t("common.close")}</Button>
+          <Button onClick={() => setDetailLeagueId(null)}>{t("common.close")}</Button>
         </DialogActions>
       </Dialog>
     </Container>

@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { type InternalAxiosRequestConfig, type AxiosResponse } from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 
@@ -10,7 +10,7 @@ export const api = axios.create({
 });
 
 // Attach auth token to every request
-api.interceptors.request.use((config: any) => {
+api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = localStorage.getItem("token");
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -18,13 +18,17 @@ api.interceptors.request.use((config: any) => {
   return config;
 });
 
-// Handle 401 globally
+// Handle 401 globally — dispatch event for AuthContext to handle
 api.interceptors.response.use(
-  (response: any) => response,
-  (error: any) => {
-    if (error.response?.status === 401) {
+  (response: AxiosResponse) => response,
+  (error: unknown) => {
+    if (
+      error instanceof Error &&
+      "response" in error &&
+      (error as { response?: { status?: number } }).response?.status === 401
+    ) {
       localStorage.removeItem("token");
-      window.location.href = "/login";
+      window.dispatchEvent(new CustomEvent("auth:401"));
     }
     return Promise.reject(error);
   }

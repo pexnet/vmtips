@@ -30,8 +30,11 @@ export default function LoginPage() {
       const res = await authApi.login({ email, password });
       login(res.data.access_token);
       navigate("/leaderboard");
-    } catch (err: any) {
-      setError(err.response?.data?.detail || t("common.error"));
+    } catch (err: unknown) {
+      const detail = err instanceof Error && "response" in err
+        ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+        : undefined;
+      setError(detail || t("common.error"));
     } finally {
       setLoading(false);
     }

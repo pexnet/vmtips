@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
 import {
   Container,
   Typography,
@@ -12,27 +11,14 @@ import {
   Autocomplete,
   CircularProgress,
 } from "@mui/material";
-import { adminApi, matchesApi } from "../api/client";
-import { useAuth } from "../contexts/AuthContext";
-
-interface Match {
-  id: number;
-  match_number: number;
-  round: string;
-  group?: string;
-  home_team: { name: string; flag: string };
-  away_team: { name: string; flag: string };
-  status: string;
-  home_goals: number | null;
-  away_goals: number | null;
-  match_date: string;
-}
+import { adminApi } from "../api/client";
+import { useMatches } from "../hooks/useMatches";
+import { queryClient } from "../contexts/QueryClientProvider";
+import type { Match } from "../types/api";
+import { getErrorDetail } from "../types/api";
 
 export default function AdminPage() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const [matches, setMatches] = useState<Match[]>([]);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [homeGoals, setHomeGoals] = useState("");
   const [awayGoals, setAwayGoals] = useState("");
@@ -40,16 +26,7 @@ export default function AdminPage() {
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (!user) {
-      navigate("/login");
-      return;
-    }
-    matchesApi
-      .list()
-      .then((res) => setMatches(res.data))
-      .catch(() => setError(t("common.error")));
-  }, [user, navigate, t]);
+  const { data: matches = [] } = useMatches();
 
   const handleSubmit = async () => {
     if (!selectedMatch) return;
@@ -61,12 +38,14 @@ export default function AdminPage() {
         home_goals: parseInt(homeGoals, 10),
         away_goals: parseInt(awayGoals, 10),
       });
-      setSuccess("Result updated!");
+      setSuccess(t("admin.result_updated"));
       setHomeGoals("");
       setAwayGoals("");
       setSelectedMatch(null);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || t("common.error"));
+      // Invalidate matches cache so data stays fresh
+      queryClient.invalidateQueries({ queryKey: ["matches"] });
+    } catch (err: unknown) {
+      setError(getErrorDetail(err) || t("common.error"));
     } finally {
       setLoading(false);
     }
@@ -77,9 +56,10 @@ export default function AdminPage() {
     setError("");
     try {
       await adminApi.sync();
-      setSuccess("Results synced!");
-    } catch (err: any) {
-      setError(err.response?.data?.detail || t("common.error"));
+      setSuccess(t("admin.results_synced"));
+      queryClient.invalidateQueries({ queryKey: ["matches"] });
+    } catch (err: unknown) {
+      setError(getErrorDetail(err) || t("common.error"));
     } finally {
       setLoading(false);
     }
@@ -90,9 +70,10 @@ export default function AdminPage() {
     setError("");
     try {
       await adminApi.recalc();
-      setSuccess("Scores recalculated!");
-    } catch (err: any) {
-      setError(err.response?.data?.detail || t("common.error"));
+      setSuccess(t("admin.scores_recalculated"));
+      queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
+    } catch (err: unknown) {
+      setError(getErrorDetail(err) || t("common.error"));
     } finally {
       setLoading(false);
     }
@@ -101,7 +82,7 @@ export default function AdminPage() {
   return (
     <Container sx={{ mt: 4 }}>
       <Typography variant="h4" gutterBottom>
-        Admin Panel
+        {t("admin.title")}
       </Typography>
 
       {error && (
@@ -117,41 +98,47 @@ export default function AdminPage() {
 
       <Paper sx={{ p: 3, mb: 3 }}>
         <Typography variant="h6" gutterBottom>
-          Enter Match Result
+          {t("admin.enter_result")}
         </Typography>
         <Autocomplete
           options={matches}
           getOptionLabel={(m) =>
-            `#${m.match_number} ${m.home_team.name} ${m.home_team.flag} vs ${m.away_team.flag} ${m.away_team.name}`
+            `#${m.match_number} ${m.home_team?.flag_emoji ?? ""} ${m.home_team?.name ?? ""} vs ${m.away_team?.flag_emoji ?? ""} ${m.away_team?.name ?? ""}`
           }
           value={selectedMatch}
           onChange={(_, value) => setSelectedMatch(value)}
           renderInput={(params) => (
-            <TextField {...params} label="Select match" fullWidth margin="normal" />
+            <TextField {...params} label={t("admin.select_match")} fullWidth margin="normal" />
           )}
         />
-        {selectedMatch && (
+        {selectedMatch && selectedMatch.home_team && selectedMatch.away_team && (
           <Box sx={{ display: "flex", gap: 2, mt: 2 }}>
             <TextField
-              label={`${selectedMatch.home_team.name} goals`}
-              type="number"
+              label={`${selectedMatch.home_team.name} ${t("admin.goals")}`}
+              type="text"
               value={homeGoals}
-              onChange={(e) => setHomeGoals(e.target.value)}
-              slotProps={{ htmlInput: { min: 0 } }}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === "" || (/^\d*$/.test(val) && Number(val) <= 30)) setHomeGoals(val);
+              }}
+              sx={{ width: 160 }}
             />
             <TextField
-              label={`${selectedMatch.away_team.name} goals`}
-              type="number"
+              label={`${selectedMatch.away_team.name} ${t("admin.goals")}`}
+              type="text"
               value={awayGoals}
-              onChange={(e) => setAwayGoals(e.target.value)}
-              slotProps={{ htmlInput: { min: 0 } }}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === "" || (/^\d*$/.test(val) && Number(val) <= 30)) setAwayGoals(val);
+              }}
+              sx={{ width: 160 }}
             />
             <Button
               variant="contained"
               onClick={handleSubmit}
               disabled={loading || homeGoals === "" || awayGoals === ""}
             >
-              {loading ? <CircularProgress size={24} /> : "Save Result"}
+              {loading ? <CircularProgress size={24} /> : t("admin.save_result")}
             </Button>
           </Box>
         )}
@@ -159,14 +146,14 @@ export default function AdminPage() {
 
       <Paper sx={{ p: 3 }}>
         <Typography variant="h6" gutterBottom>
-          Score Management
+          {t("admin.score_management")}
         </Typography>
         <Box sx={{ display: "flex", gap: 2 }}>
           <Button variant="outlined" onClick={handleSync} disabled={loading}>
-            Sync Results
+            {t("admin.sync_results")}
           </Button>
           <Button variant="outlined" onClick={handleRecalc} disabled={loading}>
-            Recalculate Scores
+            {t("admin.recalculate_scores")}
           </Button>
         </Box>
       </Paper>

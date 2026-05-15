@@ -31,7 +31,13 @@
     "predicted": "Your prediction",
     "result": "Result",
     "locked": "Locked",
-    "save_predictions": "Save predictions"
+    "save_predictions": "Save predictions",
+    "round_of_32": "Round of 32",
+    "round_of_16": "Round of 16",
+    "quarter_final": "Quarter-finals",
+    "semi_final": "Semi-finals",
+    "match_for_third_place": "3rd Place",
+    "final": "Final"
   },
   "predictions": {
     "title": "Your Predictions",
@@ -42,7 +48,8 @@
     "winner": "Winner",
     "top_scorer": "Top Scorer",
     "top_assist": "Top Assist",
-    "total_goals": "Total Goals"
+    "total_goals": "Total Goals",
+    "no_predictions": "No predictions saved yet. Go to Matches to start predicting!"
   },
   "leaderboard": {
     "title": "Leaderboard",
@@ -53,7 +60,12 @@
     "points": "Points",
     "predictions": "Predictions",
     "perfect": "Perfect predictions",
-    "no_data": "No results yet"
+    "no_data": "No results yet",
+    "select_league": "Go to Leagues to select a league leaderboard.",
+    "match": "Match",
+    "predicted": "Predicted",
+    "actual": "Actual",
+    "match_points": "Points"
   },
   "leagues": {
     "title": "Leagues",
@@ -61,11 +73,30 @@
     "join": "Join league",
     "invite_code": "Invite code",
     "members": "Members",
-    "admin": "Admin"
+    "admin": "Admin",
+    "no_leagues": "You are not in any league yet. Create one or ask for an invite code!",
+    "copy_invite_code": "Copy invite code",
+    "code_label": "Code",
+    "league_name": "League name",
+    "no_members": "No members"
+  },
+  "admin": {
+    "title": "Admin Panel",
+    "enter_result": "Enter Match Result",
+    "select_match": "Select match",
+    "goals": "goals",
+    "save_result": "Save Result",
+    "score_management": "Score Management",
+    "sync_results": "Sync Results",
+    "recalculate_scores": "Recalculate Scores",
+    "result_updated": "Result updated!",
+    "results_synced": "Results synced!",
+    "scores_recalculated": "Scores recalculated!"
   },
   "common": {
     "cancel": "Cancel",
     "save": "Save",
+    "saved": "Saved!",
     "close": "Close",
     "loading": "Loading...",
     "error": "An error occurred",

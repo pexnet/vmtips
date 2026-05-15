@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import Grid from "@mui/material/Grid";
 import {
@@ -15,9 +15,12 @@ import {
   Alert,
   CircularProgress,
 } from "@mui/material";
-import { predictionsApi, matchesApi } from "../api/client";
+import { predictionsApi } from "../api/client";
+import { usePredictions, useTournamentBonuses, useTeamsFromMatches } from "../hooks/usePredictions";
+import type { Team } from "../types/api";
 
-interface Prediction {
+/** Shape returned by the predictions list endpoint (includes nested match info). */
+interface PredictionWithMatch {
   match_id: number;
   home_goals: number;
   away_goals: number;
@@ -25,72 +28,38 @@ interface Prediction {
     match_number: number;
     round: string;
     group?: string;
-    home_team: { name: string; flag: string };
-    away_team: { name: string; flag: string };
+    home_team: { name: string; flag_emoji: string | null };
+    away_team: { name: string; flag_emoji: string | null };
   };
-}
-
-interface Team {
-  id: number;
-  name: string;
-  flag: string;
 }
 
 export default function PredictionsPage() {
   const { t } = useTranslation();
   const [tab, setTab] = useState(0);
-  const [predictions, setPredictions] = useState<Prediction[]>([]);
-  const [teams, setTeams] = useState<Team[]>([]);
   const [bonuses, setBonuses] = useState({
     winner_team_id: null as number | null,
     top_scorer_name: "",
     top_assist_name: "",
     total_goals: "",
   });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [saveMsg, setSaveMsg] = useState("");
+  const [localError, setLocalError] = useState("");
 
-  useEffect(() => {
-    Promise.all([
-      predictionsApi
-        .list()
-        .then((res) => setPredictions(res.data))
-        .catch(() => setError(t("common.error"))),
-      matchesApi
-        .list()
-        .then((res) => {
-          // Extract unique teams from matches
-          const seen = new Set();
-          const allTeams: Team[] = [];
-          res.data.forEach((m: any) => {
-            if (m.home_team?.id && !seen.has(m.home_team.id)) {
-              seen.add(m.home_team.id);
-              allTeams.push(m.home_team);
-            }
-            if (m.away_team?.id && !seen.has(m.away_team.id)) {
-              seen.add(m.away_team.id);
-              allTeams.push(m.away_team);
-            }
-          });
-          setTeams(allTeams.sort((a, b) => a.name.localeCompare(b.name)));
-        })
-        .catch(() => {}),
-      predictionsApi
-        .tournament()
-        .then((res) => {
-          if (res.data) {
-            setBonuses({
-              winner_team_id: res.data.winner_team_id || null,
-              top_scorer_name: res.data.top_scorer_name || "",
-              top_assist_name: res.data.top_assist_name || "",
-              total_goals: res.data.total_goals ? String(res.data.total_goals) : "",
-            });
-          }
-        })
-        .catch(() => {}),
-    ]).finally(() => setLoading(false));
-  }, [t]);
+  const { data: rawPredictions = [], isLoading: predictionsLoading, error: predictionsError } = usePredictions();
+  const predictions = rawPredictions as unknown as PredictionWithMatch[];
+  const { data: teams = [] } = useTeamsFromMatches();
+  const { data: bonusesData } = useTournamentBonuses();
+
+  // Populate bonuses form when tournament bonuses are loaded
+  if (bonusesData && !bonuses.top_scorer_name && !bonuses.top_assist_name && !bonuses.total_goals && bonuses.winner_team_id === null) {
+    const b = bonusesData;
+    setBonuses({
+      winner_team_id: b.winner_team_id || null,
+      top_scorer_name: b.top_scorer_name || "",
+      top_assist_name: b.top_assist_name || "",
+      total_goals: b.total_goals ? String(b.total_goals) : "",
+    });
+  }
 
   const saveBonuses = () => {
     setSaveMsg("");
@@ -102,12 +71,14 @@ export default function PredictionsPage() {
         total_goals: bonuses.total_goals ? Number(bonuses.total_goals) : undefined,
       })
       .then(() => setSaveMsg(t("predictions.save_success")))
-      .catch(() => setError(t("common.error")));
+      .catch(() => setLocalError(t("common.error")));
   };
 
-  const selectedTeam = teams.find((t) => t.id === bonuses.winner_team_id) || null;
+  const selectedTeam = teams.find((tm: Team) => tm.id === bonuses.winner_team_id) || null;
 
-  if (loading) {
+  const error = localError || (predictionsError ? t("common.error") : "");
+
+  if (predictionsLoading) {
     return (
       <Container sx={{ mt: 8, textAlign: "center" }}>
         <CircularProgress />
@@ -130,9 +101,9 @@ export default function PredictionsPage() {
       {tab === 0 && (
         <Box>
           {predictions.length === 0 ? (
-            <Alert severity="info">{`Inga tips sparade annu. Ga till "Matcher" for att tippa!`}</Alert>
+            <Alert severity="info">{t("predictions.no_predictions")}</Alert>
           ) : (
-            predictions.map((p) => (
+            predictions.map((p: PredictionWithMatch) => (
               <Paper key={p.match_id} elevation={2} sx={{ p: 2, mb: 2 }}>
                 <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
                   <Typography variant="caption" color="text.secondary">
@@ -142,9 +113,9 @@ export default function PredictionsPage() {
                   <Chip size="small" label={p.match.round} />
                 </Box>
                 <Grid container sx={{ alignItems: 'center' }} spacing={2}>
-                  <Grid size={{ xs: 4 }}><Typography align="right">{p.match.home_team.flag} {p.match.home_team.name}</Typography></Grid>
+                  <Grid size={{ xs: 4 }}><Typography align="right">{p.match.home_team.flag_emoji ?? ""} {p.match.home_team.name}</Typography></Grid>
                   <Grid size={{ xs: 4 }}><Typography align="center" variant="h6">{p.home_goals} - {p.away_goals}</Typography></Grid>
-                  <Grid size={{ xs: 4 }}><Typography>{p.match.away_team.name} {p.match.away_team.flag}</Typography></Grid>
+                  <Grid size={{ xs: 4 }}><Typography>{p.match.away_team.name} {p.match.away_team.flag_emoji ?? ""}</Typography></Grid>
                 </Grid>
               </Paper>
             ))
@@ -159,7 +130,7 @@ export default function PredictionsPage() {
           <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
             <Autocomplete
               options={teams}
-              getOptionLabel={(o) => `${o.flag} ${o.name}`}
+              getOptionLabel={(o) => `${o.flag_emoji ?? ""} ${o.name}`}
               value={selectedTeam}
               onChange={(_, v) => setBonuses((b) => ({ ...b, winner_team_id: v?.id || null }))}
               renderInput={(params) => (
@@ -183,9 +154,12 @@ export default function PredictionsPage() {
 
             <TextField
               label={t("predictions.total_goals")}
-              type="number"
+              type="text"
               value={bonuses.total_goals}
-              onChange={(e) => setBonuses((b) => ({ ...b, total_goals: e.target.value }))}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === "" || (/^\d*$/.test(val) && Number(val) <= 999)) setBonuses((b) => ({ ...b, total_goals: val }));
+              }}
               fullWidth
             />
 

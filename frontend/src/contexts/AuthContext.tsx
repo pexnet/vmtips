@@ -1,12 +1,7 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { authApi } from "../api/client";
-
-interface User {
-  id: number;
-  email: string;
-  display_name: string | null;
-}
+import type { User } from "../types/api";
 
 interface AuthContextType {
   user: User | null;
@@ -23,12 +18,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
+  const logout = useCallback(() => {
+    localStorage.removeItem("token");
+    setUser(null);
+    navigate("/login");
+  }, [navigate]);
+
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) {
       authApi
         .me()
-        .then((res: any) => setUser(res.data))
+        .then((res) => setUser(res.data as User))
         .catch(() => {
           localStorage.removeItem("token");
         })
@@ -36,17 +37,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else {
       setIsLoading(false);
     }
-  }, []);
+
+    // Listen for 401 events from axios interceptor
+    const handleAuth401 = () => {
+      setUser(null);
+      navigate("/login");
+    };
+    window.addEventListener("auth:401", handleAuth401);
+    return () => window.removeEventListener("auth:401", handleAuth401);
+  }, [navigate]);
 
   const login = (token: string) => {
     localStorage.setItem("token", token);
-    authApi.me().then((res: any) => setUser(res.data));
-  };
-
-  const logout = () => {
-    localStorage.removeItem("token");
-    setUser(null);
-    navigate("/login");
+    authApi.me().then((res) => {
+      setUser(res.data as User);
+      navigate("/leaderboard");
+    });
   };
 
   return (

@@ -28,8 +28,11 @@ export default function RegisterPage() {
     try {
       await authApi.register({ email, password, display_name: displayName });
       navigate("/login");
-    } catch (err: any) {
-      setError(err.response?.data?.detail || t("common.error"));
+    } catch (err: unknown) {
+      const detail = err instanceof Error && "response" in err
+        ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+        : undefined;
+      setError(detail || t("common.error"));
     } finally {
       setLoading(false);
     }

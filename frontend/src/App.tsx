@@ -1,7 +1,10 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppThemeProvider } from "./contexts/ThemeContext";
 import { AuthProvider } from "./contexts/AuthContext";
+import { AppQueryClientProvider } from "./contexts/QueryClientProvider";
 import Navbar from "./components/Navbar";
+import ProtectedRoute from "./components/ProtectedRoute";
+import AdminRoute from "./components/AdminRoute";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -17,20 +20,51 @@ export default function App() {
   return (
     <BrowserRouter>
       <AppThemeProvider>
-        <AuthProvider>
-          <Navbar />
-          <Routes>
+        <AppQueryClientProvider>
+          <AuthProvider>
+            <Navbar />
+            <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
-            <Route path="/matches" element={<MatchesPage />} />
-            <Route path="/predictions" element={<PredictionsPage />} />
             <Route path="/leaderboard" element={<LeaderboardPage />} />
-            <Route path="/leagues" element={<LeaguesPage />} />
-            <Route path="/admin" element={<AdminPage />} />
+            <Route
+              path="/matches"
+              element={
+                <ProtectedRoute>
+                  <MatchesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/predictions"
+              element={
+                <ProtectedRoute>
+                  <PredictionsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/leagues"
+              element={
+                <ProtectedRoute>
+                  <LeaguesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <AdminRoute>
+                  <AdminPage />
+                </AdminRoute>
+              }
+            />
+            <Route path="*" element={<LeaderboardPage />} />
           </Routes>
         </AuthProvider>
-      </AppThemeProvider>
-    </BrowserRouter>
+      </AppQueryClientProvider>
+    </AppThemeProvider>
+  </BrowserRouter>
   );
 }

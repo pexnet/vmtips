@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
@@ -15,26 +15,10 @@ import {
   CircularProgress,
   Autocomplete,
 } from "@mui/material";
-import { matchesApi, predictionsApi } from "../api/client";
-
-interface Match {
-  id: number;
-  match_number: number;
-  round: string;
-  group?: string;
-  home_team: { name: string; flag_emoji: string };
-  away_team: { name: string; flag_emoji: string };
-  match_date: string;
-  status: string;
-  home_goals: number | null;
-  away_goals: number | null;
-}
-
-interface Team {
-  id: number;
-  name: string;
-  flag_emoji: string;
-}
+import { predictionsApi } from "../api/client";
+import { useMatches } from "../hooks/useMatches";
+import { useTournamentBonuses, useTeamsFromMatches } from "../hooks/usePredictions";
+import type { Match } from "../types/api";
 
 function MatchCard({
   match,
@@ -83,47 +67,51 @@ function MatchCard({
         ) : null}
       </Box>
 
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-        <Typography variant="body2" sx={{ fontSize: "1.1rem" }}>{home.flag_emoji}</Typography>
-        <Typography variant="body2" sx={{ fontWeight: 500, flex: 1 }} noWrap>
-          {home.name}
-        </Typography>
-        <TextField
-          size="small"
-          type="text"
-          placeholder="-"
-          value={pred.home}
-          onChange={(e) => {
-            const val = e.target.value;
-            if (val === "" || (/^\d*$/.test(val) && Number(val) <= 15)) {
-              onChange(match.id, "home", val);
-            }
-          }}
-          disabled={disabled}
-          sx={{ width: 60, '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': { WebkitAppearance: 'none' } }}
-        />
-      </Box>
+      {home && (
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Typography variant="body2" sx={{ fontSize: "1.1rem" }}>{home.flag_emoji ?? ""}</Typography>
+          <Typography variant="body2" sx={{ fontWeight: 500, flex: 1 }} noWrap>
+            {home.name}
+          </Typography>
+          <TextField
+            size="small"
+            type="text"
+            placeholder="-"
+            value={pred.home}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === "" || (/^\d*$/.test(val) && Number(val) <= 15)) {
+                onChange(match.id, "home", val);
+              }
+            }}
+            disabled={disabled}
+            sx={{ width: 60, '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': { WebkitAppearance: 'none' } }}
+          />
+        </Box>
+      )}
 
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-        <Typography variant="body2" sx={{ fontSize: "1.1rem" }}>{away.flag_emoji}</Typography>
-        <Typography variant="body2" sx={{ fontWeight: 500, flex: 1 }} noWrap>
-          {away.name}
-        </Typography>
-        <TextField
-          size="small"
-          type="text"
-          placeholder="-"
-          value={pred.away}
-          onChange={(e) => {
-            const val = e.target.value;
-            if (val === "" || (/^\d*$/.test(val) && Number(val) <= 15)) {
-              onChange(match.id, "away", val);
-            }
-          }}
-          disabled={disabled}
-          sx={{ width: 60, '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': { WebkitAppearance: 'none' } }}
-        />
-      </Box>
+      {away && (
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Typography variant="body2" sx={{ fontSize: "1.1rem" }}>{away.flag_emoji ?? ""}</Typography>
+          <Typography variant="body2" sx={{ fontWeight: 500, flex: 1 }} noWrap>
+            {away.name}
+          </Typography>
+          <TextField
+            size="small"
+            type="text"
+            placeholder="-"
+            value={pred.away}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === "" || (/^\d*$/.test(val) && Number(val) <= 15)) {
+                onChange(match.id, "away", val);
+              }
+            }}
+            disabled={disabled}
+            sx={{ width: 60, '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': { WebkitAppearance: 'none' } }}
+          />
+        </Box>
+      )}
 
       {isFinished && match.home_goals !== null && (
         <Typography variant="caption" color="text.secondary" align="center">
@@ -136,7 +124,8 @@ function MatchCard({
 
 function BonusTab() {
   const { t } = useTranslation();
-  const [teams, setTeams] = useState<Team[]>([]);
+  const { data: teams = [] } = useTeamsFromMatches();
+  const { data: bonusesData } = useTournamentBonuses();
   const [bonuses, setBonuses] = useState({
     winner_team_id: null as number | null,
     top_scorer_name: "",
@@ -145,26 +134,16 @@ function BonusTab() {
   });
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
-    predictionsApi.tournament().then((res) => {
-      const b = res.data || {};
-      setBonuses({
-        winner_team_id: b.winner_team_id || null,
-        top_scorer_name: b.top_scorer_name || "",
-        top_assist_name: b.top_assist_name || "",
-        total_goals: b.total_goals != null ? String(b.total_goals) : "",
-      });
+  // Populate form when tournament bonuses are loaded
+  if (bonusesData && !bonuses.top_scorer_name && !bonuses.top_assist_name && !bonuses.total_goals && bonuses.winner_team_id === null) {
+    const b = bonusesData;
+    setBonuses({
+      winner_team_id: b.winner_team_id || null,
+      top_scorer_name: b.top_scorer_name || "",
+      top_assist_name: b.top_assist_name || "",
+      total_goals: b.total_goals != null ? String(b.total_goals) : "",
     });
-    matchesApi.list().then((res) => {
-      const all = res.data;
-      const teamMap = new Map<number, Team>();
-      all.forEach((m: any) => {
-        if (m.home_team?.id) teamMap.set(m.home_team.id, m.home_team);
-        if (m.away_team?.id) teamMap.set(m.away_team.id, m.away_team);
-      });
-      setTeams(Array.from(teamMap.values()));
-    });
-  }, []);
+  }
 
   const handleSave = () => {
     predictionsApi
@@ -187,7 +166,7 @@ function BonusTab() {
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
         <Autocomplete
           options={teams}
-          getOptionLabel={(o) => `${o.flag_emoji} ${o.name}`}
+          getOptionLabel={(o) => `${o.flag_emoji ?? ""} ${o.name}`}
           value={teams.find((t) => t.id === bonuses.winner_team_id) || null}
           onChange={(_, v) => setBonuses((b) => ({ ...b, winner_team_id: v?.id || null }))}
           renderInput={(params) => (
@@ -253,20 +232,12 @@ export default function MatchesPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [tab, setTab] = useState(0);
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [predictions, setPredictions] = useState(
     {} as Record<number, { home: string; away: string }>
   );
 
-  useEffect(() => {
-    matchesApi
-      .list()
-      .then((res) => setMatches(res.data))
-      .catch(() => setError(t("common.error")))
-      .finally(() => setLoading(false));
-  }, [t]);
+  const { data: matches = [], isLoading } = useMatches();
 
   const handleChange = (id: number, side: "home" | "away", val: string) => {
     setPredictions((prev) => ({
@@ -286,32 +257,21 @@ export default function MatchesPage() {
 
     if (batch.length === 0) return;
 
-    const token = localStorage.getItem("token");
-    if (!token) {
-      navigate("/login");
-      return;
-    }
-
-    fetch("/api/predictions/batch", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ predictions: batch }),
-    })
-      .then((r) => {
-        if (r.status === 401) navigate("/login");
-        else if (r.ok) setPredictions({});
-      })
-      .catch(() => setError(t("common.error")));
+    predictionsApi
+      .batch(batch)
+      .then(() => setPredictions({}))
+      .catch((err: unknown) => {
+        const axiosErr = err as { response?: { status?: number } };
+        if (axiosErr.response?.status === 401) navigate("/login");
+        else setError(t("common.error"));
+      });
   };
 
   const groupMatches = matches.filter((m) => m.round === "group");
   const knockoutMatches = matches.filter((m) => m.round !== "group");
   const groups = [...new Set(groupMatches.map((m) => m.group).filter(Boolean))].sort();
 
-  if (loading) {
+  if (isLoading) {
     return (
       <Container sx={{ mt: 8, textAlign: "center" }}>
         <CircularProgress />
@@ -395,9 +355,12 @@ export default function MatchesPage() {
             variant="contained"
             size="large"
             onClick={() => {
-              const token = localStorage.getItem("token");
-              if (!token) navigate("/login");
-              else handleSave();
+            const token = localStorage.getItem("token");
+            if (!token) {
+              navigate("/login");
+              return;
+            }
+            handleSave();
             }}
             disabled={Object.keys(predictions).length === 0}
           >

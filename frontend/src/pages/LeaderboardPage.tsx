@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Container,
@@ -17,17 +17,10 @@ import {
   CircularProgress,
   Chip,
 } from "@mui/material";
-import { leaderboardApi } from "../api/client";
+import { useGlobalLeaderboard, usePersonalScore } from "../hooks/useLeaderboard";
+import type { LeaderboardEntry, ScoreBreakdown } from "../types/api";
 
-interface LeaderEntry {
-  rank: number;
-  display_name: string;
-  total_points: number;
-  predictions_made: number;
-  perfect_predictions: number;
-}
-
-function LeaderTable({ data }: { data: LeaderEntry[] }) {
+function LeaderTable({ data }: { data: LeaderboardEntry[] }) {
   const { t } = useTranslation();
   return (
     <TableContainer component={Paper}>
@@ -65,25 +58,11 @@ function LeaderTable({ data }: { data: LeaderEntry[] }) {
 export default function LeaderboardPage() {
   const { t } = useTranslation();
   const [tab, setTab] = useState(0);
-  const [global, setGlobal] = useState<LeaderEntry[]>([]);
-  const [personal, setPersonal] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
-  useEffect(() => {
-    Promise.all([
-      leaderboardApi
-        .global()
-        .then((res) => setGlobal(res.data.leaderboard))
-        .catch(() => setError(t("common.error"))),
-      leaderboardApi
-        .me()
-        .then((res) => setPersonal(res.data))
-        .catch(() => {}),
-    ]).finally(() => setLoading(false));
-  }, [t]);
+  const { data: global = [], isLoading: globalLoading, error: globalError } = useGlobalLeaderboard();
+  const { data: personal } = usePersonalScore();
 
-  if (loading) {
+  if (globalLoading) {
     return (
       <Container sx={{ mt: 8, textAlign: "center" }}>
         <CircularProgress />
@@ -94,7 +73,7 @@ export default function LeaderboardPage() {
   return (
     <Container sx={{ mt: 4, mb: 8 }}>
       <Typography variant="h4" gutterBottom>{t("leaderboard.title")}</Typography>
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {globalError && <Alert severity="error" sx={{ mb: 2 }}>{t("common.error")}</Alert>}
 
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
         <Tab label={t("leaderboard.global")} />
@@ -106,7 +85,7 @@ export default function LeaderboardPage() {
 
       {tab === 1 && (
         <Alert severity="info">
-          Ga till "Ligor" for att valja en liga att visa topplistan for.
+          {t("leaderboard.select_league")}
         </Alert>
       )}
 
@@ -125,14 +104,14 @@ export default function LeaderboardPage() {
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Match</TableCell>
-                    <TableCell align="center">Predicted</TableCell>
-                    <TableCell align="center">Actual</TableCell>
-                    <TableCell align="right">Points</TableCell>
+                    <TableCell>{t("leaderboard.match")}</TableCell>
+                    <TableCell align="center">{t("leaderboard.predicted")}</TableCell>
+                    <TableCell align="center">{t("leaderboard.actual")}</TableCell>
+                    <TableCell align="right">{t("leaderboard.match_points")}</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {personal.breakdown.map((row: any, i: number) => (
+                  {personal.breakdown.map((row: ScoreBreakdown, i: number) => (
                     <TableRow key={i}>
                       <TableCell>{row.home_team} vs {row.away_team}</TableCell>
                       <TableCell align="center">{row.predicted}</TableCell>

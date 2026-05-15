@@ -31,7 +31,13 @@
     "predicted": "Ditt tips",
     "result": "Resultat",
     "locked": "Låst",
-    "save_predictions": "Spara tips"
+    "save_predictions": "Spara tips",
+    "round_of_32": "Sextondelsfinal",
+    "round_of_16": "Åttondelsfinal",
+    "quarter_final": "Kvartsfinal",
+    "semi_final": "Semifinal",
+    "match_for_third_place": "Bronsmatch",
+    "final": "Final"
   },
   "predictions": {
     "title": "Dina tips",
@@ -42,7 +48,8 @@
     "winner": "Vinnare",
     "top_scorer": "Skyttekung",
     "top_assist": "Assistkung",
-    "total_goals": "Totalt antal mål"
+    "total_goals": "Totalt antal mål",
+    "no_predictions": "Inga tips sparade ännu. Gå till Matcher för att tippa!"
   },
   "leaderboard": {
     "title": "Topplista",
@@ -53,7 +60,12 @@
     "points": "Poäng",
     "predictions": "Antal tips",
     "perfect": "Perfekta tips",
-    "no_data": "Inga resultat ännu"
+    "no_data": "Inga resultat ännu",
+    "select_league": "Gå till Ligor för att välja en liga att visa topplistan för.",
+    "match": "Match",
+    "predicted": "Tippat",
+    "actual": "Faktiskt",
+    "match_points": "Poäng"
   },
   "leagues": {
     "title": "Ligor",
@@ -61,11 +73,30 @@
     "join": "Gå med i liga",
     "invite_code": "Inbjudningskod",
     "members": "Medlemmar",
-    "admin": "Admin"
+    "admin": "Admin",
+    "no_leagues": "Du är inte med i någon liga än. Skapa en eller be om en inbjudningskod!",
+    "copy_invite_code": "Kopiera inbjudningskod",
+    "code_label": "Kod",
+    "league_name": "Liganamn",
+    "no_members": "Inga medlemmar"
+  },
+  "admin": {
+    "title": "Adminpanel",
+    "enter_result": "Ange matchresultat",
+    "select_match": "Välj match",
+    "goals": "mål",
+    "save_result": "Spara resultat",
+    "score_management": "Poänghantering",
+    "sync_results": "Synka resultat",
+    "recalculate_scores": "Beräkna om poäng",
+    "result_updated": "Resultat uppdaterat!",
+    "results_synced": "Resultat synkade!",
+    "scores_recalculated": "Poäng omberäknade!"
   },
   "common": {
     "cancel": "Avbryt",
     "save": "Spara",
+    "saved": "Sparat!",
     "close": "Stäng",
     "loading": "Laddar...",
     "error": "Ett fel uppstod",
