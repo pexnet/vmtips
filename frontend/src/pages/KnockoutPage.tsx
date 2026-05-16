@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
+import { usePhase, isKnockoutOpen } from "../hooks/usePhase";
 import {
   Container,
   Typography,
@@ -34,10 +35,12 @@ function KnockoutMatchCard({
   match,
   predictions,
   onChange,
+  disabled: disabledProp = false,
 }: {
   match: Match;
   predictions: Record<number, { home: string; away: string }>;
   onChange: (id: number, side: "home" | "away", val: string) => void;
+  disabled?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const home = match.home_team;
@@ -45,7 +48,7 @@ function KnockoutMatchCard({
   const pred = predictions[match.id] || { home: "", away: "" };
   const isFinished = match.status === "finished";
   const isLocked = new Date(match.match_date) <= new Date();
-  const disabled = isFinished || isLocked;
+  const isDisabled = disabledProp || isFinished || isLocked;
 
   const kickoff = new Date(match.match_date).toLocaleString(i18n.language, {
     weekday: "short",
@@ -73,11 +76,15 @@ function KnockoutMatchCard({
         <Typography variant="caption" color="text.secondary">
           {roundLabel(match.round)} · {kickoff}
         </Typography>
-        {isFinished ? (
-          <Chip size="small" label={t("matches.result")} color="success" />
-        ) : isLocked ? (
-          <Chip size="small" label={t("matches.locked")} color="error" />
-        ) : null}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+          {isFinished ? (
+            <Chip size="small" label={t("matches.result")} color="success" />
+          ) : isLocked ? (
+            <Chip size="small" label={t("matches.locked")} color="error" />
+          ) : (
+            <Chip size="small" label={t("matches.max_points_hint", { points: 7 })} variant="outlined" color="primary" />
+          )}
+        </Box>
       </Box>
 
       {home && (
@@ -97,7 +104,7 @@ function KnockoutMatchCard({
                 onChange(match.id, "home", val);
               }
             }}
-            disabled={disabled}
+            disabled={isDisabled}
             sx={{ width: 60, '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': { WebkitAppearance: 'none' } }}
           />
         </Box>
@@ -120,7 +127,7 @@ function KnockoutMatchCard({
                 onChange(match.id, "away", val);
               }
             }}
-            disabled={disabled}
+            disabled={isDisabled}
             sx={{ width: 60, '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': { WebkitAppearance: 'none' } }}
           />
         </Box>
@@ -162,6 +169,7 @@ function BracketRoundColumn({
     semi_final: 4,
     match_for_third_place: 2,
     final: 2,
+    world_champion: 1,
   };
   const slotCount = slotsPerRound[round];
 
@@ -250,6 +258,10 @@ export default function KnockoutPage() {
   const [error, setError] = useState("");
   const [saveMsg, setSaveMsg] = useState("");
 
+  // Phase gating
+  const { data: phaseData } = usePhase();
+  const knockoutLocked = !isKnockoutOpen(phaseData);
+
   // Knockout matches & predictions
   const { data: knockoutMatches = [], isLoading: knockoutLoading } = useMatchKnockout();
   const [matchPredictions, setMatchPredictions] = useState(
@@ -270,6 +282,7 @@ export default function KnockoutPage() {
     semi_final: [],
     final: [],
     match_for_third_place: [],
+    world_champion: [],
   });
 
   // Populate bracket selections from saved entries on first load
@@ -281,6 +294,7 @@ export default function KnockoutPage() {
       semi_final: [],
       final: [],
       match_for_third_place: [],
+      world_champion: [],
     };
     for (const entry of bracketEntries) {
       const r = entry.round as BracketRound;
@@ -416,12 +430,13 @@ export default function KnockoutPage() {
           ) : (
             matchesByRound.map(({ round, matches }) => {
               const roundLabel =
-                round === "ro32" ? t("matches.round_of_32") :
-                round === "ro16" ? t("matches.round_of_16") :
-                round === "qf" ? t("matches.quarter_final") :
-                round === "sf" ? t("matches.semi_final") :
-                round === "3p" ? t("matches.match_for_third_place") :
-                t("matches.final");
+                round === "round_of_32" ? t("matches.round_of_32") :
+                round === "round_of_16" ? t("matches.round_of_16") :
+                round === "quarter_final" ? t("matches.quarter_final") :
+                round === "semi_final" ? t("matches.semi_final") :
+                round === "match_for_third_place" ? t("matches.match_for_third_place") :
+                round === "final" ? t("matches.final") :
+                round;
 
               return (
                 <Box key={round} sx={{ mb: 3 }}>
@@ -441,6 +456,7 @@ export default function KnockoutPage() {
                           match={m}
                           predictions={matchPredictions}
                           onChange={handleMatchChange}
+                          disabled={knockoutLocked}
                         />
                       </Box>
                     ))}

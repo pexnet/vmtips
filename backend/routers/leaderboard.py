@@ -9,7 +9,11 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from errors import NotFoundError, ForbiddenError
-from models import User, Prediction, Match, League, LeagueMember, Score, BracketPrediction, TournamentResult, TournamentBonus
+from models import (
+    User, Prediction, Match, League, LeagueMember, Score,
+    BracketPrediction, TournamentResult, TournamentBonus,
+    KnockoutAdvancement,
+)
 from security import fetch_current_user
 from scoring import calculate_match_points, calculate_bracket_points, calculate_tournament_bonus_points, BRACKET_ROUND_POINTS
 
@@ -60,7 +64,6 @@ def _calculate_user_score(user_id: int, db: Session) -> dict:
         })
 
     # ── Bracket points ──
-    # Build actual advancements from finished knockout matches
     actual_advancements = _build_actual_advancements(db)
     bracket_preds = (
         db.query(BracketPrediction)
@@ -73,38 +76,55 @@ def _calculate_user_score(user_id: int, db: Session) -> dict:
     )
     total_bracket_points = bracket_result["points"]
 
-    # Tournament bonus points
+    # ── Tournament bonus points ──
     actual_result = db.query(TournamentResult).first()
+    tb = db.query(TournamentBonus).filter(TournamentBonus.user_id == user_id).first()
+
     actual_winner_id = actual_result.winner_team_id if actual_result else None
     actual_top_scorer = actual_result.top_scorer_name if actual_result else None
-    actual_top_assist = actual_result.top_assist_name if actual_result else None
-    actual_total_goals = actual_result.total_goals if actual_result else None
+    actual_bronze_winner_id = actual_result.bronze_winner_team_id if actual_result else None
+    actual_most_goals_team_id = actual_result.most_goals_team_id if actual_result else None
+    actual_most_conceded_team_id = actual_result.most_conceded_team_id if actual_result else None
+    actual_custom_bonus_1 = actual_result.custom_bonus_1_answer if actual_result else None
+    actual_custom_bonus_2 = actual_result.custom_bonus_2_answer if actual_result else None
 
-    tb = db.query(TournamentBonus).filter(TournamentBonus.user_id == user_id).first()
     tournament_bonus_points = 0
     tournament_bonus_details = {
         "winner_correct": False,
         "top_scorer_correct": False,
-        "top_assist_correct": False,
-        "total_goals_correct": False,
+        "bronze_winner_correct": False,
+        "most_goals_team_correct": False,
+        "most_conceded_team_correct": False,
+        "custom_bonus_1_correct": False,
+        "custom_bonus_2_correct": False,
     }
+
     if tb:
         tb_result = calculate_tournament_bonus_points(
             pred_winner_id=tb.winner_team_id,
             actual_winner_id=actual_winner_id,
             pred_top_scorer=tb.top_scorer_name,
             actual_top_scorer=actual_top_scorer,
-            pred_top_assist=tb.top_assist_name,
-            actual_top_assist=actual_top_assist,
-            pred_total_goals=tb.total_goals,
-            actual_total_goals=actual_total_goals,
+            pred_bronze_winner_id=tb.bronze_winner_team_id,
+            actual_bronze_winner_id=actual_bronze_winner_id,
+            pred_most_goals_team_id=tb.most_goals_team_id,
+            actual_most_goals_team_id=actual_most_goals_team_id,
+            pred_most_conceded_team_id=tb.most_conceded_team_id,
+            actual_most_conceded_team_id=actual_most_conceded_team_id,
+            pred_custom_bonus_1=tb.custom_bonus_1,
+            actual_custom_bonus_1=actual_custom_bonus_1,
+            pred_custom_bonus_2=tb.custom_bonus_2,
+            actual_custom_bonus_2=actual_custom_bonus_2,
         )
         tournament_bonus_points = tb_result["points"]
         tournament_bonus_details = {
-            "winner_correct": tb_result["winner_correct"],
-            "top_scorer_correct": tb_result["top_scorer_correct"],
-            "top_assist_correct": tb_result["top_assist_correct"],
-            "total_goals_correct": tb_result["total_goals_correct"],
+            "winner_correct": tb_result.get("winner_correct", False),
+            "top_scorer_correct": tb_result.get("top_scorer_correct", False),
+            "bronze_winner_correct": tb_result.get("bronze_winner_correct", False),
+            "most_goals_correct": tb_result.get("most_goals_correct", False),
+            "most_conceded_correct": tb_result.get("most_conceded_correct", False),
+            "custom_bonus_1_correct": tb_result.get("custom_bonus_1_correct", False),
+            "custom_bonus_2_correct": tb_result.get("custom_bonus_2_correct", False),
         }
 
     total_points = total_match_points + total_bracket_points + tournament_bonus_points
@@ -127,9 +147,15 @@ def _build_actual_advancements(db) -> list[dict]:
     """
     Build a list of actual team advancements from the database.
 
-    A team is considered to have reached a knockout round if there is a
-    finished match in that round where the team is listed.
+    Prefers explicit KnockoutAdvancement entries, falls back to
+    deriving from finished knockout matches.
     """
+    # Check explicit advancements first
+    advancements_db = db.query(KnockoutAdvancement).all()
+    if advancements_db:
+        return [{"team_id": a.team_id, "round": a.round} for a in advancements_db]
+
+    # Fallback: derive from finished knockout matches
     finished_knockout = (
         db.query(Match)
         .filter(

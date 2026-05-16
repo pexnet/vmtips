@@ -1,5 +1,10 @@
 """
 Tests for the leaderboard endpoints.
+Scoring rules (7p max per match):
+  - Correct outcome: 3p
+  - Correct home score: 2p
+  - Correct away score: 2p
+  - Perfect (all 3): 7p
 """
 
 
@@ -30,7 +35,11 @@ class TestGlobalLeaderboard:
         assert data["leaderboard"][0]["total_points"] == 0
 
     def test_leaderboard_with_scores(self, client, set_match_result):
-        """Two users with predictions on a finished match."""
+        """Two users with predictions on a finished match.
+
+        Alice predicts 2-1, actual 2-1 = perfect (outcome 3 + home 2 + away 2 = 7p)
+        Bob predicts 1-0, actual 2-1 = outcome only (3p)
+        """
         set_match_result(1, 2, 1)
 
         alice_token = _register_and_login(client, "alice2@example.com", "secret123", "Alice")
@@ -41,20 +50,27 @@ class TestGlobalLeaderboard:
 
         r = client.get("/leaderboard/global")
         data = r.json()
-        assert len(data["leaderboard"]) == 2
+        # Seeded admin user (0 points) is also in the leaderboard
+        assert len(data["leaderboard"]) >= 2
 
-        assert data["leaderboard"][0]["display_name"] == "Alice"
-        assert data["leaderboard"][0]["total_points"] == 9
-        assert data["leaderboard"][0]["rank"] == 1
+        # Alice should be first (7 points), Bob second (3 points)
+        alice = next(u for u in data["leaderboard"] if u["display_name"] == "Alice")
+        assert alice["total_points"] == 7
+        assert alice["rank"] == 1
 
-        assert data["leaderboard"][1]["display_name"] == "Bob"
-        assert data["leaderboard"][1]["total_points"] == 4
-        assert data["leaderboard"][1]["rank"] == 2
+        bob = next(u for u in data["leaderboard"] if u["display_name"] == "Bob")
+        assert bob["total_points"] == 3
+        assert bob["rank"] == 2
 
 
 class TestPersonalScores:
     def test_my_scores(self, client, set_match_result):
-        """GET /leaderboard/me returns my score breakdown."""
+        """GET /leaderboard/me returns my score breakdown.
+
+        Carol predicts match1: 2-1 (actual 2-1) = 7p (perfect)
+        Carol predicts match2: 1-1 (actual 0-0) = 3p (draw correct outcome, wrong scores)
+        Total = 10p
+        """
         set_match_result(1, 2, 1)
         set_match_result(2, 0, 0)
 
@@ -70,13 +86,13 @@ class TestPersonalScores:
         data = r.json()
 
         assert data["display_name"] == "Carol"
-        assert data["total_points"] == 13
+        assert data["total_points"] == 10
         assert data["predictions_made"] == 2
         assert data["matches_scored"] == 2
         assert data["perfect_predictions"] == 1
         assert len(data["breakdown"]) == 2
         assert data["breakdown"][0]["perfect"] is True
-        assert data["breakdown"][0]["points"] == 9
+        assert data["breakdown"][0]["points"] == 7
 
     def test_my_scores_no_auth(self, client):
         """GET /leaderboard/me without token returns 401."""
@@ -86,7 +102,11 @@ class TestPersonalScores:
 
 class TestLeagueLeaderboard:
     def test_league_leaderboard(self, client, set_match_result):
-        """Members-only leaderboard for a league."""
+        """Members-only leaderboard for a league.
+
+        Alice predicts 2-1 (actual 2-1) = 7p
+        Bob predicts 1-0 (actual 2-1) = 3p
+        """
         set_match_result(1, 2, 1)
 
         alice_token = _register_and_login(client, "a@example.com", "secret123", "Alice")
@@ -107,8 +127,8 @@ class TestLeagueLeaderboard:
 
         assert data["league_name"] == "My League"
         assert len(data["leaderboard"]) == 2
-        assert data["leaderboard"][0]["total_points"] == 9
-        assert data["leaderboard"][1]["total_points"] == 4
+        assert data["leaderboard"][0]["total_points"] == 7
+        assert data["leaderboard"][1]["total_points"] == 3
 
     def test_league_not_member(self, client):
         """Non-member cannot view league leaderboard."""

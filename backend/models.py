@@ -12,6 +12,7 @@ from sqlalchemy import (
     ForeignKey,
     UniqueConstraint,
     CheckConstraint,
+    Float,
 )
 from sqlalchemy.orm import relationship
 
@@ -131,13 +132,19 @@ class TournamentBonus(Base):
     user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
     winner_team_id = Column(Integer, ForeignKey("teams.id"))
     top_scorer_name = Column(String)
-    top_assist_name = Column(String)
-    total_goals = Column(Integer)
+    bronze_winner_team_id = Column(Integer, ForeignKey("teams.id"))
+    most_goals_team_id = Column(Integer, ForeignKey("teams.id"))
+    most_conceded_team_id = Column(Integer, ForeignKey("teams.id"))
+    custom_bonus_1 = Column(String)
+    custom_bonus_2 = Column(String)
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     user = relationship("User", back_populates="tournament_bonuses")
-    winner_team = relationship("Team")
+    winner_team = relationship("Team", foreign_keys=[winner_team_id])
+    bronze_winner_team = relationship("Team", foreign_keys=[bronze_winner_team_id])
+    most_goals_team = relationship("Team", foreign_keys=[most_goals_team_id])
+    most_conceded_team = relationship("Team", foreign_keys=[most_conceded_team_id])
 
 
 class LeagueBonusQuestion(Base):
@@ -176,14 +183,13 @@ class BracketPrediction(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
-    round = Column(String, nullable=False)  # round_of_32 / round_of_16 / quarter_final / semi_final / final
+    round = Column(String, nullable=False)  # round_of_32 / round_of_16 / quarter_final / semi_final / match_for_third_place / final
+    source = Column(String, default="knockout_prediction")  # group_prediction / knockout_prediction
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     user = relationship("User", back_populates="bracket_predictions")
     team = relationship("Team")
-
-
 
 
 class TournamentResult(Base):
@@ -192,11 +198,66 @@ class TournamentResult(Base):
     id = Column(Integer, primary_key=True, index=True)
     winner_team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
     top_scorer_name = Column(String)
-    top_assist_name = Column(String)
-    total_goals = Column(Integer)
+    bronze_winner_team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
+    most_goals_team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
+    most_conceded_team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
+    custom_bonus_1_answer = Column(String)
+    custom_bonus_2_answer = Column(String)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
-    winner_team = relationship("Team")
+    winner_team = relationship("Team", foreign_keys=[winner_team_id])
+    bronze_winner_team = relationship("Team", foreign_keys=[bronze_winner_team_id])
+    most_goals_team = relationship("Team", foreign_keys=[most_goals_team_id])
+    most_conceded_team = relationship("Team", foreign_keys=[most_conceded_team_id])
+
+
+class KnockoutAdvancement(Base):
+    """Tracks which teams have actually advanced to each knockout round."""
+    __tablename__ = "knockout_advancements"
+    __table_args__ = (
+        UniqueConstraint("team_id", "round", name="uq_team_round_advancement"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
+    round = Column(String, nullable=False)  # round_of_32 / round_of_16 / quarter_final / semi_final / match_for_third_place / final
+    match_number = Column(Integer, nullable=True)  # The match where they appeared
+    created_at = Column(DateTime, default=_utcnow)
+
+    team = relationship("Team")
+
+
+class TournamentPhase(Base):
+    """Tracks the current phase of the tournament for prediction gating."""
+    __tablename__ = "tournament_phases"
+
+    id = Column(Integer, primary_key=True, index=True)
+    phase = Column(String, default="group_open")  # group_open / group_closed / knockout_open / knockout_closed
+    group_deadline = Column(DateTime, nullable=True)  # When group predictions close
+    knockout_opens_at = Column(DateTime, nullable=True)  # When knockout predictions open
+    knockout_deadline = Column(DateTime, nullable=True)  # When knockout predictions close
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+
+class GroupStanding(Base):
+    """Cached group standings computed from finished group matches."""
+    __tablename__ = "group_standings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
+    group = Column(String(1), nullable=False)
+    position = Column(Integer)  # 1-4 within group
+    played = Column(Integer, default=0)
+    won = Column(Integer, default=0)
+    drawn = Column(Integer, default=0)
+    lost = Column(Integer, default=0)
+    goals_for = Column(Integer, default=0)
+    goals_against = Column(Integer, default=0)
+    goal_difference = Column(Integer, default=0)
+    points = Column(Integer, default=0)
+
+    team = relationship("Team")
+
 
 class Score(Base):
     __tablename__ = "scores"

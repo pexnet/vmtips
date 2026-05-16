@@ -60,8 +60,11 @@ export const predictionsApi = {
   saveTournament: (data: {
     winner_team_id?: number;
     top_scorer_name?: string;
-    top_assist_name?: string;
-    total_goals?: number;
+    bronze_winner_team_id?: number;
+    most_goals_team_id?: number;
+    most_conceded_team_id?: number;
+    custom_bonus_1?: string;
+    custom_bonus_2?: string;
   }) => api.post("/predictions/tournament", data),
   bracket: () => api.get("/predictions/bracket"),
   saveBracket: (entries: Array<{ team_id: number; round: string }>) =>
@@ -93,6 +96,11 @@ export const leaderboardApi = {
   league: (id: number) => api.get(`/leaderboard/league/${id}`),
 };
 
+// Phase (public endpoint)
+export const phaseApi = {
+  get: () => api.get("/admin/phase"),
+};
+
 // Admin
 export const adminApi = {
   setResult: (id: number, data: { home_goals: number; away_goals: number }) =>
@@ -103,8 +111,11 @@ export const adminApi = {
   setTournamentResult: (data: {
     winner_team_id?: number;
     top_scorer_name?: string;
-    top_assist_name?: string;
-    total_goals?: number;
+    bronze_winner_team_id?: number;
+    most_goals_team_id?: number;
+    most_conceded_team_id?: number;
+    custom_bonus_1_answer?: string;
+    custom_bonus_2_answer?: string;
   }) => api.post("/admin/tournament-result", data),
   syncConfig: () => api.get("/admin/sync-config"),
   updateSyncConfig: (data: {
@@ -112,6 +123,25 @@ export const adminApi = {
     auto_sync_enabled?: boolean;
     auto_sync_interval_minutes?: number;
   }) => api.post("/admin/sync-config", data),
+  // Phase management
+  updatePhase: (data: {
+    phase?: string;
+    group_deadline?: string;
+    knockout_opens_at?: string;
+    knockout_deadline?: string;
+  }) => api.post("/admin/phase", data),
+  // Group standings
+  computeStandings: () => api.post("/admin/compute-standings"),
+  getStandings: () => api.get("/admin/group-standings"),
+  // Knockout advancement
+  getAdvancements: () => api.get("/admin/knockout-advancements"),
+  setAdvancement: (data: { team_id: number; round: string; match_number?: number }) =>
+    api.post("/admin/set-advancement", data),
+  resolveKnockoutTeams: () => api.post("/admin/resolve-knockout-teams"),
+  // Scoring overview
+  scoringOverview: () => api.get("/admin/scoring-overview"),
+  // All users' predictions
+  allPredictions: () => api.get("/admin/all-predictions"),
 };
 
 export default api;

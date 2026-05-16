@@ -27,7 +27,7 @@ def test_create_league(client):
     data = response.json()
     assert data["name"] == "Alice's League"
     assert len(data["invite_code"]) == 6
-    assert data["admin_user_id"] == 1
+    assert data["admin_user_id"] == 2  # Seeded admin is id=1; Alice is id=2
 
 
 def test_list_my_leagues(client):

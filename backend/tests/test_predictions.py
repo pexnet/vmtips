@@ -79,7 +79,15 @@ def test_tournament_bonuses(client):
     token = _register_and_login(client, "eve@example.com", "secret123", "Eve")
     save_r = client.post(
         "/predictions/tournament",
-        json={"winner_team_id": 1, "top_scorer_name": "Mbappe", "total_goals": 170},
+        json={
+            "winner_team_id": 1,
+            "top_scorer_name": "Mbappe",
+            "bronze_winner_team_id": 2,
+            "most_goals_team_id": 3,
+            "most_conceded_team_id": 4,
+            "custom_bonus_1": "Sweden",
+            "custom_bonus_2": "Brazil",
+        },
         headers={"Authorization": f"Bearer {token}"},
     )
     assert save_r.status_code == 200
@@ -89,7 +97,11 @@ def test_tournament_bonuses(client):
     data = get_r.json()
     assert data["winner_team_id"] == 1
     assert data["top_scorer_name"] == "Mbappe"
-    assert data["total_goals"] == 170
+    assert data["bronze_winner_team_id"] == 2
+    assert data["most_goals_team_id"] == 3
+    assert data["most_conceded_team_id"] == 4
+    assert data["custom_bonus_1"] == "Sweden"
+    assert data["custom_bonus_2"] == "Brazil"
 
 
 def test_predictions_require_auth(client):

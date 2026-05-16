@@ -1,12 +1,14 @@
 """
 Seed script for the VMTips database.
-Populates teams and all 104 World Cup 2026 matches from openfootball data.
+Populates teams, all 104 World Cup 2026 matches, a default admin user,
+and the initial tournament phase from openfootball data.
 Source: https://github.com/openfootball/worldcup.json
 Run: cd backend && uv run python seed.py
 """
 import datetime
 from database import SessionLocal, engine, Base
-from models import Team, Match
+from models import Team, Match, User, TournamentPhase, TournamentResult
+from security import get_password_hash
 
 TEAM_DATA = [
     ("Czech Republic", "CZE", "A", "🇨🇿"),
@@ -169,6 +171,15 @@ KNOCKOUT_MATCHES = [
     (104, "final", "W101", "W102", datetime.datetime(2026, 7, 19, 19, 0)),
 ]
 
+# Default admin user credentials
+ADMIN_EMAIL = "admin@vmtips.se"
+ADMIN_PASSWORD = "admin"
+ADMIN_DISPLAY_NAME = "Admin"
+
+# Custom bonus question labels (displayed in frontend)
+CUSTOM_BONUS_1 = "Vilken målvakt gör flest räddningar?"
+CUSTOM_BONUS_2 = "Vilket lag får flest gula kort?"
+
 
 def _get_team_id(db, team_name):
     """Look up a team by name. Returns None for placeholder names."""
@@ -249,6 +260,53 @@ def seed_knockout_matches(db):
     print(f"[seed] Inserted {len(matches)} knockout matches")
 
 
+def seed_admin(db):
+    """Create a default admin user if not already present."""
+    existing = db.query(User).filter(User.email == ADMIN_EMAIL).first()
+    if existing:
+        print(f"[seed] Admin user already exists: {ADMIN_EMAIL}")
+        return
+
+    admin = User(
+        email=ADMIN_EMAIL,
+        password_hash=get_password_hash(ADMIN_PASSWORD),
+        display_name=ADMIN_DISPLAY_NAME,
+        is_admin=True,
+    )
+    db.add(admin)
+    db.commit()
+    print(f"[seed] Created admin user: {ADMIN_EMAIL} / {ADMIN_PASSWORD}")
+
+
+def seed_tournament_phase(db):
+    """Create the default tournament phase row (group_open) if not present."""
+    existing = db.query(TournamentPhase).first()
+    if existing:
+        print(f"[seed] Tournament phase already exists: {existing.phase}")
+        return
+
+    phase = TournamentPhase(phase="group_open")
+    db.add(phase)
+    db.commit()
+    print("[seed] Created tournament phase: group_open")
+
+
+def seed_tournament_result(db):
+    """Seed TournamentResult with custom bonus labels if not present."""
+    existing = db.query(TournamentResult).first()
+    if existing:
+        print("[seed] Tournament result row already exists, skipping")
+        return
+
+    result = TournamentResult(
+        custom_bonus_1_answer=CUSTOM_BONUS_1,
+        custom_bonus_2_answer=CUSTOM_BONUS_2,
+    )
+    db.add(result)
+    db.commit()
+    print(f"[seed] Created tournament result with custom bonus labels")
+
+
 def main(session=None):
     """Seed the database. If a session is provided, use it (for testing)."""
     if session is None:
@@ -260,6 +318,9 @@ def main(session=None):
         seed_teams(db)
         seed_group_matches(db)
         seed_knockout_matches(db)
+        seed_admin(db)
+        seed_tournament_phase(db)
+        seed_tournament_result(db)
         print("[seed] Database seeded successfully")
     finally:
         if session is None:

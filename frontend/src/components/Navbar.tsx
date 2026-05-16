@@ -36,12 +36,6 @@ export default function Navbar() {
               <Button color="inherit" component={Link} to="/matches">
                 {t("nav.matches")}
               </Button>
-              <Button color="inherit" component={Link} to="/predictions">
-                {t("nav.predictions")}
-              </Button>
-              <Button color="inherit" component={Link} to="/knockout">
-                {t("nav.knockout")}
-              </Button>
               <Button color="inherit" component={Link} to="/leaderboard">
                 {t("nav.leaderboard")}
               </Button>
@@ -51,8 +45,16 @@ export default function Navbar() {
               <Button color="inherit" component={Link} to="/profile">
                 {t("nav.profile")}
               </Button>
+              {user?.is_admin && (
+                <Button color="inherit" component={Link} to="/admin">
+                  {t("admin.title")}
+                </Button>
+              )}
             </>
           )}
+          <Button color="inherit" component={Link} to="/info">
+            {t("nav.info")}
+          </Button>
         </Box>
 
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>

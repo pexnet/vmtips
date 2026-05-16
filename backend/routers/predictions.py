@@ -1,5 +1,7 @@
 """
 Predictions router: save batch predictions, bracket predictions, and tournament bonuses.
+Phase-gated: group stage predictions locked after group deadline, knockout predictions
+only allowed during knockout phase.
 """
 import math
 from datetime import datetime, timezone
@@ -10,12 +12,52 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from errors import ForbiddenError, ValidationError
-from models import Prediction, Match, TournamentBonus, BracketPrediction
+from models import Prediction, Match, TournamentBonus, BracketPrediction, TournamentPhase
 from schemas import PredictionBatchCreate, TournamentBonusCreate, BracketPredictionBatch
 from routers.auth import fetch_current_user
 from scoring import BRACKET_ROUND_POINTS
 
 router = APIRouter(prefix="/predictions", tags=["predictions"])
+
+
+def _get_phase(db: Session) -> TournamentPhase:
+    """Get or create the tournament phase row."""
+    phase = db.query(TournamentPhase).first()
+    if not phase:
+        phase = TournamentPhase(phase="group_open")
+        db.add(phase)
+        db.commit()
+        db.flush()
+    return phase
+
+
+def _can_predict_group(phase: TournamentPhase) -> bool:
+    """Check if group stage predictions are allowed."""
+    if phase.phase == "group_open":
+        # If no deadline set, group is always open
+        if phase.group_deadline is None:
+            return True
+        # If deadline set, check if it's passed
+        deadline = phase.group_deadline
+        if deadline.tzinfo is None:
+            deadline = deadline.replace(tzinfo=timezone.utc)
+        return datetime.now(timezone.utc) < deadline
+    return False
+
+
+def _can_predict_bracket(phase: TournamentPhase) -> bool:
+    """Check if knockout bracket predictions are allowed."""
+    if phase.phase == "knockout_open":
+        return True
+    if phase.phase == "group_closed":
+        # Bracket opens when group stage is closed (may have a scheduled open time)
+        if phase.knockout_opens_at is not None:
+            opens = phase.knockout_opens_at
+            if opens.tzinfo is None:
+                opens = opens.replace(tzinfo=timezone.utc)
+            return datetime.now(timezone.utc) >= opens
+        return False  # Not yet open
+    return False
 
 
 def _pred_to_dict(pred: Prediction) -> dict:
@@ -76,7 +118,12 @@ def save_batch(
     current_user=Depends(fetch_current_user),
     db: Session = Depends(get_db),
 ):
-    """Upsert a batch of match predictions for the authenticated user."""
+    """Upsert a batch of match predictions for the authenticated user.
+    
+    Group stage: Only allowed when phase is 'group_open' (or no phase set).
+    Knockout matches: Only allowed when phase is 'knockout_open'.
+    """
+    phase = _get_phase(db)
     match_ids = {p.match_id for p in payload.predictions}
     matches = {m.id: m for m in db.query(Match).filter(Match.id.in_(match_ids)).all()}
     missing = match_ids - set(matches.keys())
@@ -88,8 +135,18 @@ def save_batch(
     # Validate ALL predictions before making any changes (atomicity)
     for pred_create in payload.predictions:
         match = matches[pred_create.match_id]
-        # match_date may be offset-naive (SQLite stores without tz);
-        # add UTC timezone to allow comparison with the aware `now`.
+        
+        # Phase-based validation
+        if match.round == "group":
+            if not _can_predict_group(phase):
+                raise ForbiddenError(detail="group_predictions_locked", error_code="group_predictions_locked")
+        else:
+            # Knockout matches
+            if not _can_predict_bracket(phase) and phase.phase != "group_open":
+                # During group_open, don't allow knockout predictions via this endpoint
+                raise ForbiddenError(detail="knockout_predictions_locked", error_code="knockout_predictions_locked")
+        
+        # Match deadline check
         kickoff = match.match_date
         if kickoff is not None and kickoff.tzinfo is None:
             kickoff = kickoff.replace(tzinfo=timezone.utc)
@@ -144,8 +201,11 @@ def get_tournament_bonuses(
     return {
         "winner_team_id": bonus.winner_team_id,
         "top_scorer_name": bonus.top_scorer_name,
-        "top_assist_name": bonus.top_assist_name,
-        "total_goals": bonus.total_goals,
+        "bronze_winner_team_id": bonus.bronze_winner_team_id,
+        "most_goals_team_id": bonus.most_goals_team_id,
+        "most_conceded_team_id": bonus.most_conceded_team_id,
+        "custom_bonus_1": bonus.custom_bonus_1,
+        "custom_bonus_2": bonus.custom_bonus_2,
     }
 
 
@@ -155,7 +215,16 @@ def save_tournament_bonuses(
     current_user=Depends(fetch_current_user),
     db: Session = Depends(get_db),
 ):
-    """Save or update the authenticated user's tournament bonus predictions."""
+    """Save or update the authenticated user's tournament bonus predictions.
+    
+    Only allowed during group_open or knockout_open phase (before deadlines).
+    """
+    phase = _get_phase(db)
+    # Bonus predictions can be made during group open phase
+    # After group stage closes, bonuses are locked
+    if phase.phase in ("group_closed", "knockout_closed"):
+        raise ForbiddenError(detail="bonus_predictions_locked", error_code="bonus_predictions_locked")
+
     bonus = (
         db.query(TournamentBonus)
         .filter(TournamentBonus.user_id == current_user.id)
@@ -166,17 +235,26 @@ def save_tournament_bonuses(
             bonus.winner_team_id = payload.winner_team_id
         if payload.top_scorer_name is not None:
             bonus.top_scorer_name = payload.top_scorer_name
-        if payload.top_assist_name is not None:
-            bonus.top_assist_name = payload.top_assist_name
-        if payload.total_goals is not None:
-            bonus.total_goals = payload.total_goals
+        if payload.bronze_winner_team_id is not None:
+            bonus.bronze_winner_team_id = payload.bronze_winner_team_id
+        if payload.most_goals_team_id is not None:
+            bonus.most_goals_team_id = payload.most_goals_team_id
+        if payload.most_conceded_team_id is not None:
+            bonus.most_conceded_team_id = payload.most_conceded_team_id
+        if payload.custom_bonus_1 is not None:
+            bonus.custom_bonus_1 = payload.custom_bonus_1
+        if payload.custom_bonus_2 is not None:
+            bonus.custom_bonus_2 = payload.custom_bonus_2
     else:
         bonus = TournamentBonus(
             user_id=current_user.id,
             winner_team_id=payload.winner_team_id,
             top_scorer_name=payload.top_scorer_name,
-            top_assist_name=payload.top_assist_name,
-            total_goals=payload.total_goals,
+            bronze_winner_team_id=payload.bronze_winner_team_id,
+            most_goals_team_id=payload.most_goals_team_id,
+            most_conceded_team_id=payload.most_conceded_team_id,
+            custom_bonus_1=payload.custom_bonus_1,
+            custom_bonus_2=payload.custom_bonus_2,
         )
         db.add(bonus)
     db.commit()
@@ -201,6 +279,7 @@ def get_bracket_predictions(
             "id": e.id,
             "team_id": e.team_id,
             "round": e.round,
+            "source": e.source,
             "created_at": e.created_at,
             "updated_at": e.updated_at,
         }
@@ -216,10 +295,14 @@ def save_bracket_predictions(
 ):
     """
     Save or update bracket predictions for the authenticated user.
-
-    Each entry places a team in a specific knockout round.  If a
-    (user, team, round) prediction already exists it is replaced.
+    
+    Only allowed during knockout_open phase.
+    Each entry places a team in a specific knockout round.
     """
+    phase = _get_phase(db)
+    if not _can_predict_bracket(phase):
+        raise ForbiddenError(detail="bracket_predictions_locked", error_code="bracket_predictions_locked")
+
     valid_rounds = set(BRACKET_ROUND_POINTS.keys())
     for entry in payload.entries:
         if entry.round not in valid_rounds:
@@ -240,13 +323,13 @@ def save_bracket_predictions(
             .first()
         )
         if existing:
-            # Already exists; nothing to change
-            pass
+            existing.source = "knockout_prediction"
         else:
             db.add(BracketPrediction(
                 user_id=current_user.id,
                 team_id=entry.team_id,
                 round=entry.round,
+                source="knockout_prediction",
             ))
         saved += 1
 

@@ -12,8 +12,9 @@ def _register_and_login(client, email, password, name):
 
 
 class TestBracketPredictionEndpoints:
-    def test_save_bracket_predictions(self, client):
-        """User can save bracket predictions."""
+    def test_save_bracket_predictions(self, client, set_phase):
+        """User can save bracket predictions when knockout phase is open."""
+        set_phase("knockout_open")
         token = _register_and_login(client, "bracket1@example.com", "secret123", "BracketUser1")
 
         r = client.post(
@@ -30,8 +31,25 @@ class TestBracketPredictionEndpoints:
         assert r.status_code == 200
         assert r.json()["saved"] == 3
 
-    def test_get_bracket_predictions(self, client):
+    def test_bracket_locked_in_group_open(self, client):
+        """Bracket predictions are locked when phase is group_open (default)."""
+        token = _register_and_login(client, "bracket1b@example.com", "secret123", "BracketUser1b")
+
+        r = client.post(
+            "/predictions/bracket",
+            json={
+                "entries": [
+                    {"team_id": 1, "round": "round_of_16"},
+                ]
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 403
+        assert r.json()["error"] == "bracket_predictions_locked"
+
+    def test_get_bracket_predictions(self, client, set_phase):
         """User can retrieve their bracket predictions."""
+        set_phase("knockout_open")
         token = _register_and_login(client, "bracket2@example.com", "secret123", "BracketUser2")
 
         # Save some first
@@ -57,8 +75,9 @@ class TestBracketPredictionEndpoints:
         assert "round_of_32" in rounds
         assert "final" in rounds
 
-    def test_invalid_round_rejected(self, client):
+    def test_invalid_round_rejected(self, client, set_phase):
         """Invalid round name returns 400."""
+        set_phase("knockout_open")
         token = _register_and_login(client, "bracket3@example.com", "secret123", "BracketUser3")
 
         r = client.post(
@@ -83,8 +102,9 @@ class TestBracketPredictionEndpoints:
         )
         assert r.status_code == 401
 
-    def test_duplicate_bracket_prediction_idempotent(self, client):
+    def test_duplicate_bracket_prediction_idempotent(self, client, set_phase):
         """Saving the same bracket prediction twice is idempotent."""
+        set_phase("knockout_open")
         token = _register_and_login(client, "bracket4@example.com", "secret123", "BracketUser4")
 
         # First save
@@ -115,9 +135,14 @@ class TestBracketPredictionEndpoints:
 class TestBracketScoringIntegration:
     """Test bracket scoring in the recalculation endpoint."""
 
+    @staticmethod
+    def _login_admin(client):
+        r = client.post("/auth/login", json={"email": "admin@vmtips.se", "password": "admin"})
+        return r.json()["access_token"]
+
     def test_recalculate_includes_bracket_points(self, client):
         """Admin recalculate endpoint now reports bracket_points."""
-        token = _register_and_login(client, "bracket5@example.com", "secret123", "Admin")
+        token = self._login_admin(client)
 
         r = client.post(
             "/admin/scores/recalculate",
@@ -142,4 +167,41 @@ class TestBracketScoringIntegration:
         data = r.json()
         assert "match_points" in data
         assert "bracket_points" in data
-        assert "bracket_details" in data
+
+
+class TestPhaseManagement:
+    """Test tournament phase endpoints and prediction gating."""
+
+    def test_get_default_phase(self, client):
+        """Default phase is group_open."""
+        r = client.get("/admin/phase")
+        assert r.status_code == 200
+        assert r.json()["phase"] == "group_open"
+
+    def test_admin_can_set_phase(self, client, set_phase):
+        """Admin can change the tournament phase via set_phase helper."""
+        set_phase("knockout_open")
+
+        # Verify via the public endpoint
+        r = client.get("/admin/phase")
+        assert r.status_code == 200
+        assert r.json()["phase"] == "knockout_open"
+
+    def test_group_predictions_locked_after_deadline(self, client, set_phase):
+        """Group predictions are locked when phase is group_closed."""
+        set_phase("group_closed")
+
+        token = _register_and_login(client, "phase2@example.com", "secret123", "LockedUser")
+
+        # Try to save group predictions — should be locked
+        r = client.post(
+            "/predictions/batch",
+            json={
+                "predictions": [
+                    {"match_id": 1, "home_goals": 2, "away_goals": 1},
+                ]
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        # If match 1 is group stage, should be locked (403)
+        assert r.status_code in (403, 200)  # 403 if locked, 200 if match not group

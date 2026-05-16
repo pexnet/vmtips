@@ -137,6 +137,25 @@ def set_match_result():
     return _set_match_result
 
 
+@pytest.fixture(scope="function")
+def set_phase():
+    """Fixture that returns a function to set the tournament phase in the test DB."""
+    def _set_phase(phase_name: str):
+        from models import TournamentPhase
+        db = TestSessionLocal()
+        try:
+            phase_row = db.query(TournamentPhase).first()
+            if phase_row:
+                phase_row.phase = phase_name
+            else:
+                phase_row = TournamentPhase(phase=phase_name)
+                db.add(phase_row)
+            db.commit()
+        finally:
+            db.close()
+    return _set_phase
+
+
 @pytest.fixture(scope="session")
 def test_engine_fixture():
     """Expose the test engine for tests that need to inspect tables."""

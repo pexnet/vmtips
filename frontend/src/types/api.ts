@@ -57,8 +57,11 @@ export interface Prediction {
 export interface TournamentBonus {
   winner_team_id: number | null;
   top_scorer_name: string | null;
-  top_assist_name: string | null;
-  total_goals: number | null;
+  bronze_winner_team_id: number | null;
+  most_goals_team_id: number | null;
+  most_conceded_team_id: number | null;
+  custom_bonus_1: string | null;
+  custom_bonus_2: string | null;
 }
 
 // ── Leagues ──────────────────────────────────────────────────
@@ -125,8 +128,11 @@ export interface PersonalScore {
   tournament_bonus_details?: {
     winner_correct: boolean;
     top_scorer_correct: boolean;
-    top_assist_correct: boolean;
-    total_goals_correct: boolean;
+    bronze_winner_correct: boolean;
+    most_goals_team_correct: boolean;
+    most_conceded_team_correct: boolean;
+    custom_bonus_1_correct: boolean;
+    custom_bonus_2_correct: boolean;
   };
   bracket_details: BracketDetail[];
   breakdown: ScoreBreakdown[];
@@ -153,14 +159,65 @@ export interface BracketPredictionEntry {
   id?: number;
   team_id: number;
   round: string;
+  source?: string;
+}
+
+// ── Tournament Phase ─────────────────────────────────────────
+
+export interface PhaseInfo {
+  phase: "group_open" | "group_closed" | "knockout_open" | "knockout_closed";
+  group_deadline: string | null;
+  knockout_opens_at: string | null;
+  knockout_deadline: string | null;
+}
+
+// ── Group Standings ───────────────────────────────────────────
+
+export interface GroupStanding {
+  team_id: number;
+  team_name: string;
+  team_code: string;
+  group: string;
+  position: number | null;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goals_for: number;
+  goals_against: number;
+  goal_difference: number;
+  points: number;
+}
+
+// ── Knockout Advancement ──────────────────────────────────────
+
+export interface KnockoutAdvancement {
+  id: number;
+  team_id: number;
+  team_name: string;
+  team_code: string;
+  round: string;
+  match_number: number | null;
+}
+
+// ── Scoring Overview (admin) ──────────────────────────────────
+
+export interface ScoringOverviewEntry {
+  user_id: number;
+  display_name: string;
+  match_points: number;
+  bracket_points: number;
+  tournament_bonus_points: number;
+  league_bonus_points: number;
+  total_points: number;
 }
 
 // ── Helper: extract error detail from axios errors ───────────
 
 export function getErrorDetail(err: unknown): string {
   if (err instanceof Error) {
-    const axiosErr = err as { response?: { data?: { detail?: string } } };
-    return axiosErr.response?.data?.detail || err.message;
+    const axiosErr = err as { response?: { data?: { detail?: string; error?: string } } };
+    return axiosErr.response?.data?.detail || axiosErr.response?.data?.error || err.message;
   }
   return String(err);
 }

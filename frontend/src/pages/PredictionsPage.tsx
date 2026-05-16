@@ -39,8 +39,11 @@ export default function PredictionsPage() {
   const [bonuses, setBonuses] = useState({
     winner_team_id: null as number | null,
     top_scorer_name: "",
-    top_assist_name: "",
-    total_goals: "",
+    bronze_winner_team_id: null as number | null,
+    most_goals_team_id: null as number | null,
+    most_conceded_team_id: null as number | null,
+    custom_bonus_1: "",
+    custom_bonus_2: "",
   });
   const [saveMsg, setSaveMsg] = useState("");
   const [localError, setLocalError] = useState("");
@@ -51,30 +54,40 @@ export default function PredictionsPage() {
   const { data: bonusesData } = useTournamentBonuses();
 
   // Populate bonuses form when tournament bonuses are loaded
-  if (bonusesData && !bonuses.top_scorer_name && !bonuses.top_assist_name && !bonuses.total_goals && bonuses.winner_team_id === null) {
+  if (bonusesData && !bonuses.top_scorer_name && bonuses.winner_team_id === null && bonuses.bronze_winner_team_id === null) {
     const b = bonusesData;
     setBonuses({
       winner_team_id: b.winner_team_id || null,
       top_scorer_name: b.top_scorer_name || "",
-      top_assist_name: b.top_assist_name || "",
-      total_goals: b.total_goals ? String(b.total_goals) : "",
+      bronze_winner_team_id: b.bronze_winner_team_id || null,
+      most_goals_team_id: b.most_goals_team_id || null,
+      most_conceded_team_id: b.most_conceded_team_id || null,
+      custom_bonus_1: b.custom_bonus_1 || "",
+      custom_bonus_2: b.custom_bonus_2 || "",
     });
   }
 
   const saveBonuses = () => {
     setSaveMsg("");
+    setLocalError("");
     predictionsApi
       .saveTournament({
         winner_team_id: bonuses.winner_team_id || undefined,
         top_scorer_name: bonuses.top_scorer_name || undefined,
-        top_assist_name: bonuses.top_assist_name || undefined,
-        total_goals: bonuses.total_goals ? Number(bonuses.total_goals) : undefined,
+        bronze_winner_team_id: bonuses.bronze_winner_team_id || undefined,
+        most_goals_team_id: bonuses.most_goals_team_id || undefined,
+        most_conceded_team_id: bonuses.most_conceded_team_id || undefined,
+        custom_bonus_1: bonuses.custom_bonus_1 || undefined,
+        custom_bonus_2: bonuses.custom_bonus_2 || undefined,
       })
       .then(() => setSaveMsg(t("predictions.save_success")))
       .catch(() => setLocalError(t("common.error")));
   };
 
   const selectedTeam = teams.find((tm: Team) => tm.id === bonuses.winner_team_id) || null;
+  const selectedBronzeWinner = teams.find((tm: Team) => tm.id === bonuses.bronze_winner_team_id) || null;
+  const selectedMostGoals = teams.find((tm: Team) => tm.id === bonuses.most_goals_team_id) || null;
+  const selectedMostConceded = teams.find((tm: Team) => tm.id === bonuses.most_conceded_team_id) || null;
 
   const error = localError || (predictionsError ? t("common.error") : "");
 
@@ -145,21 +158,47 @@ export default function PredictionsPage() {
               fullWidth
             />
 
+            <Autocomplete
+              options={teams}
+              getOptionLabel={(o) => `${o.flag_emoji ?? ""} ${o.name}`}
+              value={selectedBronzeWinner}
+              onChange={(_, v) => setBonuses((b) => ({ ...b, bronze_winner_team_id: v?.id || null }))}
+              renderInput={(params) => (
+                <TextField {...params} label={`${t("predictions.bronze_winner")} (20p)`} />
+              )}
+            />
+
+            <Autocomplete
+              options={teams}
+              getOptionLabel={(o) => `${o.flag_emoji ?? ""} ${o.name}`}
+              value={selectedMostGoals}
+              onChange={(_, v) => setBonuses((b) => ({ ...b, most_goals_team_id: v?.id || null }))}
+              renderInput={(params) => (
+                <TextField {...params} label={`${t("predictions.most_goals_team")} (10p)`} />
+              )}
+            />
+
+            <Autocomplete
+              options={teams}
+              getOptionLabel={(o) => `${o.flag_emoji ?? ""} ${o.name}`}
+              value={selectedMostConceded}
+              onChange={(_, v) => setBonuses((b) => ({ ...b, most_conceded_team_id: v?.id || null }))}
+              renderInput={(params) => (
+                <TextField {...params} label={`${t("predictions.most_conceded_team")} (10p)`} />
+              )}
+            />
+
             <TextField
-              label={t("predictions.top_assist")}
-              value={bonuses.top_assist_name}
-              onChange={(e) => setBonuses((b) => ({ ...b, top_assist_name: e.target.value }))}
+              label={`${t("predictions.custom_bonus_1")} (10p)`}
+              value={bonuses.custom_bonus_1}
+              onChange={(e) => setBonuses((b) => ({ ...b, custom_bonus_1: e.target.value }))}
               fullWidth
             />
 
             <TextField
-              label={t("predictions.total_goals")}
-              type="text"
-              value={bonuses.total_goals}
-              onChange={(e) => {
-                const val = e.target.value;
-                if (val === "" || (/^\d*$/.test(val) && Number(val) <= 999)) setBonuses((b) => ({ ...b, total_goals: val }));
-              }}
+              label={`${t("predictions.custom_bonus_2")} (10p)`}
+              value={bonuses.custom_bonus_2}
+              onChange={(e) => setBonuses((b) => ({ ...b, custom_bonus_2: e.target.value }))}
               fullWidth
             />
 

@@ -305,14 +305,8 @@ class TestAdminSyncEndpoint:
         """Admin can trigger sync and get results back."""
         import json
 
-        def _register_and_login(client, email, password, name):
-            client.post("/auth/register", json={
-                "email": email, "password": password, "display_name": name,
-            })
-            r = client.post("/auth/login", json={"email": email, "password": password})
-            return r.json()["access_token"]
-
-        token = _register_and_login(client, "syncadmin@example.com", "secret123", "Admin")
+        r = client.post("/auth/login", json={"email": "admin@vmtips.se", "password": "admin"})
+        token = r.json()["access_token"]
 
         mock_api_data = [
             {
@@ -341,14 +335,8 @@ class TestAdminSyncEndpoint:
         """When external API is unreachable, sync returns synced=False with error info."""
         from sync_service import SyncError
 
-        def _register_and_login(client, email, password, name):
-            client.post("/auth/register", json={
-                "email": email, "password": password, "display_name": name,
-            })
-            r = client.post("/auth/login", json={"email": email, "password": password})
-            return r.json()["access_token"]
-
-        token = _register_and_login(client, "syncadmin2@example.com", "secret123", "Admin")
+        r = client.post("/auth/login", json={"email": "admin@vmtips.se", "password": "admin"})
+        token = r.json()["access_token"]
 
         with patch("sync_service._fetch_matches", side_effect=SyncError("Connection timeout")):
             r = client.post(

@@ -61,18 +61,20 @@ export const BRACKET_ROUNDS = [
   "round_of_16",
   "quarter_final",
   "semi_final",
+  "match_for_third_place",
   "final",
-    "match_for_third_place",
+  "world_champion",
 ] as const;
 
 export type BracketRound = (typeof BRACKET_ROUNDS)[number];
 
 /** Points per round (must match backend/scoring.py BRACKET_ROUND_POINTS). */
 export const BRACKET_ROUND_POINTS: Record<BracketRound, number> = {
-  round_of_32: 4,
-  round_of_16: 6,
-  quarter_final: 8,
-  semi_final: 10,
-  final: 15,
-  match_for_third_place: 3,
+  round_of_32: 1,
+  round_of_16: 2,
+  quarter_final: 4,
+  semi_final: 6,
+  final: 8,
+  match_for_third_place: 8,
+  world_champion: 20,
 };
