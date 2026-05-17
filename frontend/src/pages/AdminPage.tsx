@@ -24,6 +24,10 @@ import {
   InputLabel,
   Switch,
   FormControlLabel,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
 } from "@mui/material";
 import { adminApi } from "../api/client";
 import { useMatches } from "../hooks/useMatches";
@@ -98,6 +102,21 @@ export default function AdminPage() {
     auto_sync_interval_minutes: number;
   } | null>(null);
   const [syncConfigLoading, setSyncConfigLoading] = useState(false);
+
+  // ── League management state ──
+  const [leagues, setLeagues] = useState<{
+    id: number;
+    name: string;
+    invite_code: string;
+    is_public: boolean;
+    admin_user_id: number;
+    member_count: number;
+    created_at: string;
+  }[]>([]);
+  const [leaguesLoading, setLeaguesLoading] = useState(false);
+  const [editingLeague, setEditingLeague] = useState<number | null>(null);
+  const [editLeagueForm, setEditLeagueForm] = useState({ name: "", is_public: false });
+  const [deleteConfirmLeagueId, setDeleteConfirmLeagueId] = useState<number | null>(null);
 
   const { data: matches = [], isLoading: matchesLoading } = useMatches();
   const { data: teams = [] } = useTeams();
@@ -205,7 +224,10 @@ export default function AdminPage() {
 
   // ── Group standings handlers ──
   function loadStandings() {
-    adminApi.getStandings().then((res) => { setStandings(res.data as GroupStanding[]); })
+    adminApi.getStandings().then((res) => {
+      const payload = res.data as { standings?: GroupStanding[] };
+      setStandings(payload.standings ?? []);
+    })
       .catch(() => setStandings([]));
   }
 
@@ -219,7 +241,10 @@ export default function AdminPage() {
 
   // ── Knockout advancement handlers ──
   function loadAdvancements() {
-    adminApi.getAdvancements().then((res) => { setAdvancements(res.data as typeof advancements); })
+    adminApi.getAdvancements().then((res) => {
+      const payload = res.data as { advancements?: typeof advancements };
+      setAdvancements(payload.advancements ?? []);
+    })
       .catch(() => setAdvancements([]));
   }
 
@@ -247,7 +272,10 @@ export default function AdminPage() {
 
   // ── Scoring overview ──
   function loadScoringOverview() {
-    adminApi.scoringOverview().then((res) => { setScoringOverview(res.data as ScoringOverviewEntry[]); })
+    adminApi.scoringOverview().then((res) => {
+      const payload = res.data as { scores?: ScoringOverviewEntry[] };
+      setScoringOverview(payload.scores ?? []);
+    })
       .catch(() => setScoringOverview([]));
   }
 
@@ -255,7 +283,14 @@ export default function AdminPage() {
   useEffect(() => {
     setAllPredictionsLoading(true);
     adminApi.allPredictions()
-      .then((res) => { setAllPredictions(res.data as NonNullable<typeof allPredictions>); })
+      .then((res) => {
+        const payload = res.data as { users?: NonNullable<typeof allPredictions>["users"] };
+        if (payload.users) {
+          setAllPredictions({ users: payload.users });
+        } else {
+          setAllPredictions(null);
+        }
+      })
       .catch(() => { setAllPredictions(null); })
       .finally(() => setAllPredictionsLoading(false));
   }, []);
@@ -273,6 +308,45 @@ export default function AdminPage() {
     adminApi.updateSyncConfig(syncConfig).then(() => setSuccess(t("admin.sync_config_saved")))
       .catch((err: unknown) => setError(getErrorDetail(err)))
       .finally(() => setSyncConfigLoading(false));
+  }
+
+  // ── League management ──
+  function loadLeagues() {
+    setLeaguesLoading(true);
+    adminApi.listLeagues()
+      .then((res) => {
+        const data = res.data as typeof leagues;
+        setLeagues(data);
+      })
+      .catch((err: unknown) => setError(getErrorDetail(err)))
+      .finally(() => setLeaguesLoading(false));
+  }
+
+  function handleSaveLeagueEdit() {
+    if (editingLeague === null) return;
+    clearMessages();
+    adminApi.updateLeague(editingLeague, {
+      name: editLeagueForm.name,
+      is_public: editLeagueForm.is_public,
+    })
+      .then(() => {
+        setSuccess(t("common.saved"));
+        setEditingLeague(null);
+        loadLeagues();
+      })
+      .catch((err: unknown) => setError(getErrorDetail(err)));
+  }
+
+  function handleDeleteLeague() {
+    if (deleteConfirmLeagueId === null) return;
+    clearMessages();
+    adminApi.deleteLeague(deleteConfirmLeagueId)
+      .then(() => {
+        setSuccess(t("common.success"));
+        setDeleteConfirmLeagueId(null);
+        loadLeagues();
+      })
+      .catch((err: unknown) => setError(getErrorDetail(err)));
   }
 
   // ── Helpers ──
@@ -304,6 +378,7 @@ export default function AdminPage() {
         <Tab label={t("admin.scoring_overview")} />
         <Tab label={t("admin.score_management")} />
         <Tab label={t("admin.all_predictions")} />
+        <Tab label={t("admin.league_management")} />
       </Tabs>
 
       {/* ═══ TAB 0: MATCH RESULTS ═══ */}
@@ -513,7 +588,7 @@ export default function AdminPage() {
         <Paper elevation={2} sx={{ p: 3 }}>
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
             <Typography variant="h6">{t("admin.scoring_overview")}</Typography>
-            <Button variant="outlined" onClick={() => { loadScoringOverview(); }} startIcon="↻">{t("admin.refresh_overview")}</Button>
+            <Button variant="outlined" onClick={() => { loadScoringOverview(); }}>{t("admin.refresh_overview")}</Button>
           </Box>
           {scoringOverview.length === 0 ? (
             <Alert severity="info">No scoring data yet. Recalculate scores first.</Alert>
@@ -712,6 +787,109 @@ export default function AdminPage() {
           )}
         </Paper>
       )}
+
+      {/* ═══ TAB 8: LEAGUE MANAGEMENT ═══ */}
+      {tab === 8 && (
+        <Paper elevation={2} sx={{ p: 3 }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+            <Typography variant="h6">{t("admin.league_management")}</Typography>
+            <Button variant="outlined" onClick={() => loadLeagues()} disabled={leaguesLoading}>
+              {leaguesLoading ? <CircularProgress size={20} /> : t("common.refresh")}
+            </Button>
+          </Box>
+
+          {leagues.length === 0 ? (
+            <Alert severity="info">{t("admin.no_predictions")}</Alert>
+          ) : (
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>ID</TableCell>
+                    <TableCell>{t("admin.league_name")}</TableCell>
+                    <TableCell>{t("admin.invite_code")}</TableCell>
+                    <TableCell align="center">{t("admin.league_visibility")}</TableCell>
+                    <TableCell align="center">{t("admin.league_members")}</TableCell>
+                    <TableCell align="right">{t("common.actions")}</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {leagues.map((l) => (
+                    <TableRow key={l.id}>
+                      <TableCell>{l.id}</TableCell>
+                      <TableCell>{l.name}</TableCell>
+                      <TableCell>{l.invite_code}</TableCell>
+                      <TableCell align="center">
+                        {l.is_public ? t("admin.league_public") : t("admin.league_private")}
+                      </TableCell>
+                      <TableCell align="center">{l.member_count}</TableCell>
+                      <TableCell align="right">
+                        <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
+                          {editingLeague === l.id ? (
+                            <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+                              <TextField
+                                size="small"
+                                value={editLeagueForm.name}
+                                onChange={(e) => setEditLeagueForm((f) => ({ ...f, name: e.target.value }))}/>
+                              <FormControlLabel
+                                control={<Switch
+                                  size="small"
+                                  checked={editLeagueForm.is_public}
+                                  onChange={(e) => setEditLeagueForm((f) => ({ ...f, is_public: e.target.checked }))}/>
+                                }
+                                label={editLeagueForm.is_public ? t("admin.league_public") : t("admin.league_private")}
+                              />
+                              <Button size="small" variant="contained" onClick={handleSaveLeagueEdit}>Save</Button>
+                              <Button size="small" onClick={() => setEditingLeague(null)}>Cancel</Button>
+                            </Box>
+                          ) : (
+                            <>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => {
+                                  setEditingLeague(l.id);
+                                  setEditLeagueForm({ name: l.name, is_public: l.is_public });
+                                }}
+                              >
+                                {t("admin.edit_league")}
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                color="error"
+                                disabled={l.name === "VM2026"}
+                                onClick={() => setDeleteConfirmLeagueId(l.id)}
+                              >
+                                {l.name === "VM2026" ? t("admin.default_league_protected") : t("admin.delete_league")}
+                              </Button>
+                            </>
+                          )}
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+
+          <Dialog
+            open={deleteConfirmLeagueId !== null}
+            onClose={() => setDeleteConfirmLeagueId(null)}
+          >
+            <DialogTitle>{t("common.confirm")}</DialogTitle>
+            <DialogContent>
+              <Typography>{t("admin.delete_league_confirm")}</Typography>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setDeleteConfirmLeagueId(null)}>{t("common.cancel")}</Button>
+              <Button color="error" onClick={handleDeleteLeague}>{t("common.delete")}</Button>
+            </DialogActions>
+          </Dialog>
+        </Paper>
+      )}
+
     </Container>
   );
 }

@@ -39,6 +39,24 @@ def register(request: Request, payload: UserCreate, db: Session = Depends(get_db
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    # Ensure default VM2026 league exists and auto-join user
+    from models import League, LeagueMember
+    default_league = db.query(League).filter(League.name == "VM2026").first()
+    if not default_league:
+        default_league = League(
+            name="VM2026",
+            invite_code="VM2026",
+            is_public=True,
+            admin_user_id=user.id,
+        )
+        db.add(default_league)
+        db.commit()
+        db.refresh(default_league)
+    member = LeagueMember(league_id=default_league.id, user_id=user.id)
+    db.add(member)
+    db.commit()
+
     return user
 
 

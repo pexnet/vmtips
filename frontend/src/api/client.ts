@@ -51,13 +51,21 @@ export const matchesApi = {
   detail: (id: number) => api.get(`/matches/${id}`),
 };
 
+// Teams
+export const teamsApi = {
+  list: () => api.get("/teams"),
+  knockoutAdvancements: () => api.get("/teams/knockout-advancements"),
+};
+
 // Predictions
 export const predictionsApi = {
-  list: () => api.get("/predictions"),
-  batch: (predictions: Array<{ match_id: number; home_goals: number; away_goals: number }>) =>
-    api.post("/predictions/batch", { predictions }),
-  tournament: () => api.get("/predictions/tournament"),
-  saveTournament: (data: {
+  list: (leagueId?: number) =>
+    api.get(`/predictions${leagueId !== undefined ? `?league_id=${leagueId}` : ""}`),
+  batch: (leagueId: number, predictions: Array<{ match_id: number; home_goals: number; away_goals: number }>) =>
+    api.post("/predictions/batch", { league_id: leagueId, predictions }),
+  tournament: (leagueId?: number) =>
+    api.get(`/predictions/tournament${leagueId !== undefined ? `?league_id=${leagueId}` : ""}`),
+  saveTournament: (leagueId: number, data: {
     winner_team_id?: number;
     top_scorer_name?: string;
     bronze_winner_team_id?: number;
@@ -65,10 +73,11 @@ export const predictionsApi = {
     most_conceded_team_id?: number;
     custom_bonus_1?: string;
     custom_bonus_2?: string;
-  }) => api.post("/predictions/tournament", data),
-  bracket: () => api.get("/predictions/bracket"),
-  saveBracket: (entries: Array<{ team_id: number; round: string }>) =>
-    api.post("/predictions/bracket", { entries }),
+  }) => api.post("/predictions/tournament", { league_id: leagueId, ...data }),
+  bracket: (leagueId?: number) =>
+    api.get(`/predictions/bracket${leagueId !== undefined ? `?league_id=${leagueId}` : ""}`),
+  saveBracket: (leagueId: number, entries: Array<{ team_id: number; round: string }>) =>
+    api.post("/predictions/bracket", { league_id: leagueId, entries }),
 };
 
 // Leagues
@@ -142,6 +151,10 @@ export const adminApi = {
   scoringOverview: () => api.get("/admin/scoring-overview"),
   // All users' predictions
   allPredictions: () => api.get("/admin/all-predictions"),
+  // League management
+  listLeagues: () => api.get("/admin/leagues"),
+  updateLeague: (id: number, data: { name?: string; is_public?: boolean }) => api.patch(`/admin/leagues/${id}`, data),
+  deleteLeague: (id: number) => api.delete(`/admin/leagues/${id}`),
 };
 
 export default api;

@@ -94,13 +94,13 @@ class PredictionOut(BaseModel):
     created_at: str
     updated_at: str
 
-    class Config:
-        from_attributes = True
+class PredictionBatchCreate(BaseModel):
+    league_id: int
+    predictions: list[PredictionCreate]
 
-
-# ── Tournament Bonuses ──────────────────────────────────────
 
 class TournamentBonusCreate(BaseModel):
+    league_id: int
     winner_team_id: int | None = None
     top_scorer_name: str | None = None
     bronze_winner_team_id: int | None = None
@@ -109,24 +109,29 @@ class TournamentBonusCreate(BaseModel):
     custom_bonus_1: str | None = None
     custom_bonus_2: str | None = None
 
-class TournamentBonusOut(BaseModel):
+
+# ── Bracket Predictions ───────────────────────────────────────
+
+class BracketPredictionEntry(BaseModel):
+    """Single team placement in a knockout round."""
+    team_id: int
+    round: str  # round_of_32 / round_of_16 / quarter_final / semi_final / match_for_third_place / final
+
+class BracketPredictionBatch(BaseModel):
+    """Batch of bracket predictions for the authenticated user."""
+    league_id: int
+    entries: list[BracketPredictionEntry]
+
+class BracketPredictionOut(BaseModel):
     id: int
-    user_id: int
-    winner_team_id: int | None = None
-    top_scorer_name: str | None = None
-    bronze_winner_team_id: int | None = None
-    most_goals_team_id: int | None = None
-    most_conceded_team_id: int | None = None
-    custom_bonus_1: str | None = None
-    custom_bonus_2: str | None = None
-    created_at: str | None = None
-    updated_at: str | None = None
+    team_id: int
+    round: str
+    source: str | None = "knockout_prediction"
+    created_at: str
+    updated_at: str
 
     class Config:
         from_attributes = True
-
-class PredictionBatchCreate(BaseModel):
-    predictions: list[PredictionCreate]
 
 
 # ── League Bonus Questions ────────────────────────────────────
@@ -204,29 +209,6 @@ class TournamentResultUpdate(BaseModel):
     most_conceded_team_id: int | None = None
     custom_bonus_1_answer: str | None = None
     custom_bonus_2_answer: str | None = None
-
-
-# ── Bracket Predictions ───────────────────────────────────────
-
-class BracketPredictionEntry(BaseModel):
-    """Single team placement in a knockout round."""
-    team_id: int
-    round: str  # round_of_32 / round_of_16 / quarter_final / semi_final / match_for_third_place / final
-
-class BracketPredictionBatch(BaseModel):
-    """Batch of bracket predictions for the authenticated user."""
-    entries: list[BracketPredictionEntry]
-
-class BracketPredictionOut(BaseModel):
-    id: int
-    team_id: int
-    round: str
-    source: str | None = "knockout_prediction"
-    created_at: str
-    updated_at: str
-
-    class Config:
-        from_attributes = True
 
 
 # ── Phase ─────────────────────────────────────────────────────

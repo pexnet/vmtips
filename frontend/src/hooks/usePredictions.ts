@@ -2,21 +2,21 @@ import { useQuery } from "@tanstack/react-query";
 import { predictionsApi, matchesApi } from "../api/client";
 import type { Prediction, TournamentBonus, Team, Match } from "../types/api";
 
-export function usePredictions() {
+export function usePredictions(leagueId?: number) {
   return useQuery<Prediction[]>({
-    queryKey: ["predictions"],
+    queryKey: ["predictions", leagueId],
     queryFn: async () => {
-      const res = await predictionsApi.list();
+      const res = await predictionsApi.list(leagueId);
       return res.data as Prediction[];
     },
   });
 }
 
-export function useTournamentBonuses() {
+export function useTournamentBonuses(leagueId?: number) {
   return useQuery<TournamentBonus>({
-    queryKey: ["predictions", "tournament"],
+    queryKey: ["predictions", "tournament", leagueId],
     queryFn: async () => {
-      const res = await predictionsApi.tournament();
+      const res = await predictionsApi.tournament(leagueId);
       return res.data as TournamentBonus;
     },
   });

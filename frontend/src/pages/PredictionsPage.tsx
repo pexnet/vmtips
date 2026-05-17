@@ -17,6 +17,7 @@ import {
 } from "@mui/material";
 import { predictionsApi } from "../api/client";
 import { usePredictions, useTournamentBonuses, useTeamsFromMatches } from "../hooks/usePredictions";
+import { useLeague } from "../contexts/LeagueContext";
 import type { Team } from "../types/api";
 
 /** Shape returned by the predictions list endpoint (includes nested match info). */
@@ -35,6 +36,7 @@ interface PredictionWithMatch {
 
 export default function PredictionsPage() {
   const { t } = useTranslation();
+  const { selectedLeagueId } = useLeague();
   const [tab, setTab] = useState(0);
   const [bonuses, setBonuses] = useState({
     winner_team_id: null as number | null,
@@ -48,10 +50,10 @@ export default function PredictionsPage() {
   const [saveMsg, setSaveMsg] = useState("");
   const [localError, setLocalError] = useState("");
 
-  const { data: rawPredictions = [], isLoading: predictionsLoading, error: predictionsError } = usePredictions();
+  const { data: rawPredictions = [], isLoading: predictionsLoading, error: predictionsError } = usePredictions(selectedLeagueId ?? undefined);
   const predictions = rawPredictions as unknown as PredictionWithMatch[];
   const { data: teams = [] } = useTeamsFromMatches();
-  const { data: bonusesData } = useTournamentBonuses();
+  const { data: bonusesData } = useTournamentBonuses(selectedLeagueId ?? undefined);
 
   // Populate bonuses form when tournament bonuses are loaded
   if (bonusesData && !bonuses.top_scorer_name && bonuses.winner_team_id === null && bonuses.bronze_winner_team_id === null) {
@@ -70,8 +72,12 @@ export default function PredictionsPage() {
   const saveBonuses = () => {
     setSaveMsg("");
     setLocalError("");
+    if (!selectedLeagueId) {
+      setLocalError(t("predictions.no_league_selected"));
+      return;
+    }
     predictionsApi
-      .saveTournament({
+      .saveTournament(selectedLeagueId, {
         winner_team_id: bonuses.winner_team_id || undefined,
         top_scorer_name: bonuses.top_scorer_name || undefined,
         bronze_winner_team_id: bonuses.bronze_winner_team_id || undefined,

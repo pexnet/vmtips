@@ -133,24 +133,23 @@ app.add_middleware(
 )
 
 # Health check
-@app.get("/health")
+@app.get("/api/health")
 def health():
     return {"status": "ok", "version": "0.1.0"}
 
 # API Routers
-app.include_router(auth.router)
-app.include_router(matches.router)
-app.include_router(predictions.router)
-app.include_router(leagues.router)
-app.include_router(leaderboard.router)
-app.include_router(admin.router)
-app.include_router(league_bonus_questions.router)
-app.include_router(teams.router)
+app.include_router(auth.router, prefix="/api")
+app.include_router(matches.router, prefix="/api")
+app.include_router(predictions.router, prefix="/api")
+app.include_router(leagues.router, prefix="/api")
+app.include_router(leaderboard.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
+app.include_router(league_bonus_questions.router, prefix="/api")
+app.include_router(teams.router, prefix="/api")
 
-# Static files — served only for non-API paths
+# Static files — serve SPA index.html for all non-API, non-health paths
 API_PREFIXES = (
-    "/auth", "/matches", "/predictions", "/leagues",
-    "/leaderboard", "/admin", "/health", "/teams",
+    "api", "health",
 )
 
 static_dir = os.getenv("STATIC_DIR", "../frontend/dist")
@@ -158,7 +157,8 @@ static_dir = os.getenv("STATIC_DIR", "../frontend/dist")
 if os.path.isdir(static_dir):
     @app.get("/{path:path}")
     async def serve_static(path: str):
-        if any(path.startswith(p.lstrip("/")) for p in API_PREFIXES):
+        # API routes should be handled by routers, not static files
+        if any(path.startswith(p) for p in API_PREFIXES):
             raise HTTPException(status_code=404, detail="Not found")
         file_path = os.path.join(static_dir, path)
         if os.path.exists(file_path) and os.path.isfile(file_path):

@@ -36,9 +36,6 @@ export default function InfoPage() {
     { label: t("info.bonus.custom2"), points: 10 },
   ];
 
-  const totalMatchPoints = 72 * 7; // 72 group matches x 7p = 504p
-  const totalBracketPoints = 32 * 1 + 16 * 2 + 8 * 4 + 4 * 6 + 2 * 8 + 2 * 8 + 1 * 20; // = 144 (not used, just for calc)
-  const totalKnockoutMatchPoints = 16 + 8 + 4 + 2 + 1 + 1; // matches per round
   const bracketPointValues = { r32: 1, r16: 2, qf: 4, sf: 6, third: 8, final: 8, champion: 20 };
   const bracketSlots = { r32: 32, r16: 16, qf: 8, sf: 4, third: 2, final: 2, champion: 1 };
   const totalBracketPts = Object.entries(bracketSlots as Record<string, number>)

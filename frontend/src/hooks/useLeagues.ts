@@ -1,14 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { leaguesApi } from "../api/client";
-import type { League, LeagueDetail, UserLeaguesResponse } from "../types/api";
+import type { League, LeagueDetail } from "../types/api";
 
 export function useLeagues() {
   return useQuery<League[]>({
     queryKey: ["leagues"],
     queryFn: async () => {
       const res = await leaguesApi.list();
-      const data = res.data as UserLeaguesResponse;
-      return data.leagues || [];
+      const data = res.data as League[] | { leagues?: League[] };
+      // Backend returns League[] directly (not { leagues: [...] })
+      if (Array.isArray(data)) return data;
+      return (data as { leagues?: League[] }).leagues || [];
     },
   });
 }

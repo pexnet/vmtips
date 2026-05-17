@@ -27,6 +27,7 @@ import {
   type BracketRound,
 } from "../hooks/useBracket";
 import { useTeamsFromMatches } from "../hooks/usePredictions";
+import { useLeague } from "../contexts/LeagueContext";
 import type { Match, Team, BracketPredictionEntry } from "../types/api";
 
 // ── Match prediction input card for knockout matches ────────
@@ -254,6 +255,7 @@ function BracketRoundColumn({
 export default function KnockoutPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { selectedLeagueId } = useLeague();
   const [tab, setTab] = useState(0);
   const [error, setError] = useState("");
   const [saveMsg, setSaveMsg] = useState("");
@@ -270,9 +272,9 @@ export default function KnockoutPage() {
   const [matchSaveMsg, setMatchSaveMsg] = useState("");
 
   // Bracket predictions
-  const { data: bracketEntries = [], isLoading: bracketLoading } = useBracketPredictions();
+  const { data: bracketEntries = [], isLoading: bracketLoading } = useBracketPredictions(selectedLeagueId ?? undefined);
   const { data: allTeams = [] } = useTeamsFromMatches();
-  const saveBracketMutation = useSaveBracketPredictions();
+  const saveBracketMutation = useSaveBracketPredictions(selectedLeagueId ?? 0);
 
   // Local bracket state: round -> list of team IDs
   const [bracketSelections, setBracketSelections] = useState<Record<BracketRound, number[]>>({
@@ -371,17 +373,21 @@ export default function KnockoutPage() {
       }));
 
     if (batch.length === 0) return;
+    if (!selectedLeagueId) {
+      setError(t("predictions.no_league_selected"));
+      return;
+    }
 
     predictionsApi
-      .batch(batch)
+      .batch(selectedLeagueId, batch)
       .then(() => {
         setMatchPredictions({});
         setMatchSaveMsg(t("predictions.save_success"));
       })
       .catch((err: unknown) => {
-        const axiosErr = err as { response?: { status?: number } };
+        const axiosErr = err as { response?: { status?: number; data?: { detail?: string } } };
         if (axiosErr.response?.status === 401) navigate("/login");
-        else setError(t("common.error"));
+        else setError(axiosErr.response?.data?.detail || t("common.error"));
       });
   };
 

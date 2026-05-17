@@ -17,6 +17,7 @@ from errors import NotFoundError, ForbiddenError
 from models import (
     Match, User, Prediction, Score, BracketPrediction, TournamentResult,
     TournamentBonus, TournamentPhase, GroupStanding, KnockoutAdvancement, Team,
+    League, LeagueMember,
 )
 from schemas import (
     MatchResultUpdate, TournamentResultUpdate, PhaseUpdate,
@@ -863,3 +864,68 @@ def all_predictions(
         })
 
     return {"users": result}
+
+# ═══════════════════════════════════════════════════════════════
+# League management
+# ═══════════════════════════════════════════════════════════════
+
+@router.get("/leagues")
+def list_leagues(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """List all leagues."""
+    leagues = db.query(League).all()
+    return [
+        {
+            "id": l.id,
+            "name": l.name,
+            "invite_code": l.invite_code,
+            "is_public": l.is_public,
+            "admin_user_id": l.admin_user_id,
+            "member_count": len(l.members),
+            "created_at": l.created_at.isoformat() if l.created_at else None,
+        }
+        for l in leagues
+    ]
+
+
+class LeagueUpdate(BaseModel):
+    name: str | None = None
+    is_public: bool | None = None
+
+
+@router.patch("/leagues/{league_id}")
+def update_league(
+    league_id: int,
+    payload: LeagueUpdate,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Update a league name or visibility."""
+    league = db.query(League).filter(League.id == league_id).first()
+    if not league:
+        raise NotFoundError(detail="league_not_found", error_code="league_not_found")
+    if payload.name is not None:
+        league.name = payload.name
+    if payload.is_public is not None:
+        league.is_public = payload.is_public
+    db.commit()
+    return {"updated": True}
+
+
+@router.delete("/leagues/{league_id}")
+def delete_league(
+    league_id: int,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Delete a league and all related data (members, scores, predictions)."""
+    league = db.query(League).filter(League.id == league_id).first()
+    if not league:
+        raise NotFoundError(detail="league_not_found", error_code="league_not_found")
+    if league.name == "VM2026":
+        raise ForbiddenError(detail="cannot_delete_default_league", error_code="cannot_delete_default_league")
+    db.delete(league)
+    db.commit()
+    return {"deleted": True}

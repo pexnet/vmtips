@@ -27,10 +27,12 @@ import { useLeagues, useLeagueDetail, useInvalidateLeagues, usePublicLeagues } f
 import type { League } from "../types/api";
 import { getErrorDetail } from "../types/api";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function LeaguesPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [error, setError] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
@@ -114,7 +116,7 @@ export default function LeaguesPage() {
             <Paper key={l.id} elevation={2} sx={{ mb: 2 }}>
               <ListItem
                 secondaryAction={
-                  l.is_admin ? (
+                  user?.id === l.admin_user_id ? (
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                       <Chip size="small" label={t("leagues.admin")} color="primary" />
                       <IconButton
@@ -140,7 +142,7 @@ export default function LeaguesPage() {
                       </Button>
                     </Typography>
                   }
-                  secondary={l.is_admin ? `${t("leagues.code_label")}: ${l.invite_code}` : ""}
+                  secondary={`${t("leagues.code_label")}: ${l.invite_code || "—"}`}
                 />
               </ListItem>
             </Paper>

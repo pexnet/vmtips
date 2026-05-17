@@ -7,7 +7,7 @@ Run: cd backend && uv run python seed.py
 """
 import datetime
 from database import SessionLocal, engine, Base
-from models import Team, Match, User, TournamentPhase, TournamentResult
+from models import Team, Match, User, TournamentPhase, TournamentResult, League, LeagueMember
 from security import get_password_hash
 
 TEAM_DATA = [
@@ -307,6 +307,38 @@ def seed_tournament_result(db):
     print(f"[seed] Created tournament result with custom bonus labels")
 
 
+def seed_default_league(db):
+    """Ensure a private VM2026 default league exists and admin is member."""
+    existing = db.query(League).filter(League.name == "VM2026").first()
+    if existing:
+        print("[seed] Default VM2026 league already exists")
+        return
+
+    # Clean up any stray leagues created before this fix
+    db.query(League).filter(League.name != "VM2026").delete(synchronize_session=False)
+    db.commit()
+
+    admin = db.query(User).filter(User.email == ADMIN_EMAIL).first()
+    if not admin:
+        print("[seed] Admin user not found, skipping default league creation")
+        return
+
+    default_league = League(
+        name="VM2026",
+        invite_code="VM2026",
+        is_public=False,
+        admin_user_id=admin.id,
+    )
+    db.add(default_league)
+    db.commit()
+    db.refresh(default_league)
+
+    member = LeagueMember(league_id=default_league.id, user_id=admin.id)
+    db.add(member)
+    db.commit()
+    print(f"[seed] Created default VM2026 league (private) and joined admin")
+
+
 def main(session=None):
     """Seed the database. If a session is provided, use it (for testing)."""
     if session is None:
@@ -321,6 +353,7 @@ def main(session=None):
         seed_admin(db)
         seed_tournament_phase(db)
         seed_tournament_result(db)
+        seed_default_league(db)
         print("[seed] Database seeded successfully")
     finally:
         if session is None:

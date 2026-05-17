@@ -79,11 +79,12 @@ class Match(Base):
 class Prediction(Base):
     __tablename__ = "predictions"
     __table_args__ = (
-        UniqueConstraint("user_id", "match_id", name="uq_user_match_prediction"),
+        UniqueConstraint("user_id", "match_id", "league_id", name="uq_user_match_league_prediction"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    league_id = Column(Integer, ForeignKey("leagues.id"), nullable=True)
     match_id = Column(Integer, ForeignKey("matches.id"), nullable=False)
     home_goals = Column(Integer, nullable=False)
     away_goals = Column(Integer, nullable=False)
@@ -91,6 +92,7 @@ class Prediction(Base):
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     user = relationship("User", back_populates="predictions")
+    league = relationship("League")
     match = relationship("Match", back_populates="predictions")
 
 
@@ -127,9 +129,13 @@ class LeagueMember(Base):
 
 class TournamentBonus(Base):
     __tablename__ = "tournament_bonuses"
+    __table_args__ = (
+        UniqueConstraint("user_id", "league_id", name="uq_user_league_bonus"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    league_id = Column(Integer, ForeignKey("leagues.id"), nullable=False)
     winner_team_id = Column(Integer, ForeignKey("teams.id"))
     top_scorer_name = Column(String)
     bronze_winner_team_id = Column(Integer, ForeignKey("teams.id"))
@@ -141,6 +147,7 @@ class TournamentBonus(Base):
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     user = relationship("User", back_populates="tournament_bonuses")
+    league = relationship("League")
     winner_team = relationship("Team", foreign_keys=[winner_team_id])
     bronze_winner_team = relationship("Team", foreign_keys=[bronze_winner_team_id])
     most_goals_team = relationship("Team", foreign_keys=[most_goals_team_id])
@@ -177,11 +184,12 @@ class LeagueBonusAnswer(Base):
 class BracketPrediction(Base):
     __tablename__ = "bracket_predictions"
     __table_args__ = (
-        UniqueConstraint("user_id", "team_id", "round", name="uq_user_team_round"),
+        UniqueConstraint("user_id", "league_id", "team_id", "round", name="uq_user_league_team_round"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    league_id = Column(Integer, ForeignKey("leagues.id"), nullable=False)
     team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
     round = Column(String, nullable=False)  # round_of_32 / round_of_16 / quarter_final / semi_final / match_for_third_place / final
     source = Column(String, default="knockout_prediction")  # group_prediction / knockout_prediction
@@ -189,6 +197,7 @@ class BracketPrediction(Base):
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     user = relationship("User", back_populates="bracket_predictions")
+    league = relationship("League")
     team = relationship("Team")
 
 

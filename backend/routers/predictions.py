@@ -2,6 +2,7 @@
 Predictions router: save batch predictions, bracket predictions, and tournament bonuses.
 Phase-gated: group stage predictions locked after group deadline, knockout predictions
 only allowed during knockout phase.
+All predictions are scoped per league (league_id required on save, optional on list).
 """
 import math
 from datetime import datetime, timezone
@@ -12,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from errors import ForbiddenError, ValidationError
-from models import Prediction, Match, TournamentBonus, BracketPrediction, TournamentPhase
+from models import Prediction, Match, TournamentBonus, BracketPrediction, TournamentPhase, LeagueMember
 from schemas import PredictionBatchCreate, TournamentBonusCreate, BracketPredictionBatch
 from routers.auth import fetch_current_user
 from scoring import BRACKET_ROUND_POINTS
@@ -64,6 +65,7 @@ def _pred_to_dict(pred: Prediction) -> dict:
     """Serialize a Prediction ORM row."""
     return {
         "id": pred.id,
+        "league_id": pred.league_id,
         "match_id": pred.match_id,
         "home_goals": pred.home_goals,
         "away_goals": pred.away_goals,
@@ -81,25 +83,22 @@ def _pred_to_dict(pred: Prediction) -> dict:
 
 @router.get("")
 def list_predictions(
+    league_id: Optional[int] = Query(None, description="Filter predictions by league"),
     page: Optional[int] = Query(None, ge=1, description="Page number (1-indexed)"),
     per_page: Optional[int] = Query(None, ge=1, le=200, description="Items per page"),
     current_user=Depends(fetch_current_user),
     db: Session = Depends(get_db),
 ):
-    """Return all predictions for the authenticated user.
-    
-    If page and per_page are provided, returns a paginated response.
-    Otherwise returns the full list (backward compatible).
-    """
+    """Return predictions for the authenticated user, optionally filtered by league."""
     query = db.query(Prediction).filter(Prediction.user_id == current_user.id)
+    if league_id is not None:
+        query = query.filter(Prediction.league_id == league_id)
     total = query.count()
 
-    # If no pagination params given, return full list (backward compatible)
     if page is None or per_page is None:
         preds = query.all()
         return [_pred_to_dict(p) for p in preds]
 
-    # Paginated response
     offset = (page - 1) * per_page
     preds = query.offset(offset).limit(per_page).all()
     total_pages = math.ceil(total / per_page) if per_page > 0 else 1
@@ -118,11 +117,19 @@ def save_batch(
     current_user=Depends(fetch_current_user),
     db: Session = Depends(get_db),
 ):
-    """Upsert a batch of match predictions for the authenticated user.
-    
+    """Upsert a batch of match predictions for the authenticated user in a specific league.
+
     Group stage: Only allowed when phase is 'group_open' (or no phase set).
     Knockout matches: Only allowed when phase is 'knockout_open'.
     """
+    # Verify user is member of the league
+    member = db.query(LeagueMember).filter(
+        LeagueMember.league_id == payload.league_id,
+        LeagueMember.user_id == current_user.id
+    ).first()
+    if not member:
+        raise ForbiddenError(detail="not_league_member", error_code="not_league_member")
+
     phase = _get_phase(db)
     match_ids = {p.match_id for p in payload.predictions}
     matches = {m.id: m for m in db.query(Match).filter(Match.id.in_(match_ids)).all()}
@@ -135,7 +142,7 @@ def save_batch(
     # Validate ALL predictions before making any changes (atomicity)
     for pred_create in payload.predictions:
         match = matches[pred_create.match_id]
-        
+
         # Phase-based validation
         if match.round == "group":
             if not _can_predict_group(phase):
@@ -143,9 +150,8 @@ def save_batch(
         else:
             # Knockout matches
             if not _can_predict_bracket(phase) and phase.phase != "group_open":
-                # During group_open, don't allow knockout predictions via this endpoint
                 raise ForbiddenError(detail="knockout_predictions_locked", error_code="knockout_predictions_locked")
-        
+
         # Match deadline check
         kickoff = match.match_date
         if kickoff is not None and kickoff.tzinfo is None:
@@ -162,6 +168,7 @@ def save_batch(
                 .filter(
                     Prediction.user_id == current_user.id,
                     Prediction.match_id == pred_create.match_id,
+                    Prediction.league_id == payload.league_id,
                 )
                 .first()
             )
@@ -172,6 +179,7 @@ def save_batch(
                 db.add(
                     Prediction(
                         user_id=current_user.id,
+                        league_id=payload.league_id,
                         match_id=pred_create.match_id,
                         home_goals=pred_create.home_goals,
                         away_goals=pred_create.away_goals,
@@ -188,14 +196,14 @@ def save_batch(
 
 @router.get("/tournament")
 def get_tournament_bonuses(
+    league_id: Optional[int] = Query(None, description="Filter by league"),
     current_user=Depends(fetch_current_user), db: Session = Depends(get_db)
 ):
-    """Return the authenticated user's tournament bonus predictions."""
-    bonus = (
-        db.query(TournamentBonus)
-        .filter(TournamentBonus.user_id == current_user.id)
-        .first()
-    )
+    """Return the authenticated user's tournament bonus predictions, optionally per league."""
+    query = db.query(TournamentBonus).filter(TournamentBonus.user_id == current_user.id)
+    if league_id is not None:
+        query = query.filter(TournamentBonus.league_id == league_id)
+    bonus = query.first()
     if not bonus:
         return None
     return {
@@ -215,19 +223,28 @@ def save_tournament_bonuses(
     current_user=Depends(fetch_current_user),
     db: Session = Depends(get_db),
 ):
-    """Save or update the authenticated user's tournament bonus predictions.
-    
+    """Save or update the authenticated user's tournament bonus predictions for a league.
+
     Only allowed during group_open or knockout_open phase (before deadlines).
     """
     phase = _get_phase(db)
-    # Bonus predictions can be made during group open phase
-    # After group stage closes, bonuses are locked
     if phase.phase in ("group_closed", "knockout_closed"):
         raise ForbiddenError(detail="bonus_predictions_locked", error_code="bonus_predictions_locked")
 
+    # Verify user is member of the league
+    member = db.query(LeagueMember).filter(
+        LeagueMember.league_id == payload.league_id,
+        LeagueMember.user_id == current_user.id
+    ).first()
+    if not member:
+        raise ForbiddenError(detail="not_league_member", error_code="not_league_member")
+
     bonus = (
         db.query(TournamentBonus)
-        .filter(TournamentBonus.user_id == current_user.id)
+        .filter(
+            TournamentBonus.user_id == current_user.id,
+            TournamentBonus.league_id == payload.league_id,
+        )
         .first()
     )
     if bonus:
@@ -248,6 +265,7 @@ def save_tournament_bonuses(
     else:
         bonus = TournamentBonus(
             user_id=current_user.id,
+            league_id=payload.league_id,
             winner_team_id=payload.winner_team_id,
             top_scorer_name=payload.top_scorer_name,
             bronze_winner_team_id=payload.bronze_winner_team_id,
@@ -266,14 +284,14 @@ def save_tournament_bonuses(
 
 @router.get("/bracket")
 def get_bracket_predictions(
+    league_id: Optional[int] = Query(None, description="Filter by league"),
     current_user=Depends(fetch_current_user), db: Session = Depends(get_db)
 ):
-    """Return the authenticated user's bracket (knockout) predictions."""
-    entries = (
-        db.query(BracketPrediction)
-        .filter(BracketPrediction.user_id == current_user.id)
-        .all()
-    )
+    """Return the authenticated user's bracket (knockout) predictions, optionally per league."""
+    query = db.query(BracketPrediction).filter(BracketPrediction.user_id == current_user.id)
+    if league_id is not None:
+        query = query.filter(BracketPrediction.league_id == league_id)
+    entries = query.all()
     return [
         {
             "id": e.id,
@@ -294,14 +312,22 @@ def save_bracket_predictions(
     db: Session = Depends(get_db),
 ):
     """
-    Save or update bracket predictions for the authenticated user.
-    
+    Save or update bracket predictions for the authenticated user in a league.
+
     Only allowed during knockout_open phase.
     Each entry places a team in a specific knockout round.
     """
     phase = _get_phase(db)
     if not _can_predict_bracket(phase):
         raise ForbiddenError(detail="bracket_predictions_locked", error_code="bracket_predictions_locked")
+
+    # Verify user is member of the league
+    member = db.query(LeagueMember).filter(
+        LeagueMember.league_id == payload.league_id,
+        LeagueMember.user_id == current_user.id
+    ).first()
+    if not member:
+        raise ForbiddenError(detail="not_league_member", error_code="not_league_member")
 
     valid_rounds = set(BRACKET_ROUND_POINTS.keys())
     for entry in payload.entries:
@@ -317,6 +343,7 @@ def save_bracket_predictions(
             db.query(BracketPrediction)
             .filter(
                 BracketPrediction.user_id == current_user.id,
+                BracketPrediction.league_id == payload.league_id,
                 BracketPrediction.team_id == entry.team_id,
                 BracketPrediction.round == entry.round,
             )
@@ -327,6 +354,7 @@ def save_bracket_predictions(
         else:
             db.add(BracketPrediction(
                 user_id=current_user.id,
+                league_id=payload.league_id,
                 team_id=entry.team_id,
                 round=entry.round,
                 source="knockout_prediction",

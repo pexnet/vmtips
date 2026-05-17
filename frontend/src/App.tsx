@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Suspense, lazy } from "react";
 import { AppThemeProvider } from "./contexts/ThemeContext";
 import { AuthProvider } from "./contexts/AuthContext";
+import { LeagueProvider } from "./contexts/LeagueContext";
 import { AppQueryClientProvider } from "./contexts/QueryClientProvider";
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -26,63 +27,65 @@ export default function App() {
       <AppThemeProvider>
         <AppQueryClientProvider>
           <AuthProvider>
-            <Navbar />
-            <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/leaderboard" element={<LeaderboardPage />} />
-            <Route path="/info" element={<InfoPage />} />
-            <Route
-              path="/matches"
-              element={
-                <ProtectedRoute>
-                  <MatchesPage />
-                </ProtectedRoute>
-              }
-            />
-            {/* Legacy /predictions and /knockout redirect to /matches */}
-            <Route path="/predictions" element={<Navigate to="/matches" />} />
-            <Route path="/knockout" element={<Navigate to="/matches" />} />
-            <Route
-              path="/leagues"
-              element={
-                <ProtectedRoute>
-                  <LeaguesPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/leagues/:leagueId/bonus-questions"
-              element={
-                <ProtectedRoute>
-                  <LeagueBonusQuestionsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/profile"
-              element={
-                <ProtectedRoute>
-                  <ProfilePage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin"
-              element={
-                <AdminRoute>
-                  <Suspense fallback={<div style={{padding: 40, textAlign: 'center'}}>Loading...</div>}>
-                    <AdminPage />
-                  </Suspense>
-                </AdminRoute>
-              }
-            />
-            <Route path="*" element={<LeaderboardPage />} />
-          </Routes>
-        </AuthProvider>
-      </AppQueryClientProvider>
-    </AppThemeProvider>
-  </BrowserRouter>
+            <LeagueProvider>
+              <Navbar />
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+                <Route path="/leaderboard" element={<LeaderboardPage />} />
+                <Route path="/info" element={<InfoPage />} />
+                <Route
+                  path="/matches"
+                  element={
+                    <ProtectedRoute>
+                      <MatchesPage />
+                    </ProtectedRoute>
+                  }
+                />
+                {/* Legacy /predictions and /knockout redirect to /matches */}
+                <Route path="/predictions" element={<Navigate to="/matches" />} />
+                <Route path="/knockout" element={<Navigate to="/matches" />} />
+                <Route
+                  path="/leagues"
+                  element={
+                    <ProtectedRoute>
+                      <LeaguesPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/leagues/:leagueId/bonus-questions"
+                  element={
+                    <ProtectedRoute>
+                      <LeagueBonusQuestionsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/profile"
+                  element={
+                    <ProtectedRoute>
+                      <ProfilePage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin"
+                  element={
+                    <AdminRoute>
+                      <Suspense fallback={<div style={{padding: 40, textAlign: 'center'}}>Loading...</div>}>
+                        <AdminPage />
+                      </Suspense>
+                    </AdminRoute>
+                  }
+                />
+                <Route path="*" element={<LeaderboardPage />} />
+              </Routes>
+            </LeagueProvider>
+          </AuthProvider>
+        </AppQueryClientProvider>
+      </AppThemeProvider>
+    </BrowserRouter>
   );
 }

@@ -2,27 +2,27 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { predictionsApi, matchesApi } from "../api/client";
 import type { BracketPredictionEntry, Match, Team } from "../types/api";
 
-/** Fetch the current user's bracket predictions. */
-export function useBracketPredictions() {
+/** Fetch the current user's bracket predictions (per league). */
+export function useBracketPredictions(leagueId?: number) {
   return useQuery<BracketPredictionEntry[]>({
-    queryKey: ["predictions", "bracket"],
+    queryKey: ["predictions", "bracket", leagueId],
     queryFn: async () => {
-      const res = await predictionsApi.bracket();
+      const res = await predictionsApi.bracket(leagueId);
       return res.data as BracketPredictionEntry[];
     },
   });
 }
 
-/** Mutation to save bracket predictions. */
-export function useSaveBracketPredictions() {
+/** Mutation to save bracket predictions (per league). */
+export function useSaveBracketPredictions(leagueId: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (entries: Array<{ team_id: number; round: string }>) => {
-      const res = await predictionsApi.saveBracket(entries);
+      const res = await predictionsApi.saveBracket(leagueId, entries);
       return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["predictions", "bracket"] });
+      queryClient.invalidateQueries({ queryKey: ["predictions", "bracket", leagueId] });
     },
   });
 }
