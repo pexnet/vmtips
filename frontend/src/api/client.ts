@@ -157,4 +157,10 @@ export const adminApi = {
   deleteLeague: (id: number) => api.delete(`/admin/leagues/${id}`),
 };
 
+// Bracket
+export const bracketApi = {
+  generate: (leagueId: number) => api.post(`/bracket/generate?league_id=${leagueId}`),
+  view: (leagueId: number) => api.get(`/bracket/view?league_id=${leagueId}`),
+};
+
 export default api;

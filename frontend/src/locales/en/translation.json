@@ -27,11 +27,11 @@
     "group_stage": "Group Stage",
     "knockout": "Knockout",
     "round": "Round",
-    "group": "Group",
+    "group": "Grupp",
     "home": "Home",
     "away": "Away",
     "predicted": "Your prediction",
-    "result": "Result",
+    "result": "Resultat",
     "locked": "Locked",
     "save_predictions": "Save predictions",
     "max_points_hint": "Max {{points}}p/match",
@@ -304,5 +304,14 @@
     "total_bracket": "Knockout bracket",
     "total_bonuses": "Bonus questions",
     "grand_total": "Grand total"
+  },
+  "bracket": {
+    "view_tab": "Knockout",
+    "predicted_standings": "Predicted Group Standings",
+    "third_places": "Best Third-Place Rankings",
+    "knockout_matches": "Knockout Matches",
+    "predicted": "Predicted",
+    "actual": "Actual",
+    "no_data": "No knockout tree available. Tip all group stage matches first."
   }
 }

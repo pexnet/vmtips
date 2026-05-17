@@ -16,6 +16,7 @@ from errors import ForbiddenError, ValidationError
 from models import Prediction, Match, TournamentBonus, BracketPrediction, TournamentPhase, LeagueMember
 from schemas import PredictionBatchCreate, TournamentBonusCreate, BracketPredictionBatch
 from routers.auth import fetch_current_user
+from bracket_engine import save_generated_bracket
 from scoring import BRACKET_ROUND_POINTS
 
 router = APIRouter(prefix="/predictions", tags=["predictions"])
@@ -187,6 +188,23 @@ def save_batch(
                 )
             saved += 1
         db.commit()
+
+        # Auto-generate bracket from group predictions if all group matches are tipped
+        try:
+            group_pred_count = (
+                db.query(Prediction)
+                .join(Match)
+                .filter(
+                    Prediction.user_id == current_user.id,
+                    Prediction.league_id == payload.league_id,
+                    Match.round == "group",
+                )
+                .count()
+            )
+            if group_pred_count >= 72:
+                save_generated_bracket(db, current_user.id, payload.league_id)
+        except Exception:
+            pass  # Don't fail the batch save if bracket generation fails
     except Exception:
         db.rollback()
         raise

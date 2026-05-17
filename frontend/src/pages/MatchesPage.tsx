@@ -32,6 +32,7 @@ import {
 } from "../hooks/useBracket";
 import { usePhase, isGroupOpen, isKnockoutOpen } from "../hooks/usePhase";
 import { useLeague } from "../contexts/LeagueContext";
+import BracketViewTab from "../components/BracketViewTab";
 import { useQuery } from "@tanstack/react-query";
 
 import type { Match, Team, BracketPredictionEntry, KnockoutAdvancement } from "../types/api";
@@ -853,8 +854,7 @@ export default function MatchesPage() {
   type TabItem = { label: string; always: boolean; show?: () => boolean };
   const allTabs: TabItem[] = [
     { label: t("matches.group_stage"), always: true },
-    { label: t("matches.knockout"), always: true },
-    { label: t("knockout.bracket_tab"), always: false, show: () => isKnockoutOpen(phaseData) },
+    { label: t("bracket.view_tab"), always: true },
     { label: t("predictions.tournament_bonuses"), always: true },
   ];
   const tabs = allTabs.filter((tab) => tab.always || (tab.show ? tab.show() : false));
@@ -874,7 +874,7 @@ export default function MatchesPage() {
 
   // Map tab indices to content sections
   // 0 = group, 1 = knockout, 2 = predictions, 3 = bracket (maybe), 4 = bonuses (maybe)
-  const bracketTabIndex = tabs.findIndex((tabItem) => tabItem.label === t("knockout.bracket_tab"));
+  const bracketTabIndex = tabs.findIndex((tabItem) => tabItem.label === t("bracket.view_tab"));
 
   return (
     <Container sx={{ mt: 2, mb: 8, maxWidth: "lg" }}>
@@ -938,75 +938,9 @@ export default function MatchesPage() {
         </Box>
       )}
 
-      {/* KNOCKOUT MATCHES */}
-      {tab === 1 && (
-        <Box>
-          {["round_of_32","round_of_16","quarter_final","semi_final","match_for_third_place","final"].map((round) => {
-            const roundMatches = knockoutMatches.filter((m) => m.round === round);
-            if (roundMatches.length === 0) return null;
-            return (
-              <Box key={round} sx={{ mb: 3 }}>
-                <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>
-                  {t(`matches.${round}`)}
-                </Typography>
-                <TwoColumnGrid>
-                  {roundMatches.map((m) => (
-                    <MatchCard
-                      key={m.id}
-                      match={m}
-                      predictions={predictions}
-                      onChange={handleChange}
-                    />
-                  ))}
-                </TwoColumnGrid>
-              </Box>
-            );
-          })}
-        </Box>
-      )}
-
-      {/* BRACKET PREDICTIONS */}
+      {/* BRACKET VIEW */}
       {tab === bracketTabIndex && bracketTabIndex >= 0 && (
-        <Box>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {t("knockout.subtitle")}
-          </Typography>
-
-          <Box
-            sx={{
-              display: "flex",
-              gap: 2,
-              overflowX: "auto",
-              pb: 2,
-              "&::-webkit-scrollbar": { height: 8 },
-              "&::-webkit-scrollbar-thumb": { bgcolor: "grey.400", borderRadius: 4 },
-            }}
-          >
-            {BRACKET_ROUNDS.map((round) => (
-              <BracketRoundColumn
-                key={round}
-                round={round}
-                selectedTeamIds={bracketSelections[round]}
-                allTeams={teams}
-                onChange={handleBracketChange}
-                existingEntries={bracketEntries}
-                disabled={knockoutLocked}
-                actualAdvancements={actualAdvancements}
-              />
-            ))}
-          </Box>
-
-          <Box sx={{ mt: 3, textAlign: "center" }}>
-            <Button
-              variant="contained"
-              size="large"
-              onClick={handleSaveBracket}
-              disabled={saveBracketMutation.isPending || knockoutLocked || Object.values(bracketSelections).every((arr) => arr.length === 0)}
-            >
-              {saveBracketMutation.isPending ? <CircularProgress size={24} color="inherit" /> : t("knockout.save_bracket")}
-            </Button>
-          </Box>
-        </Box>
+        <BracketViewTab />
       )}
 
       {/* TOURNAMENT BONUSES */}

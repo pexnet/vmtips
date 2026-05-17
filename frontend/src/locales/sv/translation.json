@@ -303,5 +303,14 @@
     "total_bracket": "Slutspelsbracket",
     "total_bonuses": "Bonusfrågor",
     "grand_total": "Grand total"
+  },
+  "bracket": {
+    "view_tab": "Slutspel",
+    "predicted_standings": "Tippade grupptabeller",
+    "third_places": "Bästa trea-placeringar",
+    "knockout_matches": "Slutspelsmatcher",
+    "predicted": "Tippat",
+    "actual": "Faktiskt",
+    "no_data": "Inget slutspelsträd tillgängligt. Tipsa alla gruppspelsmatcher först."
   }
 }
