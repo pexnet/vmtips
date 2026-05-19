@@ -95,12 +95,12 @@ class PredictionOut(BaseModel):
     updated_at: str
 
 class PredictionBatchCreate(BaseModel):
-    league_id: int
+    league_id: int | None = None
     predictions: list[PredictionCreate]
 
 
 class TournamentBonusCreate(BaseModel):
-    league_id: int
+    league_id: int | None = None
     winner_team_id: int | None = None
     top_scorer_name: str | None = None
     bronze_winner_team_id: int | None = None
@@ -119,7 +119,7 @@ class BracketPredictionEntry(BaseModel):
 
 class BracketPredictionBatch(BaseModel):
     """Batch of bracket predictions for the authenticated user."""
-    league_id: int
+    league_id: int | None = None
     entries: list[BracketPredictionEntry]
 
 class BracketPredictionOut(BaseModel):

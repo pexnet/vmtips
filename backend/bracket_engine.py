@@ -24,17 +24,6 @@ def compute_predicted_group_standings(db: Session, user_id: int, league_id: int)
     Compute predicted group standings from a user's match predictions.
     Returns dict: {group_letter: [team_standings...]}
     """
-    preds = (
-        db.query(Prediction)
-        .join(Match)
-        .filter(
-            Prediction.user_id == user_id,
-            Prediction.league_id == league_id,
-            Match.round == "group",
-        )
-        .all()
-    )
-
     group_stats = defaultdict(lambda: defaultdict(lambda: {
         "team_id": None,
         "name": None,
@@ -50,15 +39,112 @@ def compute_predicted_group_standings(db: Session, user_id: int, league_id: int)
         "points": 0,
     }))
 
-    for pred in preds:
+    teams = db.query(Team).all()
+    for team in teams:
+        group = str(team.group)
+        stats = group_stats[group][team.id]
+        stats["team_id"] = team.id
+        stats["name"] = team.name
+        stats["code"] = team.code
+        stats["flag_emoji"] = team.flag_emoji
+
+    predictions = (
+        db.query(Prediction)
+        .join(Match, Prediction.match_id == Match.id)
+        .filter(
+            Prediction.user_id == user_id,
+            Prediction.league_id == league_id,
+            Match.round == "group",
+            Prediction.home_goals.isnot(None),
+            Prediction.away_goals.isnot(None),
+        )
+        .all()
+    )
+
+    for pred in predictions:
         match = pred.match
         if not match.home_team or not match.away_team:
             continue
 
         home = match.home_team
         away = match.away_team
-        hg = int(pred.home_goals) if pred.home_goals is not None else 0
-        ag = int(pred.away_goals) if pred.away_goals is not None else 0
+        hg = pred.home_goals
+        ag = pred.away_goals
+        outcome = _determine_outcome(hg, ag)
+
+        for team, is_home, goals_for, goals_against in [
+            (home, True, hg, ag),
+            (away, False, ag, hg),
+        ]:
+            group = str(team.group)
+            stats = group_stats[group][team.id]
+            stats["team_id"] = team.id
+            stats["name"] = team.name
+            stats["code"] = team.code
+            stats["flag_emoji"] = team.flag_emoji
+            stats["played"] += 1
+            stats["gf"] += goals_for
+            stats["ga"] += goals_against
+            stats["gd"] = stats["gf"] - stats["ga"]
+
+            if outcome == "draw":
+                stats["drawn"] += 1
+                stats["points"] += 1
+            elif (outcome == "home" and is_home) or (outcome == "away" and not is_home):
+                stats["won"] += 1
+                stats["points"] += 3
+            else:
+                stats["lost"] += 1
+
+    standings = {}
+    for group, teams_by_id in group_stats.items():
+        standings[group] = sorted(
+            teams_by_id.values(),
+            key=lambda t: (-t["points"], -t["gd"], -t["gf"], -t["won"], t["name"] or ""),
+        )
+
+    return standings
+
+
+def compute_actual_group_standings(db: Session, league_id: int) -> dict:
+    """
+    Compute ACTUAL group standings from finished match results.
+    Returns dict: {group_letter: [team_standings...]}
+    """
+    group_stats = defaultdict(lambda: defaultdict(lambda: {
+        "team_id": None,
+        "name": None,
+        "code": None,
+        "flag_emoji": None,
+        "played": 0,
+        "won": 0,
+        "drawn": 0,
+        "lost": 0,
+        "gf": 0,
+        "ga": 0,
+        "gd": 0,
+        "points": 0,
+    }))
+
+    matches = (
+        db.query(Match)
+        .filter(
+            Match.round == "group",
+            Match.status == "finished",
+            Match.home_goals.isnot(None),
+            Match.away_goals.isnot(None),
+        )
+        .all()
+    )
+
+    for match in matches:
+        if not match.home_team or not match.away_team:
+            continue
+
+        home = match.home_team
+        away = match.away_team
+        hg = match.home_goals
+        ag = match.away_goals
         outcome = _determine_outcome(hg, ag)
 
         for team, is_home, goals_for, goals_against in [
@@ -355,10 +441,21 @@ def get_bracket_view(db: Session, user_id: int, league_id: int) -> dict:
     Get a full bracket view for a user: predicted teams per match,
     actual teams when available, and points.
     """
-    standings = compute_predicted_group_standings(db, user_id, league_id)
-    third_places = compute_third_place_rankings(standings)
-    r32_teams = resolve_r32_teams(standings, third_places)
-    result = simulate_full_bracket(db, user_id, league_id, r32_teams)
+    # Check if group stage has actual results
+    actual_standings = compute_actual_group_standings(db, league_id)
+    has_actual_results = len(actual_standings) > 0
+    
+    # Use actual standings if available, otherwise use predicted
+    if has_actual_results:
+        standings = actual_standings
+        third_places = compute_third_place_rankings(standings)
+        r32_teams = resolve_r32_teams(standings, third_places)
+        result = simulate_full_bracket(db, user_id, league_id, r32_teams)
+    else:
+        standings = compute_predicted_group_standings(db, user_id, league_id)
+        third_places = compute_third_place_rankings(standings)
+        r32_teams = resolve_r32_teams(standings, third_places)
+        result = simulate_full_bracket(db, user_id, league_id, r32_teams)
 
     # Get all knockout matches with actual results
     knockout_matches = (
@@ -402,7 +499,7 @@ def get_bracket_view(db: Session, user_id: int, league_id: int) -> dict:
             .first()
         )
 
-        # Resolve flag emojis for predicted teams
+        # Resolve flag emojis for predicted teams (bracket engine predictions)
         pred_home_flag = None
         pred_away_flag = None
         if pred_home_id:
@@ -416,27 +513,44 @@ def get_bracket_view(db: Session, user_id: int, league_id: int) -> dict:
         actual_home_flag = actual_home.flag_emoji if actual_home else None
         actual_away_flag = actual_away.flag_emoji if actual_away else None
 
+        # Resolve flag emojis for predicted team names if only ID available
+        if not pred_home_name and pred_home_id:
+            th = db.query(Team).filter(Team.id == pred_home_id).first()
+            pred_home_name = th.name if th else None
+        if not pred_away_name and pred_away_id:
+            ta = db.query(Team).filter(Team.id == pred_away_id).first()
+            pred_away_name = ta.name if ta else None
+
         matches_view.append({
+            "match_id": match.id,
             "match_number": mn,
             "round": rnd,
             "match_date": match.match_date.isoformat() if match.match_date else None,
+            "user_prediction": {
+                "home_goals": pred.home_goals if pred else None,
+                "away_goals": pred.away_goals if pred else None,
+            },
             "predicted": {
                 "home_team_id": pred_home_id,
                 "home_team_name": pred_home_name,
                 "home_team_flag": pred_home_flag,
+                "home_team_placeholder": match.home_team_placeholder,
                 "away_team_id": pred_away_id,
                 "away_team_name": pred_away_name,
                 "away_team_flag": pred_away_flag,
+                "away_team_placeholder": match.away_team_placeholder,
                 "home_goals": pred.home_goals if pred else None,
                 "away_goals": pred.away_goals if pred else None,
             },
             "actual": {
                 "home_team_id": actual_home.id if actual_home else None,
-                "home_team_name": actual_home.name if actual_home else match.home_team_placeholder,
+                "home_team_name": actual_home.name if actual_home else None,
                 "home_team_flag": actual_home_flag,
+                "home_team_placeholder": match.home_team_placeholder,
                 "away_team_id": actual_away.id if actual_away else None,
-                "away_team_name": actual_away.name if actual_away else match.away_team_placeholder,
+                "away_team_name": actual_away.name if actual_away else None,
                 "away_team_flag": actual_away_flag,
+                "away_team_placeholder": match.away_team_placeholder,
                 "home_goals": match.home_goals,
                 "away_goals": match.away_goals,
                 "status": match.status,

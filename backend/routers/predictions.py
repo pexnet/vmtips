@@ -5,6 +5,7 @@ only allowed during knockout phase.
 All predictions are scoped per league (league_id required on save, optional on list).
 """
 import math
+import logging
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -20,6 +21,7 @@ from bracket_engine import save_generated_bracket
 from scoring import BRACKET_ROUND_POINTS
 
 router = APIRouter(prefix="/predictions", tags=["predictions"])
+logger = logging.getLogger("vmtips")
 
 
 def _get_phase(db: Session) -> TournamentPhase:
@@ -31,6 +33,22 @@ def _get_phase(db: Session) -> TournamentPhase:
         db.commit()
         db.flush()
     return phase
+
+
+def _resolve_league_id(db: Session, user_id: int, requested_league_id: int | None) -> int:
+    """Resolve optional league_id to the user's first joined league."""
+    if requested_league_id is not None:
+        return requested_league_id
+
+    membership = (
+        db.query(LeagueMember)
+        .filter(LeagueMember.user_id == user_id)
+        .order_by(LeagueMember.joined_at.desc(), LeagueMember.id.desc())
+        .first()
+    )
+    if not membership:
+        raise ForbiddenError(detail="not_league_member", error_code="not_league_member")
+    return membership.league_id
 
 
 def _can_predict_group(phase: TournamentPhase) -> bool:
@@ -123,9 +141,11 @@ def save_batch(
     Group stage: Only allowed when phase is 'group_open' (or no phase set).
     Knockout matches: Only allowed when phase is 'knockout_open'.
     """
+    league_id = _resolve_league_id(db, current_user.id, payload.league_id)
+
     # Verify user is member of the league
     member = db.query(LeagueMember).filter(
-        LeagueMember.league_id == payload.league_id,
+        LeagueMember.league_id == league_id,
         LeagueMember.user_id == current_user.id
     ).first()
     if not member:
@@ -169,7 +189,7 @@ def save_batch(
                 .filter(
                     Prediction.user_id == current_user.id,
                     Prediction.match_id == pred_create.match_id,
-                    Prediction.league_id == payload.league_id,
+                    Prediction.league_id == league_id,
                 )
                 .first()
             )
@@ -180,7 +200,7 @@ def save_batch(
                 db.add(
                     Prediction(
                         user_id=current_user.id,
-                        league_id=payload.league_id,
+                        league_id=league_id,
                         match_id=pred_create.match_id,
                         home_goals=pred_create.home_goals,
                         away_goals=pred_create.away_goals,
@@ -196,15 +216,19 @@ def save_batch(
                 .join(Match)
                 .filter(
                     Prediction.user_id == current_user.id,
-                    Prediction.league_id == payload.league_id,
+                    Prediction.league_id == league_id,
                     Match.round == "group",
                 )
                 .count()
             )
             if group_pred_count >= 72:
-                save_generated_bracket(db, current_user.id, payload.league_id)
+                save_generated_bracket(db, current_user.id, league_id)
         except Exception:
-            pass  # Don't fail the batch save if bracket generation fails
+            logger.exception(
+                "Failed to auto-generate bracket for user_id=%s league_id=%s",
+                current_user.id,
+                league_id,
+            )
     except Exception:
         db.rollback()
         raise
@@ -249,9 +273,11 @@ def save_tournament_bonuses(
     if phase.phase in ("group_closed", "knockout_closed"):
         raise ForbiddenError(detail="bonus_predictions_locked", error_code="bonus_predictions_locked")
 
+    league_id = _resolve_league_id(db, current_user.id, payload.league_id)
+
     # Verify user is member of the league
     member = db.query(LeagueMember).filter(
-        LeagueMember.league_id == payload.league_id,
+        LeagueMember.league_id == league_id,
         LeagueMember.user_id == current_user.id
     ).first()
     if not member:
@@ -261,7 +287,7 @@ def save_tournament_bonuses(
         db.query(TournamentBonus)
         .filter(
             TournamentBonus.user_id == current_user.id,
-            TournamentBonus.league_id == payload.league_id,
+            TournamentBonus.league_id == league_id,
         )
         .first()
     )
@@ -283,7 +309,7 @@ def save_tournament_bonuses(
     else:
         bonus = TournamentBonus(
             user_id=current_user.id,
-            league_id=payload.league_id,
+            league_id=league_id,
             winner_team_id=payload.winner_team_id,
             top_scorer_name=payload.top_scorer_name,
             bronze_winner_team_id=payload.bronze_winner_team_id,
@@ -339,9 +365,11 @@ def save_bracket_predictions(
     if not _can_predict_bracket(phase):
         raise ForbiddenError(detail="bracket_predictions_locked", error_code="bracket_predictions_locked")
 
+    league_id = _resolve_league_id(db, current_user.id, payload.league_id)
+
     # Verify user is member of the league
     member = db.query(LeagueMember).filter(
-        LeagueMember.league_id == payload.league_id,
+        LeagueMember.league_id == league_id,
         LeagueMember.user_id == current_user.id
     ).first()
     if not member:
@@ -361,7 +389,7 @@ def save_bracket_predictions(
             db.query(BracketPrediction)
             .filter(
                 BracketPrediction.user_id == current_user.id,
-                BracketPrediction.league_id == payload.league_id,
+                BracketPrediction.league_id == league_id,
                 BracketPrediction.team_id == entry.team_id,
                 BracketPrediction.round == entry.round,
             )
@@ -372,7 +400,7 @@ def save_bracket_predictions(
         else:
             db.add(BracketPrediction(
                 user_id=current_user.id,
-                league_id=payload.league_id,
+                league_id=league_id,
                 team_id=entry.team_id,
                 round=entry.round,
                 source="knockout_prediction",

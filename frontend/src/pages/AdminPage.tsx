@@ -123,6 +123,7 @@ export default function AdminPage() {
 
   // Load initial data
   useEffect(() => { loadTournamentResult(); }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadPhase(); loadStandings(); loadAdvancements(); loadScoringOverview(); }, []);
 
   function clearMessages() {

@@ -79,6 +79,14 @@ def client():
     from fastapi.testclient import TestClient
     from seed import main as seed_main
 
+    class ApiPrefixTestClient(TestClient):
+        """Test client that keeps old tests pointed at the mounted API prefix."""
+
+        def request(self, method, url, *args, **kwargs):
+            if isinstance(url, str) and url.startswith("/") and not url.startswith("/api/"):
+                url = f"/api{url}"
+            return super().request(method, url, *args, **kwargs)
+
     Base.metadata.drop_all(bind=test_engine)
     Base.metadata.create_all(bind=test_engine)
 
@@ -93,7 +101,7 @@ def client():
     limiter._check_request_limit = _rate_limit_noop
     limiter.enabled = False
 
-    yield TestClient(app)
+    yield ApiPrefixTestClient(app)
     Base.metadata.drop_all(bind=test_engine)
 
 

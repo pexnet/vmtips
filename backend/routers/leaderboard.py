@@ -20,17 +20,16 @@ from scoring import calculate_match_points, calculate_bracket_points, calculate_
 router = APIRouter(prefix="/leaderboard", tags=["leaderboard"])
 
 
-def _calculate_user_score(user_id: int, db: Session) -> dict:
+def _calculate_user_score(user_id: int, db: Session, league_id: int | None = None) -> dict:
     """Calculate a user's total score and breakdown from predictions + match results + bracket."""
-    predictions = (
-        db.query(Prediction)
-        .filter(
-            Prediction.user_id == user_id,
-            Prediction.home_goals.isnot(None),
-            Prediction.away_goals.isnot(None),
-        )
-        .all()
+    prediction_query = db.query(Prediction).filter(
+        Prediction.user_id == user_id,
+        Prediction.home_goals.isnot(None),
+        Prediction.away_goals.isnot(None),
     )
+    if league_id is not None:
+        prediction_query = prediction_query.filter(Prediction.league_id == league_id)
+    predictions = prediction_query.all()
 
     match_points = []
     total_match_points = 0
@@ -65,11 +64,10 @@ def _calculate_user_score(user_id: int, db: Session) -> dict:
 
     # ── Bracket points ──
     actual_advancements = _build_actual_advancements(db)
-    bracket_preds = (
-        db.query(BracketPrediction)
-        .filter(BracketPrediction.user_id == user_id)
-        .all()
-    )
+    bracket_query = db.query(BracketPrediction).filter(BracketPrediction.user_id == user_id)
+    if league_id is not None:
+        bracket_query = bracket_query.filter(BracketPrediction.league_id == league_id)
+    bracket_preds = bracket_query.all()
     bracket_result = calculate_bracket_points(
         predictions=[{"team_id": bp.team_id, "round": bp.round} for bp in bracket_preds],
         actual_advancements=list(actual_advancements),
@@ -78,7 +76,10 @@ def _calculate_user_score(user_id: int, db: Session) -> dict:
 
     # ── Tournament bonus points ──
     actual_result = db.query(TournamentResult).first()
-    tb = db.query(TournamentBonus).filter(TournamentBonus.user_id == user_id).first()
+    bonus_query = db.query(TournamentBonus).filter(TournamentBonus.user_id == user_id)
+    if league_id is not None:
+        bonus_query = bonus_query.filter(TournamentBonus.league_id == league_id)
+    tb = bonus_query.first()
 
     actual_winner_id = actual_result.winner_team_id if actual_result else None
     actual_top_scorer = actual_result.top_scorer_name if actual_result else None
@@ -121,8 +122,8 @@ def _calculate_user_score(user_id: int, db: Session) -> dict:
             "winner_correct": tb_result.get("winner_correct", False),
             "top_scorer_correct": tb_result.get("top_scorer_correct", False),
             "bronze_winner_correct": tb_result.get("bronze_winner_correct", False),
-            "most_goals_correct": tb_result.get("most_goals_correct", False),
-            "most_conceded_correct": tb_result.get("most_conceded_correct", False),
+            "most_goals_team_correct": tb_result.get("most_goals_team_correct", False),
+            "most_conceded_team_correct": tb_result.get("most_conceded_team_correct", False),
             "custom_bonus_1_correct": tb_result.get("custom_bonus_1_correct", False),
             "custom_bonus_2_correct": tb_result.get("custom_bonus_2_correct", False),
         }
@@ -257,7 +258,7 @@ def league_leaderboard(
 
     entries = []
     for user in members:
-        score = _calculate_user_score(user.id, db)
+        score = _calculate_user_score(user.id, db, league_id=league_id)
         entries.append({
             "user_id": user.id,
             "display_name": user.display_name or user.email,
@@ -275,11 +276,24 @@ def league_leaderboard(
 
 @router.get("/me")
 def my_scores(
+    league_id: Optional[int] = Query(None, description="Filter score by league"),
     current_user=Depends(fetch_current_user),
     db: Session = Depends(get_db),
 ):
     """Return the current user's full score breakdown."""
-    score = _calculate_user_score(current_user.id, db)
+    if league_id is not None:
+        is_member = (
+            db.query(LeagueMember)
+            .filter(
+                LeagueMember.league_id == league_id,
+                LeagueMember.user_id == current_user.id,
+            )
+            .first()
+        )
+        if not is_member:
+            raise ForbiddenError(detail="not_a_member", error_code="not_a_member")
+
+    score = _calculate_user_score(current_user.id, db, league_id=league_id)
     return {
         "user_id": current_user.id,
         "display_name": current_user.display_name or current_user.email,

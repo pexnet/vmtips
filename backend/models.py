@@ -84,7 +84,7 @@ class Prediction(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    league_id = Column(Integer, ForeignKey("leagues.id"), nullable=True)
+    league_id = Column(Integer, ForeignKey("leagues.id"), nullable=False, default=1)
     match_id = Column(Integer, ForeignKey("matches.id"), nullable=False)
     home_goals = Column(Integer, nullable=False)
     away_goals = Column(Integer, nullable=False)
@@ -270,6 +270,9 @@ class GroupStanding(Base):
 
 class Score(Base):
     __tablename__ = "scores"
+    __table_args__ = (
+        UniqueConstraint("user_id", "league_id", name="uq_score_user_league"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)

@@ -40,7 +40,7 @@ def _is_admin(current_user: User) -> bool:
     admin_id_env = os.environ.get("ADMIN_USER_ID")
     if admin_id_env:
         return str(current_user.id) == admin_id_env
-    return current_user.id == 1
+    return False
 
 
 def require_admin(current_user: User = Depends(fetch_current_user)) -> User:
@@ -245,7 +245,8 @@ def recalculate_scores(
                 match.home_goals,
                 match.away_goals,
             )["points"]
-            user_match_points[pred.user_id] = user_match_points.get(pred.user_id, 0) + pts
+            key = (pred.user_id, pred.league_id)
+            user_match_points[key] = user_match_points.get(key, 0) + pts
 
     # ── 2. Bracket points ───────────────────────────────────────────
     actual_advancements = _build_actual_advancements(db)
@@ -256,7 +257,8 @@ def recalculate_scores(
         key = (bp.team_id, bp.round)
         if key in actual_advancements:
             round_pts = BRACKET_ROUND_POINTS.get(bp.round, 0)
-            user_bracket_points[bp.user_id] = user_bracket_points.get(bp.user_id, 0) + round_pts
+            score_key = (bp.user_id, bp.league_id)
+            user_bracket_points[score_key] = user_bracket_points.get(score_key, 0) + round_pts
 
     # ── 3. Tournament bonus points ──────────────────────────────────
     bonuses = db.query(TournamentBonus).all()
@@ -287,24 +289,28 @@ def recalculate_scores(
             pred_custom_bonus_2=bonus.custom_bonus_2,
             actual_custom_bonus_2=actual_custom_bonus_2,
         )
-        user_bonus_points[bonus.user_id] = result["points"]
+        user_bonus_points[(bonus.user_id, bonus.league_id)] = result["points"]
 
     # ── 4. Update Score rows ────────────────────────────────────────
-    all_user_ids = set(user_match_points) | set(user_bracket_points) | set(user_bonus_points)
+    all_score_keys = set(user_match_points) | set(user_bracket_points) | set(user_bonus_points)
 
     # Include users with existing scores who may have 0 points in all categories
     existing_scores = db.query(Score).all()
     for score_row in existing_scores:
-        all_user_ids.add(score_row.user_id)
+        all_score_keys.add((score_row.user_id, score_row.league_id))
 
     total_updated = 0
 
-    for user_id in all_user_ids:
-        mp = user_match_points.get(user_id, 0)
-        bp = user_bracket_points.get(user_id, 0)
-        tbp = user_bonus_points.get(user_id, 0)
+    for user_id, league_id in all_score_keys:
+        mp = user_match_points.get((user_id, league_id), 0)
+        bp = user_bracket_points.get((user_id, league_id), 0)
+        tbp = user_bonus_points.get((user_id, league_id), 0)
 
-        score_row = db.query(Score).filter(Score.user_id == user_id).first()
+        score_row = (
+            db.query(Score)
+            .filter(Score.user_id == user_id, Score.league_id == league_id)
+            .first()
+        )
         if score_row:
             score_row.match_points = mp
             score_row.bracket_points = bp
@@ -316,6 +322,7 @@ def recalculate_scores(
             total = mp + bp + tbp
             score_row = Score(
                 user_id=user_id,
+                league_id=league_id,
                 match_points=mp,
                 bracket_points=bp,
                 tournament_bonus_points=tbp,

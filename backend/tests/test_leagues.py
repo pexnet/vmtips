@@ -44,8 +44,9 @@ def test_list_my_leagues(client):
     list_r = client.get("/leagues", headers={"Authorization": f"Bearer {token}"})
     assert list_r.status_code == 200
     data = list_r.json()
-    assert len(data) == 1
-    assert data[0]["name"] == "Bob's League"
+    names = {league["name"] for league in data}
+    assert "VM2026" in names
+    assert "Bob's League" in names
 
 
 def test_join_league(client):
