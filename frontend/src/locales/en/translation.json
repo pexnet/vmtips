@@ -79,6 +79,10 @@
     "drag_or_select": "Pick teams for each round",
     "matches_tab": "Knockout Matches",
     "bracket_tab": "Bracket Predictions",
+    "bracket_predictions": "Predict Knockout Matches",
+    "predict_and_actual": "Predict results for the matches below. Your predicted teams are shown above the actual teams.",
+    "predicted_teams": "Predicted teams",
+    "awaiting_teams": "Awaiting teams",
     "actual_teams": "Actual teams",
     "your_predictions": "Your predictions"
   },
@@ -96,6 +100,7 @@
     "custom_bonus_1": "Custom Bonus 1",
     "custom_bonus_2": "Custom Bonus 2",
     "no_predictions": "No predictions saved yet. Go to Matches to start predicting!",
+    "no_league_selected": "No league selected.",
     "tournament_bonus_points": "Bonus Points"
   },
   "phase": {
@@ -312,6 +317,9 @@
     "knockout_matches": "Knockout Matches",
     "predicted": "Predicted",
     "actual": "Actual",
-    "no_data": "No knockout tree available. Tip all group stage matches first."
+    "no_data": "No knockout tree available. Tip all group stage matches first.",
+    "actual_teams_label": "Actual teams",
+    "predicted_teams_label": "Predicted teams",
+    "awaiting_teams": "Awaiting teams"
   }
 }

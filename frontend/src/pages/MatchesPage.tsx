@@ -20,22 +20,14 @@ import {
   TableHead,
   TableRow,
 } from "@mui/material";
-import { predictionsApi, teamsApi } from "../api/client";
+import { predictionsApi } from "../api/client";
 import { useMatches } from "../hooks/useMatches";
 import { usePredictions, useTournamentBonuses, useTeamsFromMatches } from "../hooks/usePredictions";
-import {
-  useBracketPredictions,
-  useSaveBracketPredictions,
-  BRACKET_ROUNDS,
-  BRACKET_ROUND_POINTS,
-  type BracketRound,
-} from "../hooks/useBracket";
-import { usePhase, isGroupOpen, isKnockoutOpen } from "../hooks/usePhase";
+import { usePhase, isGroupOpen } from "../hooks/usePhase";
 import { useLeague } from "../contexts/LeagueContext";
 import BracketViewTab from "../components/BracketViewTab";
-import { useQuery } from "@tanstack/react-query";
 
-import type { Match, Team, BracketPredictionEntry, KnockoutAdvancement } from "../types/api";
+import type { Match, Team } from "../types/api";
 
 /** Shape returned by the predictions list endpoint (includes nested match info). */
 interface PredictionWithMatch {
@@ -494,147 +486,6 @@ function TwoColumnGrid({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ── BracketRoundColumn ────────────────────────────────────
-
-function BracketRoundColumn({
-  round,
-  selectedTeamIds,
-  allTeams,
-  onChange,
-  existingEntries,
-  disabled,
-  actualAdvancements,
-}: {
-  round: BracketRound;
-  selectedTeamIds: number[];
-  allTeams: Team[];
-  onChange: (round: BracketRound, teamId: number | null, slotIndex: number) => void;
-  existingEntries: BracketPredictionEntry[];
-  disabled?: boolean;
-  actualAdvancements: KnockoutAdvancement[];
-}) {
-  const { t } = useTranslation();
-  const roundLabel = t(`knockout.${round}`);
-  const points = BRACKET_ROUND_POINTS[round];
-
-  const slotsPerRound: Record<BracketRound, number> = {
-    round_of_32: 32,
-    round_of_16: 16,
-    quarter_final: 8,
-    semi_final: 4,
-    match_for_third_place: 2,
-    final: 2,
-    world_champion: 1,
-  };
-  const slotCount = slotsPerRound[round];
-
-  const slots: (Team | null)[] = [];
-  const usedTeamIds = new Set<number>();
-
-  for (const entry of existingEntries) {
-    if (entry.round === round) {
-      const team = allTeams.find((t) => t.id === entry.team_id);
-      if (team) {
-        slots.push(team);
-        usedTeamIds.add(team.id);
-      }
-    }
-  }
-
-  for (const tid of selectedTeamIds) {
-    if (!usedTeamIds.has(tid)) {
-      const team = allTeams.find((t) => t.id === tid);
-      if (team) {
-        slots.push(team);
-        usedTeamIds.add(team.id);
-      }
-    }
-  }
-
-  while (slots.length < slotCount) {
-    slots.push(null);
-  }
-
-  // Actual teams in this round
-  const actualTeamsInRound = actualAdvancements
-    .filter((a) => a.round === round)
-    .map((a) => allTeams.find((t) => t.id === a.team_id))
-    .filter(Boolean) as Team[];
-
-  return (
-    <Box sx={{ minWidth: 200, flex: "0 0 auto" }}>
-      <Paper elevation={2} sx={{ p: 1.5, mb: 1, textAlign: "center", bgcolor: "primary.main", color: "primary.contrastText" }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-          {roundLabel}
-        </Typography>
-        <Typography variant="caption">
-          {points} {t("knockout.points_value")}
-        </Typography>
-      </Paper>
-
-      {/* Actual teams (shown after group stage ends) */}
-      {actualTeamsInRound.length > 0 && (
-        <Paper elevation={0} sx={{ p: 1, mb: 1, bgcolor: "success.light", opacity: 0.9 }}>
-          <Typography variant="caption" sx={{ fontWeight: 600, display: "block", mb: 0.5 }}>
-            {t("knockout.actual_teams")}
-          </Typography>
-          {actualTeamsInRound.map((t) => (
-            <Typography key={t.id} variant="caption" sx={{ display: "block" }}>
-              {t.flag_emoji} {t.name}
-            </Typography>
-          ))}
-        </Paper>
-      )}
-
-      {/* User predictions */}
-      <Typography variant="caption" sx={{ display: "block", mb: 0.5, color: "text.secondary" }}>
-        {t("knockout.your_predictions")}
-      </Typography>
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-        {slots.map((team, idx) => {
-          const availableTeams = allTeams.filter(
-            (t) => !usedTeamIds.has(t.id) || (team && t.id === team.id)
-          );
-
-          const actualTeam = actualTeamsInRound[idx];
-          const isCorrect = actualTeam && team && actualTeam.id === team.id;
-
-          return (
-            <Box key={`${round}-${idx}`}>
-              <Autocomplete
-                size="small"
-                options={availableTeams}
-                getOptionLabel={(o) => `${o.flag_emoji ?? ""} ${o.name}`}
-                value={team}
-                onChange={(_, v) => onChange(round, v?.id ?? null, idx)}
-                disabled={disabled}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    placeholder={t("knockout.select_team")}
-                    variant="outlined"
-                    size="small"
-                  />
-                )}
-                sx={{
-                  "& .MuiAutocomplete-inputRoot": { fontSize: "0.85rem", py: 0.5 },
-                  ...(isCorrect ? { '& .MuiOutlinedInput-root': { bgcolor: 'success.light' } } : {}),
-                  ...(actualTeam && team && !isCorrect ? { '& .MuiOutlinedInput-root': { bgcolor: 'error.light' } } : {}),
-                }}
-              />
-              {actualTeam && (
-                <Typography variant="caption" color={isCorrect ? "success.main" : "error.main"} sx={{ pl: 1 }}>
-                  {isCorrect ? "✓" : `✗ ${actualTeam.flag_emoji} ${actualTeam.name}`}
-                </Typography>
-              )}
-            </Box>
-          );
-        })}
-      </Box>
-    </Box>
-  );
-}
-
 // ── Main page ─────────────────────────────────────────────
 
 export default function MatchesPage() {
@@ -651,9 +502,8 @@ export default function MatchesPage() {
   // Phase gating
   const { data: phaseData } = usePhase();
   const groupLocked = !isGroupOpen(phaseData);
-  const knockoutLocked = !isKnockoutOpen(phaseData);
 
-  // Tournament bonuses state (new fields)
+  // Tournament bonuses state
   const [bonuses, setBonuses] = useState({
     top_scorer_name: "",
     most_goals_team_id: null as number | null,
@@ -662,95 +512,11 @@ export default function MatchesPage() {
     custom_bonus_2: "",
   });
 
-  // Bracket state
-  const [bracketSelections, setBracketSelections] = useState<Record<BracketRound, number[]>>({
-    round_of_32: [],
-    round_of_16: [],
-    quarter_final: [],
-    semi_final: [],
-    final: [],
-    match_for_third_place: [],
-    world_champion: [],
-  });
-
   const { data: matches = [], isLoading: matchesLoading } = useMatches();
   const { data: rawPredictions = [], isLoading: predictionsLoading } = usePredictions(selectedLeagueId ?? undefined);
   const predictionsList = rawPredictions as unknown as PredictionWithMatch[];
   const { data: teams = [] } = useTeamsFromMatches();
   const { data: bonusesData } = useTournamentBonuses(selectedLeagueId ?? undefined);
-
-  // Bracket data
-  const { data: bracketEntries = [], isLoading: bracketLoading } = useBracketPredictions(selectedLeagueId ?? undefined);
-  const saveBracketMutation = useSaveBracketPredictions(selectedLeagueId ?? 0);
-
-  // Actual knockout advancements
-  const { data: actualAdvancementsRaw } = useQuery({
-    queryKey: ["teams", "knockout-advancements"],
-    queryFn: async () => {
-      const res = await teamsApi.knockoutAdvancements();
-      return (res.data as { advancements: KnockoutAdvancement[] }).advancements ?? [];
-    },
-  });
-  const actualAdvancements = actualAdvancementsRaw ?? [];
-
-  // Populate bracket selections from saved entries
-  const populated = useMemo(() => {
-    const map: Record<BracketRound, number[]> = {
-      round_of_32: [],
-      round_of_16: [],
-      quarter_final: [],
-      semi_final: [],
-      final: [],
-      match_for_third_place: [],
-      world_champion: [],
-    };
-    for (const entry of bracketEntries) {
-      const round = entry.round as BracketRound;
-      if (map[round]) map[round].push(entry.team_id);
-    }
-    return map;
-  }, [bracketEntries]);
-
-  useEffect(() => {
-    if (bracketEntries.length > 0) {
-      setBracketSelections(populated);
-    }
-  }, [bracketEntries, populated]);
-
-  const handleBracketChange = (round: BracketRound, teamId: number | null, slotIndex: number) => {
-    setBracketSelections((prev) => {
-      const current = [...(prev[round] || [])];
-      if (teamId === null) {
-        current.splice(slotIndex, 1);
-      } else if (slotIndex < current.length) {
-        current[slotIndex] = teamId;
-      } else {
-        current.push(teamId);
-      }
-      return { ...prev, [round]: current };
-    });
-  };
-
-  const handleSaveBracket = () => {
-    setSaveMsg("");
-    setError("");
-    const entries: Array<{ team_id: number; round: string }> = [];
-    for (const round of BRACKET_ROUNDS) {
-      for (const teamId of bracketSelections[round]) {
-        entries.push({ team_id: teamId, round });
-      }
-    }
-    if (entries.length === 0) return;
-
-    saveBracketMutation.mutate(entries, {
-      onSuccess: () => {
-        setSaveMsg(t("knockout.bracket_saved"));
-      },
-      onError: () => {
-        setError(t("common.error"));
-      },
-    });
-  };
 
   // Populate bonuses form when tournament bonuses are loaded
   useEffect(() => {
@@ -845,21 +611,17 @@ export default function MatchesPage() {
   const selectedMostConceded = teams.find((tm: Team) => tm.id === bonuses.most_conceded_team_id) || null;
 
   const groupMatches = matches.filter((m) => m.round === "group");
-  const knockoutMatches = matches.filter((m) => m.round !== "group");
   const groups = [...new Set(groupMatches.map((m) => m.group).filter(Boolean))].sort();
 
-  const isLoading = matchesLoading || predictionsLoading || bracketLoading;
+  const isLoading = matchesLoading || predictionsLoading;
 
-  // Determine visible tabs based on phase
-  type TabItem = { label: string; always: boolean; show?: () => boolean };
-  const allTabs: TabItem[] = [
-    { label: t("matches.group_stage"), always: true },
-    { label: t("bracket.view_tab"), always: true },
-    { label: t("predictions.tournament_bonuses"), always: true },
+  const tabs = [
+    t("matches.group_stage"),
+    t("matches.knockout"),
+    t("predictions.tournament_bonuses"),
   ];
-  const tabs = allTabs.filter((tab) => tab.always || (tab.show ? tab.show() : false));
 
-  // Reset tab if out of bounds after tab list changes
+  // Reset tab if out of bounds
   useEffect(() => {
     if (tab >= tabs.length) setTab(Math.max(0, tabs.length - 1));
   }, [tabs.length, tab]);
@@ -872,10 +634,6 @@ export default function MatchesPage() {
     );
   }
 
-  // Map tab indices to content sections
-  // 0 = group, 1 = knockout, 2 = predictions, 3 = bracket (maybe), 4 = bonuses (maybe)
-  const bracketTabIndex = tabs.findIndex((tabItem) => tabItem.label === t("bracket.view_tab"));
-
   return (
     <Container sx={{ mt: 2, mb: 8, maxWidth: "lg" }}>
       <Typography variant="h4" gutterBottom>
@@ -885,7 +643,7 @@ export default function MatchesPage() {
       {/* Phase info banner */}
       {phaseData && (
         <Alert
-          severity={groupLocked && !knockoutLocked ? "info" : knockoutLocked ? "warning" : "success"}
+          severity={groupLocked ? "info" : "success"}
           sx={{ mb: 2 }}
         >
           {t(`phase.${phaseData.phase}`)}
@@ -894,23 +652,16 @@ export default function MatchesPage() {
         </Alert>
       )}
 
-      {groupLocked && !knockoutLocked && tab <= 1 && (
-        <Alert severity="info" sx={{ mb: 2 }}>{t("phase.group_closed_msg")}</Alert>
-      )}
-      {!knockoutLocked === false && bracketTabIndex >= 0 && (
-        <Alert severity="warning" sx={{ mb: 2 }}>{t("phase.knockout_not_open_msg")}</Alert>
-      )}
-
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {saveMsg && <Alert severity="success" sx={{ mb: 2 }}>{saveMsg}</Alert>}
 
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
-        {tabs.map((tabItem, idx) => (
-          <Tab key={idx} label={tabItem.label} />
+        {tabs.map((label, idx) => (
+          <Tab key={idx} label={label} />
         ))}
       </Tabs>
 
-      {/* GROUP STAGE */}
+      {/* GROUP STAGE TAB */}
       {tab === 0 && (
         <Box>
           {groups.map((group) => {
@@ -938,13 +689,13 @@ export default function MatchesPage() {
         </Box>
       )}
 
-      {/* BRACKET VIEW */}
-      {tab === bracketTabIndex && bracketTabIndex >= 0 && (
+      {/* KNOCKOUT / SLUTSPEL TAB — BracketViewTab with predicted vs actual + score input */}
+      {tab === 1 && (
         <BracketViewTab />
       )}
 
-      {/* TOURNAMENT BONUSES */}
-      {tab === tabs.length - 1 && (
+      {/* TOURNAMENT BONUSES TAB */}
+      {tab === 2 && (
         <Paper elevation={2} sx={{ p: 3 }}>
           <Typography variant="h6" gutterBottom>{t("predictions.tournament_bonuses")}</Typography>
 
@@ -1006,8 +757,8 @@ export default function MatchesPage() {
         </Paper>
       )}
 
-      {/* Save button — visible on match tabs only */}
-      {(tab === 0 || tab === 1) && (
+      {/* Save button — visible on group stage tab only */}
+      {tab === 0 && (
         <Box sx={{ position: "sticky", bottom: 16, textAlign: "center", bgcolor: "background.default", p: 1 }}>
           <Button
             variant="contained"

@@ -78,6 +78,11 @@
     "points_value": "p",
     "drag_or_select": "Välj lag för varje omgång",
     "bracket_tab": "Bracktips",
+    "matches_tab": "Slutspelsmatcher",
+    "bracket_predictions": "Tipsa slutspelsmatcher",
+    "predict_and_actual": "Tippa resultat på matcherna nedan. Värt tippade lag visas ovanför de verkliga lagen.",
+    "predicted_teams": "Tippade lag",
+    "awaiting_teams": "Inväntar lag",
     "actual_teams": "Verkliga lag",
     "your_predictions": "Dina tips"
   },
@@ -95,6 +100,7 @@
     "custom_bonus_1": "Egen bonusfråga 1",
     "custom_bonus_2": "Egen bonusfråga 2",
     "no_predictions": "Inga tips sparade ännu. Gå till Matcher för att tippa!",
+    "no_league_selected": "Ingen liga vald.",
     "tournament_bonus_points": "Bonuspoäng"
   },
   "phase": {
@@ -311,6 +317,9 @@
     "knockout_matches": "Slutspelsmatcher",
     "predicted": "Tippat",
     "actual": "Faktiskt",
-    "no_data": "Inget slutspelsträd tillgängligt. Tipsa alla gruppspelsmatcher först."
+    "no_data": "Inget slutspelsträd tillgängligt. Tipsa alla gruppspelsmatcher först.",
+    "actual_teams_label": "Verkliga lag",
+    "predicted_teams_label": "Tippade lag",
+    "awaiting_teams": "Inväntar lag"
   }
 }

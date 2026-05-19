@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { bracketApi } from "../api/client";
 
 export interface BracketViewMatch {
+  match_id: number;
   match_number: number;
   round: string;
   match_date: string | null;
@@ -9,9 +10,11 @@ export interface BracketViewMatch {
     home_team_id: number | null;
     home_team_name: string | null;
     home_team_flag: string | null;
+    home_team_placeholder: string | null;
     away_team_id: number | null;
     away_team_name: string | null;
     away_team_flag: string | null;
+    away_team_placeholder: string | null;
     home_goals: number | null;
     away_goals: number | null;
   };
@@ -19,9 +22,11 @@ export interface BracketViewMatch {
     home_team_id: number | null;
     home_team_name: string | null;
     home_team_flag: string | null;
+    home_team_placeholder: string | null;
     away_team_id: number | null;
     away_team_name: string | null;
     away_team_flag: string | null;
+    away_team_placeholder: string | null;
     home_goals: number | null;
     away_goals: number | null;
     status: string;
