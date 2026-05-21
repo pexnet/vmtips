@@ -6,6 +6,7 @@ import os
 import time
 import uuid
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,7 +14,6 @@ from fastapi.responses import FileResponse, JSONResponse
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
 
-from database import engine, Base
 from config import settings
 from rate_limit import limiter
 from routers import auth, matches, predictions, leagues, leaderboard, admin, league_bonus_questions, teams, bracket
@@ -23,9 +23,6 @@ from logging_config import setup_logging, request_id_ctx
 # Initialise structured logging as early as possible
 setup_logging()
 logger = logging.getLogger("vmtips")
-
-# Create tables on startup
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="VMTips API",
@@ -154,17 +151,20 @@ API_PREFIXES = (
 )
 
 static_dir = os.getenv("STATIC_DIR", "../frontend/dist")
+static_root = Path(static_dir).resolve()
 
-if os.path.isdir(static_dir):
+if static_root.is_dir():
     @app.get("/{path:path}")
     async def serve_static(path: str):
         # API routes should be handled by routers, not static files
         if any(path.startswith(p) for p in API_PREFIXES):
             raise HTTPException(status_code=404, detail="Not found")
-        file_path = os.path.join(static_dir, path)
-        if os.path.exists(file_path) and os.path.isfile(file_path):
+        file_path = (static_root / path).resolve()
+        if not file_path.is_relative_to(static_root):
+            raise HTTPException(status_code=404, detail="Not found")
+        if file_path.exists() and file_path.is_file():
             return FileResponse(file_path)
-        index_path = os.path.join(static_dir, "index.html")
-        if os.path.exists(index_path):
+        index_path = (static_root / "index.html").resolve()
+        if index_path.exists():
             return FileResponse(index_path)
         raise HTTPException(status_code=404, detail="Not found")

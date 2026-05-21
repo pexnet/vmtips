@@ -40,8 +40,8 @@ Then open **http://localhost:8000**
 | Variable | Default | Required | Description |
 |----------|---------|----------|-------------|
 | `JWT_SECRET_KEY` | `change-me-in-production` | **Yes** | JWT signing secret — **change this** |
-| `ADMIN_EMAIL` | `admin@example.com` | No | Default admin email |
-| `ADMIN_PASSWORD` | `admin` | No | Default admin password — **change this** |
+| `ADMIN_EMAIL` | `admin@example.com` | Required in prod | Admin account email. Production startup rejects the default. |
+| `ADMIN_PASSWORD` | `admin` | Required in prod | Admin password. Production startup rejects `admin` and `change-me-in-production`. |
 | `CORS_ORIGINS` | `http://localhost:8000` | No | Comma-separated allowed origins |
 | `DATABASE_URL` | `sqlite:///app/data/vmtips.db` | No | SQLite database path |
 
@@ -50,6 +50,8 @@ Set them in a `.env` file or pass directly:
 ```bash
 JWT_SECRET_KEY=my-secret-key docker compose up --build
 ```
+
+For production, store `JWT_SECRET_KEY`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` in your secret manager or deployment environment, not in source control. To rotate secrets, replace the deployment secret, restart the service, then update or remove any old admin credentials in the database so the previous password can no longer authenticate.
 
 ## Features
 

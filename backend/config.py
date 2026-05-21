@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     auto_sync_enabled: bool = False       # toggled manually by admin once tournament starts
     auto_sync_interval_minutes: int = 5   # how often auto-sync runs when enabled
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
+    environment: str = "development"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

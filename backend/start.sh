@@ -4,6 +4,19 @@ set -e
 # Create data directory if missing
 mkdir -p /app/data
 
+if [ "${ENVIRONMENT:-${APP_ENV:-development}}" = "production" ]; then
+  if [ -z "${ADMIN_EMAIL:-}" ] || [ -z "${ADMIN_PASSWORD:-}" ]; then
+    echo "[startup] ERROR: ADMIN_EMAIL and ADMIN_PASSWORD must be set in production." >&2
+    echo "[startup] Rotate admin credentials by changing these secrets and restarting, then update the admin user's password in the database or through the admin account flow." >&2
+    exit 1
+  fi
+  if [ "${ADMIN_EMAIL}" = "admin@example.com" ] || [ "${ADMIN_PASSWORD}" = "admin" ] || [ "${ADMIN_PASSWORD}" = "change-me-in-production" ]; then
+    echo "[startup] ERROR: Refusing insecure production admin credentials." >&2
+    echo "[startup] Set unique ADMIN_EMAIL and ADMIN_PASSWORD secrets. Rotate by replacing the secrets, restarting, and updating/removing old admin credentials." >&2
+    exit 1
+  fi
+fi
+
 # Run database migrations via Alembic
 alembic upgrade head
 
@@ -41,7 +54,7 @@ db = SessionLocal()
 try:
     existing = db.query(User).filter(User.email == settings.admin_email).first()
     if not existing:
-        print('[startup] Creating default admin user...')
+        print('[startup] Creating admin user...')
         admin = User(
             email=settings.admin_email,
             password_hash=get_password_hash(settings.admin_password),
@@ -50,7 +63,7 @@ try:
         )
         db.add(admin)
         db.commit()
-        print('[startup] Default admin created.')
+        print('[startup] Admin created.')
     else:
         if not existing.is_admin:
             print('[startup] Updating existing user to admin...')
