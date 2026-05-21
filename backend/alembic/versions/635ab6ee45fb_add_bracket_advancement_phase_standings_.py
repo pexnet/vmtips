@@ -72,6 +72,21 @@ def upgrade() -> None:
             sa.PrimaryKeyConstraint('id'),
         )
 
+    if 'sync_config' not in existing:
+        op.create_table(
+            'sync_config',
+            sa.Column('id', sa.Integer(), nullable=False),
+            sa.Column('source', sa.String(), nullable=False),
+            sa.Column('auto_sync_enabled', sa.Boolean(), nullable=True),
+            sa.Column('auto_sync_interval_minutes', sa.Integer(), nullable=True),
+            sa.Column('updated_at', sa.DateTime(), nullable=True),
+            sa.PrimaryKeyConstraint('id'),
+        )
+        op.execute(
+            "INSERT INTO sync_config (source, auto_sync_enabled, auto_sync_interval_minutes) "
+            "VALUES ('worldcupjson', 0, 5)"
+        )
+
     # ── Alter existing tables ───────────────────────────────────────
     # bracket_predictions: add source column
     bp_cols = {row[1] for row in conn.execute(sa.text(
@@ -131,6 +146,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Downgrade schema."""
     op.drop_table('group_standings')
+    op.drop_table('sync_config')
     op.drop_table('tournament_phases')
     op.drop_table('knockout_advancements')
 

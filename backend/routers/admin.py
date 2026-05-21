@@ -17,7 +17,7 @@ from errors import NotFoundError, ForbiddenError
 from models import (
     Match, User, Prediction, Score, BracketPrediction, TournamentResult,
     TournamentBonus, TournamentPhase, GroupStanding, KnockoutAdvancement, Team,
-    League, LeagueMember,
+    League, LeagueMember, SyncConfig,
 )
 from schemas import (
     MatchResultUpdate, TournamentResultUpdate, PhaseUpdate,
@@ -31,6 +31,20 @@ from scoring import (
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+def _get_sync_config_row(db: Session) -> SyncConfig:
+    row = db.query(SyncConfig).first()
+    if row:
+        return row
+    row = SyncConfig(
+        source=settings.sync_source,
+        auto_sync_enabled=settings.auto_sync_enabled,
+        auto_sync_interval_minutes=settings.auto_sync_interval_minutes,
+    )
+    db.add(row)
+    db.flush()
+    return row
 
 
 def _is_admin(current_user: User) -> bool:
@@ -92,24 +106,13 @@ def set_tournament_result(
 ):
     """Set the actual tournament results (for bonus scoring). Admin only."""
     result = db.query(TournamentResult).first()
-    update_fields = {
-        "winner_team_id": payload.winner_team_id,
-        "top_scorer_name": payload.top_scorer_name,
-        "bronze_winner_team_id": payload.bronze_winner_team_id,
-        "most_goals_team_id": payload.most_goals_team_id,
-        "most_conceded_team_id": payload.most_conceded_team_id,
-        "custom_bonus_1_answer": payload.custom_bonus_1_answer,
-        "custom_bonus_2_answer": payload.custom_bonus_2_answer,
-    }
+    update_fields = payload.model_dump(exclude_unset=True)
 
     if result:
         for field, value in update_fields.items():
-            if value is not None:
-                setattr(result, field, value)
+            setattr(result, field, value)
     else:
-        # Filter out None values for creation
-        create_fields = {k: v for k, v in update_fields.items() if v is not None}
-        result = TournamentResult(**create_fields)
+        result = TournamentResult(**update_fields)
         db.add(result)
     db.commit()
     return {"saved": True}
@@ -166,12 +169,16 @@ def sync_results(
 
 
 @router.get("/sync-config")
-def get_sync_config(admin: User = Depends(require_admin)):
+def get_sync_config(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
     """Return current sync configuration (read-only for admin)."""
+    row = _get_sync_config_row(db)
     return {
-        "source": settings.sync_source,
-        "auto_sync_enabled": settings.auto_sync_enabled,
-        "auto_sync_interval_minutes": settings.auto_sync_interval_minutes,
+        "source": row.source,
+        "auto_sync_enabled": row.auto_sync_enabled,
+        "auto_sync_interval_minutes": row.auto_sync_interval_minutes,
         "world_cup_json_url": settings.world_cup_json_url,
         "openfootball_url": settings.openfootball_url,
     }
@@ -187,24 +194,28 @@ class SyncConfigUpdate(BaseModel):
 def update_sync_config(
     payload: SyncConfigUpdate,
     admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
 ):
-    """Update sync configuration. Admin only. Requires restart to take full effect."""
+    """Update persisted sync configuration. Admin only."""
+    row = _get_sync_config_row(db)
     if payload.source is not None:
         if payload.source not in ("worldcupjson", "openfootball"):
             raise HTTPException(status_code=422, detail="source must be 'worldcupjson' or 'openfootball'")
-        settings.sync_source = payload.source
+        row.source = payload.source
     if payload.auto_sync_enabled is not None:
-        settings.auto_sync_enabled = payload.auto_sync_enabled
+        row.auto_sync_enabled = payload.auto_sync_enabled
     if payload.auto_sync_interval_minutes is not None:
         if payload.auto_sync_interval_minutes < 1:
             raise HTTPException(status_code=422, detail="interval must be >= 1")
-        settings.auto_sync_interval_minutes = payload.auto_sync_interval_minutes
+        row.auto_sync_interval_minutes = payload.auto_sync_interval_minutes
+
+    db.commit()
 
     return {
         "saved": True,
-        "source": settings.sync_source,
-        "auto_sync_enabled": settings.auto_sync_enabled,
-        "auto_sync_interval_minutes": settings.auto_sync_interval_minutes,
+        "source": row.source,
+        "auto_sync_enabled": row.auto_sync_enabled,
+        "auto_sync_interval_minutes": row.auto_sync_interval_minutes,
     }
 
 

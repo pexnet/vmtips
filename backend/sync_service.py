@@ -16,6 +16,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from config import settings
+from models import SyncConfig
 
 logger = logging.getLogger("vmtips.sync")
 
@@ -227,8 +228,11 @@ def _fetch_openfootball(url: str | None = None) -> list[dict]:
     return [m for m in parsed if m is not None]
 
 
-def _fetch_matches(source: str | None = None) -> list[dict]:
+def _fetch_matches(source: str | None = None, db=None) -> list[dict]:
     """Fetch matches from the configured source."""
+    if source is None and db is not None:
+        row = db.query(SyncConfig).first()
+        source = row.source if row else None
     src = source or settings.sync_source or "worldcupjson"
     if src == "openfootball":
         return _fetch_openfootball()
@@ -256,7 +260,7 @@ def sync_match_results(db, source: str | None = None) -> dict:
     """
     from models import Match, Team
 
-    raw_matches = _fetch_matches(source)
+    raw_matches = _fetch_matches(source, db=db)
 
     local_matches = {m.match_number: m for m in db.query(Match).all()}
     team_by_code = {t.code: t for t in db.query(Team).all()}
