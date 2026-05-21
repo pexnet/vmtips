@@ -2,6 +2,7 @@
 Pydantic schemas for request/response validation.
 """
 import math
+from datetime import datetime
 from typing import Generic, TypeVar
 
 from pydantic import BaseModel, EmailStr, Field
@@ -72,7 +73,7 @@ class MatchOut(BaseModel):
     away_team_placeholder: str | None = None
     home_goals: int | None = None
     away_goals: int | None = None
-    match_date: str
+    match_date: datetime
     status: str
 
     class Config:
@@ -91,8 +92,8 @@ class PredictionOut(BaseModel):
     match_id: int
     home_goals: int
     away_goals: int
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime
 
 class PredictionBatchCreate(BaseModel):
     league_id: int | None = None
@@ -127,8 +128,8 @@ class BracketPredictionOut(BaseModel):
     team_id: int
     round: str
     source: str | None = "knockout_prediction"
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
@@ -151,7 +152,7 @@ class LeagueBonusQuestionOut(BaseModel):
     question_text: str
     points_value: int
     answer: str | None = None
-    created_at: str | None = None
+    created_at: datetime | None = None
 
     class Config:
         from_attributes = True
@@ -174,7 +175,7 @@ class LeagueOut(BaseModel):
     id: int
     name: str
     invite_code: str
-    created_at: str | None = None
+    created_at: datetime | None = None
     admin_user_id: int
 
     class Config:
@@ -189,7 +190,7 @@ class LeaguePublicOut(BaseModel):
     id: int
     name: str
     member_count: int
-    created_at: str | None = None
+    created_at: datetime | None = None
 
     class Config:
         from_attributes = True
@@ -216,9 +217,9 @@ class TournamentResultUpdate(BaseModel):
 class PhaseOut(BaseModel):
     """Current tournament phase for prediction gating."""
     phase: str  # group_open / group_closed / knockout_open / knockout_closed
-    group_deadline: str | None = None
-    knockout_opens_at: str | None = None
-    knockout_deadline: str | None = None
+    group_deadline: datetime | None = None
+    knockout_opens_at: datetime | None = None
+    knockout_deadline: datetime | None = None
 
     class Config:
         from_attributes = True

@@ -1,10 +1,11 @@
 """
 League router: create, join, list, and view leagues.
 """
-import random
+import secrets
 import string
 
 from fastapi import APIRouter, Depends
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -18,7 +19,8 @@ router = APIRouter(prefix="/leagues", tags=["leagues"])
 
 def _generate_invite_code(length: int = 6) -> str:
     """Generate a random uppercase alphanumeric invite code."""
-    return "".join(random.choices(string.ascii_uppercase + string.digits, k=length))
+    alphabet = string.ascii_uppercase + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
 def _league_to_dict(league: League) -> dict:
@@ -117,17 +119,18 @@ def list_public_leagues(db: Session = Depends(get_db)):
     """List all public leagues. No authentication required.
     Returns league name, id, member count, and creation date (no invite_code)."""
     public_leagues = db.query(League).filter(League.is_public == True).all()
+    counts = dict(
+        db.query(LeagueMember.league_id, func.count(LeagueMember.id))
+        .filter(LeagueMember.league_id.in_([league.id for league in public_leagues]))
+        .group_by(LeagueMember.league_id)
+        .all()
+    ) if public_leagues else {}
     result = []
     for league in public_leagues:
-        member_count = (
-            db.query(LeagueMember)
-            .filter(LeagueMember.league_id == league.id)
-            .count()
-        )
         result.append({
             "id": league.id,
             "name": league.name,
-            "member_count": member_count,
+            "member_count": counts.get(league.id, 0),
             "created_at": league.created_at.isoformat() if league.created_at else None,
         })
     return result

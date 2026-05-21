@@ -2,6 +2,8 @@
 Authentication router: register, login, and current-user endpoints.
 """
 from fastapi import APIRouter, Depends, Request, status
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -27,35 +29,39 @@ def _fetch_current_user(
 @limiter.limit("5/minute")
 def register(request: Request, payload: UserCreate, db: Session = Depends(get_db)):
     """Create a new user account."""
-    existing = db.query(User).filter(User.email == payload.email).first()
+    email = payload.email.lower()
+    existing = db.query(User).filter(func.lower(User.email) == email).first()
     if existing:
         raise ConflictError(detail="email_already_registered", error_code="email_already_registered")
 
-    user = User(
-        email=payload.email,
-        password_hash=get_password_hash(payload.password),
-        display_name=payload.display_name,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-
-    # Ensure default VM2026 league exists and auto-join user
     from models import League, LeagueMember
-    default_league = db.query(League).filter(League.name == "VM2026").first()
-    if not default_league:
-        default_league = League(
-            name="VM2026",
-            invite_code="VM2026",
-            is_public=True,
-            admin_user_id=user.id,
+
+    try:
+        user = User(
+            email=email,
+            password_hash=get_password_hash(payload.password),
+            display_name=payload.display_name,
         )
-        db.add(default_league)
+        db.add(user)
+        db.flush()
+
+        default_league = db.query(League).filter(League.name == "VM2026").first()
+        if not default_league:
+            default_league = League(
+                name="VM2026",
+                invite_code="VM2026",
+                is_public=True,
+                admin_user_id=user.id,
+            )
+            db.add(default_league)
+            db.flush()
+        member = LeagueMember(league_id=default_league.id, user_id=user.id)
+        db.add(member)
         db.commit()
-        db.refresh(default_league)
-    member = LeagueMember(league_id=default_league.id, user_id=user.id)
-    db.add(member)
-    db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise ConflictError(detail="email_already_registered", error_code="email_already_registered")
+    db.refresh(user)
 
     return user
 
@@ -64,7 +70,8 @@ def register(request: Request, payload: UserCreate, db: Session = Depends(get_db
 @limiter.limit("10/minute")
 def login(request: Request, payload: UserLogin, db: Session = Depends(get_db)):
     """Authenticate a user and return a JWT access token."""
-    user = db.query(User).filter(User.email == payload.email).first()
+    email = payload.email.lower()
+    user = db.query(User).filter(func.lower(User.email) == email).first()
     if not user:
         # Always run bcrypt to prevent timing-based email enumeration
         verify_password("dummy", _DUMMY_HASH)
@@ -72,6 +79,10 @@ def login(request: Request, payload: UserLogin, db: Session = Depends(get_db)):
 
     if not verify_password(payload.password, user.password_hash):
         raise UnauthorizedError(detail="invalid_credentials", error_code="invalid_credentials")
+
+    if user.email != email:
+        user.email = email
+        db.commit()
 
     token = create_access_token(data={"sub": str(user.id)})
     return {"access_token": token, "token_type": "bearer"}

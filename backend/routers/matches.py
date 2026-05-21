@@ -2,6 +2,7 @@
 Matches router: list all matches, filter by group/knockout, and fetch single match.
 """
 import math
+from datetime import timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -19,6 +20,9 @@ def _match_to_dict(match: Match) -> dict:
     """Serialize a Match ORM row into a dict."""
     home = match.home_team
     away = match.away_team
+    match_date = match.match_date
+    if match_date and match_date.tzinfo is None:
+        match_date = match_date.replace(tzinfo=timezone.utc)
     return {
         "id": match.id,
         "match_number": match.match_number,
@@ -52,7 +56,7 @@ def _match_to_dict(match: Match) -> dict:
         },
         "home_goals": match.home_goals,
         "away_goals": match.away_goals,
-        "match_date": match.match_date.isoformat() + "Z" if match.match_date else None,
+        "match_date": match_date.isoformat() if match_date else None,
         "status": match.status,
     }
 
