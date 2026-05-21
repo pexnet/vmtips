@@ -21,7 +21,7 @@ export function isGroupOpen(phase: PhaseInfo | undefined): boolean {
 
 /** Convenience: is the knockout stage open for predictions? */
 export function isKnockoutOpen(phase: PhaseInfo | undefined): boolean {
-  return phase?.phase === "knockout_open" || phase?.phase === "group_closed";
+  return phase?.phase === "knockout_open";
 }
 
 /** Convenience: is the group stage closed (no more group predictions)? */

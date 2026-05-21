@@ -13,13 +13,14 @@ export function useGlobalLeaderboard() {
   });
 }
 
-export function usePersonalScore() {
+export function usePersonalScore(enabled = true) {
   return useQuery<PersonalScore>({
     queryKey: ["leaderboard", "me"],
     queryFn: async () => {
       const res = await leaderboardApi.me();
       return res.data as PersonalScore;
     },
+    enabled,
   });
 }
 

@@ -149,10 +149,6 @@ export interface LeagueLeaderboardResponse {
   league_name: string;
 }
 
-export interface UserLeaguesResponse {
-  leagues: League[];
-}
-
 // ── Bracket Predictions ──────────────────────────────────────
 
 export interface BracketPredictionEntry {

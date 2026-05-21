@@ -29,7 +29,7 @@ import {
   DialogContent,
   DialogTitle,
 } from "@mui/material";
-import { adminApi } from "../api/client";
+import { adminApi, phaseApi } from "../api/client";
 import { useMatches } from "../hooks/useMatches";
 import { useTeams } from "../hooks/useTeams";
 import { queryClient } from "../contexts/QueryClientProvider";
@@ -194,10 +194,9 @@ export default function AdminPage() {
 
   // ── Phase handlers ──
   function loadPhase() {
-    fetch("/api/admin/phase", { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } })
-      .then((r) => r.json())
+    phaseApi.get()
       .then((data) => {
-        const p = data as PhaseInfo;
+        const p = data.data as PhaseInfo;
         setPhaseState(p);
         setPhaseForm({
           phase: p.phase || "group_open",

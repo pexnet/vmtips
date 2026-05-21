@@ -21,6 +21,7 @@ import {
 
 import { useGlobalLeaderboard, usePersonalScore, useLeagueLeaderboard } from "../hooks/useLeaderboard";
 import { useLeagues } from "../hooks/useLeagues";
+import { useAuth } from "../contexts/AuthContext";
 import type { LeaderboardEntry, ScoreBreakdown, League } from "../types/api";
 
 function LeagueLeaderboardSection() {
@@ -95,9 +96,10 @@ function LeaderTable({ data }: { data: LeaderboardEntry[] }) {
 export default function LeaderboardPage() {
   const { t } = useTranslation();
   const [tab, setTab] = useState(0);
+  const { isLoggedIn } = useAuth();
 
   const { data: global = [], isLoading: globalLoading, error: globalError } = useGlobalLeaderboard();
-  const { data: personal } = usePersonalScore();
+  const { data: personal } = usePersonalScore(isLoggedIn);
 
   if (globalLoading) {
     return (

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
@@ -14,11 +14,6 @@ import {
   Alert,
   CircularProgress,
   Autocomplete,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
 } from "@mui/material";
 import { predictionsApi } from "../api/client";
 import { useMatches } from "../hooks/useMatches";
@@ -41,26 +36,6 @@ interface PredictionWithMatch {
     home_team: { name: string; flag_emoji: string | null };
     away_team: { name: string; flag_emoji: string | null };
   };
-}
-
-/** Compute points for a single match (same logic as backend scoring). */
-function calcMatchPoints(
-  predHome: number,
-  predAway: number,
-  actualHome: number,
-  actualAway: number
-): { points: number; outcome: boolean; homeCorrect: boolean; awayCorrect: boolean; perfect: boolean } {
-  const predOutcome = predHome > predAway ? "home" : predHome < predAway ? "away" : "draw";
-  const actualOutcome = actualHome > actualAway ? "home" : actualHome < actualAway ? "away" : "draw";
-  const outcomeCorrect = predOutcome === actualOutcome;
-  const homeCorrect = predHome === actualHome;
-  const awayCorrect = predAway === actualAway;
-  const perfect = outcomeCorrect && homeCorrect && awayCorrect;
-  let points = 0;
-  if (outcomeCorrect) points += 3;
-  if (homeCorrect) points += 2;
-  if (awayCorrect) points += 2;
-  return { points, outcome: outcomeCorrect, homeCorrect, awayCorrect, perfect };
 }
 
 // ── MatchCard ─────────────────────────────────────────────
@@ -92,14 +67,6 @@ function MatchCard({
     minute: "2-digit",
   });
 
-  // Points if result is known
-  const pointsData = useMemo(() => {
-    if (isFinished && match.home_goals !== null && match.away_goals !== null && pred.home !== "" && pred.away !== "") {
-      return calcMatchPoints(Number(pred.home), Number(pred.away), match.home_goals, match.away_goals);
-    }
-    return null;
-  }, [isFinished, match.home_goals, match.away_goals, pred.home, pred.away]);
-
   return (
     <Paper
       elevation={1}
@@ -127,15 +94,12 @@ function MatchCard({
       {/* Header row: predicted | actual | points */}
       <Box sx={{ display: "flex", alignItems: "center" }}>
         <Box sx={{ flex: 1 }} />
-        <Box sx={{ display: "grid", gridTemplateColumns: "56px 56px 56px", gap: 1, width: 184, flexShrink: 0 }}>
+        <Box sx={{ display: "grid", gridTemplateColumns: "56px 56px", gap: 1, width: 120, flexShrink: 0 }}>
           <Typography variant="caption" color="text.secondary" sx={{ textAlign: "center" }}>
             {t("matches.predicted")}
           </Typography>
           <Typography variant="caption" color="text.secondary" sx={{ textAlign: "center" }}>
             {t("matches.result")}
-          </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ textAlign: "center" }}>
-            {t("matches.points")}
           </Typography>
         </Box>
       </Box>
@@ -147,7 +111,7 @@ function MatchCard({
             <Typography variant="body2" sx={{ fontSize: "1.1rem", flexShrink: 0 }}>{home.flag_emoji ?? ""}</Typography>
             <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>{home.name}</Typography>
           </Box>
-          <Box sx={{ display: "grid", gridTemplateColumns: "56px 56px 56px", gap: 1, width: 184, flexShrink: 0 }}>
+          <Box sx={{ display: "grid", gridTemplateColumns: "56px 56px", gap: 1, width: 120, flexShrink: 0 }}>
             <TextField
               size="small"
               type="text"
@@ -164,21 +128,11 @@ function MatchCard({
             />
             <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
               {isFinished && match.home_goals !== null ? (
-                <Typography variant="body2" sx={{ fontWeight: 700, color: pointsData?.homeCorrect ? "success.main" : "text.primary" }}>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>
                   {match.home_goals}
                 </Typography>
               ) : (
                 <Typography variant="body2" color="text.secondary">-</Typography>
-              )}
-            </Box>
-            <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
-              {pointsData && (
-                <Chip
-                  size="small"
-                  color={pointsData.homeCorrect ? "success" : "default"}
-                  label={pointsData.homeCorrect ? "+2" : "0"}
-                  sx={{ height: 20, fontSize: "0.7rem", width: 56, justifyContent: "center" }}
-                />
               )}
             </Box>
           </Box>
@@ -192,7 +146,7 @@ function MatchCard({
             <Typography variant="body2" sx={{ fontSize: "1.1rem", flexShrink: 0 }}>{away.flag_emoji ?? ""}</Typography>
             <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>{away.name}</Typography>
           </Box>
-          <Box sx={{ display: "grid", gridTemplateColumns: "56px 56px 56px", gap: 1, width: 184, flexShrink: 0 }}>
+          <Box sx={{ display: "grid", gridTemplateColumns: "56px 56px", gap: 1, width: 120, flexShrink: 0 }}>
             <TextField
               size="small"
               type="text"
@@ -209,259 +163,23 @@ function MatchCard({
             />
             <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
               {isFinished && match.away_goals !== null ? (
-                <Typography variant="body2" sx={{ fontWeight: 700, color: pointsData?.awayCorrect ? "success.main" : "text.primary" }}>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>
                   {match.away_goals}
                 </Typography>
               ) : (
                 <Typography variant="body2" color="text.secondary">-</Typography>
               )}
             </Box>
-            <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
-              {pointsData && (
-                <Chip
-                  size="small"
-                  color={pointsData.awayCorrect ? "success" : "default"}
-                  label={pointsData.awayCorrect ? "+2" : "0"}
-                  sx={{ height: 20, fontSize: "0.7rem", width: 56, justifyContent: "center" }}
-                />
-              )}
-            </Box>
           </Box>
         </Box>
       )}
 
-      {/* Total points row */}
-      {pointsData && (
-        <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 1, mt: 0.5 }}>
-          <Typography variant="caption" color="text.secondary">
-            {pointsData.perfect
-              ? t("matches.perfect")
-              : `${pointsData.outcome ? "✓ " + t("matches.outcome") : ""}${pointsData.homeCorrect ? " ✓ " + t("matches.home_goals") : ""}${pointsData.awayCorrect ? " ✓ " + t("matches.away_goals") : ""}`}
-          </Typography>
-          <Chip
-            size="small"
-            color={pointsData.perfect ? "success" : pointsData.points > 0 ? "primary" : "default"}
-            label={`${pointsData.points}p`}
-            sx={{ height: 20, fontSize: "0.7rem", width: 56, justifyContent: "center" }}
-          />
-        </Box>
-      )}
-      {isLocked && !pointsData && (
+      {isLocked && (
         <Typography variant="caption" color="text.secondary" align="center">
           {t("matches.no_prediction")}
         </Typography>
       )}
     </Paper>
-  );
-}
-
-// ── GroupStandingsTable ─────────────────────────────────────
-
-interface StandingRow {
-  team_id: number;
-  name: string;
-  flag_emoji: string | null;
-  played: number;
-  won: number;
-  drawn: number;
-  lost: number;
-  goals_for: number;
-  goals_against: number;
-  points: number;
-}
-
-/** Initialise a standings map with every team in the group set to 0. */
-function initTeamMap(groupMatches: Match[]): Map<number, StandingRow> {
-  const map = new Map<number, StandingRow>();
-  for (const m of groupMatches) {
-    for (const tm of [m.home_team, m.away_team]) {
-      if (!tm || map.has(tm.id)) continue;
-      map.set(tm.id, {
-        team_id: tm.id,
-        name: tm.name,
-        flag_emoji: tm.flag_emoji,
-        played: 0, won: 0, drawn: 0, lost: 0,
-        goals_for: 0, goals_against: 0, points: 0,
-      });
-    }
-  }
-  return map;
-}
-
-function buildPredictedStandings(
-  groupMatches: Match[],
-  predictions: Record<number, { home: string; away: string }>
-): StandingRow[] {
-  const map = initTeamMap(groupMatches);
-
-  for (const m of groupMatches) {
-    const home = m.home_team;
-    const away = m.away_team;
-    if (!home || !away) continue;
-
-    let hg: number | null = null;
-    let ag: number | null = null;
-    if (m.status === "finished" && m.home_goals !== null && m.away_goals !== null) {
-      hg = m.home_goals;
-      ag = m.away_goals;
-    } else {
-      const pred = predictions[m.id];
-      if (pred && pred.home !== "" && pred.away !== "") {
-        hg = Number(pred.home);
-        ag = Number(pred.away);
-      }
-    }
-    if (hg === null || ag === null) continue;
-
-    const h = map.get(home.id)!;
-    const a = map.get(away.id)!;
-    h.played += 1;
-    a.played += 1;
-    h.goals_for += hg;
-    h.goals_against += ag;
-    a.goals_for += ag;
-    a.goals_against += hg;
-
-    if (hg > ag) {
-      h.won += 1; h.points += 3;
-      a.lost += 1;
-    } else if (hg === ag) {
-      h.drawn += 1; h.points += 1;
-      a.drawn += 1; a.points += 1;
-    } else {
-      h.lost += 1;
-      a.won += 1; a.points += 3;
-    }
-  }
-
-  return Array.from(map.values()).sort(
-    (a, b) => b.points - a.points || (b.goals_for - b.goals_against) - (a.goals_for - a.goals_against) || b.goals_for - a.goals_for
-  );
-}
-
-function buildActualStandings(groupMatches: Match[]): StandingRow[] {
-  const map = initTeamMap(groupMatches);
-
-  for (const m of groupMatches) {
-    if (m.status !== "finished" || m.home_goals === null || m.away_goals === null) continue;
-    const home = m.home_team;
-    const away = m.away_team;
-    if (!home || !away) continue;
-
-    const hg = m.home_goals;
-    const ag = m.away_goals;
-
-    const h = map.get(home.id)!;
-    const a = map.get(away.id)!;
-    h.played += 1;
-    a.played += 1;
-    h.goals_for += hg;
-    h.goals_against += ag;
-    a.goals_for += ag;
-    a.goals_against += hg;
-
-    if (hg > ag) {
-      h.won += 1; h.points += 3;
-      a.lost += 1;
-    } else if (hg === ag) {
-      h.drawn += 1; h.points += 1;
-      a.drawn += 1; a.points += 1;
-    } else {
-      h.lost += 1;
-      a.won += 1; a.points += 3;
-    }
-  }
-
-  return Array.from(map.values()).sort(
-    (a, b) => b.points - a.points || (b.goals_for - b.goals_against) - (a.goals_for - a.goals_against) || b.goals_for - a.goals_for
-  );
-}
-
-function GroupStandingsTables({ matches, predictions }: { matches: Match[]; predictions: Record<number, { home: string; away: string }> }) {
-  const { t } = useTranslation();
-  const predicted = useMemo(() => buildPredictedStandings(matches, predictions), [matches, predictions]);
-  const actual = useMemo(() => buildActualStandings(matches), [matches]);
-
-  return (
-    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, mt: 1.5, mb: 1.5 }}>
-      {/* Predicted */}
-      <Paper
-        elevation={0}
-        sx={{
-          flex: 1,
-          minWidth: 280,
-          overflow: "hidden",
-          border: (theme) => `1px solid ${theme.palette.divider}`,
-        }}
-      >
-        <Box sx={{ px: 1.5, py: 0.75, bgcolor: "action.hover" }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: "0.8rem" }}>
-            {t("matches.predicted_standings")}
-          </Typography>
-        </Box>
-        <Table size="small" sx={{ '& td, & th': { px: 1, py: 0.5, fontSize: '0.75rem' } }}>
-          <TableHead>
-            <TableRow>
-              <TableCell sx={{ width: 28 }}>#</TableCell>
-              <TableCell>{t("matches.team")}</TableCell>
-              <TableCell align="center" sx={{ width: 32 }}>{t("matches.played_short")}</TableCell>
-              <TableCell align="center" sx={{ width: 32 }}>{t("matches.goal_diff_short")}</TableCell>
-              <TableCell align="center" sx={{ width: 36, fontWeight: 700 }}>{t("matches.points_short")}</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {predicted.map((s, idx) => (
-              <TableRow key={s.team_id} hover>
-                <TableCell sx={{ fontWeight: 700, color: idx < 2 ? "success.main" : "text.secondary" }}>{idx + 1}</TableCell>
-                <TableCell>{s.flag_emoji} {s.name}</TableCell>
-                <TableCell align="center">{s.played}</TableCell>
-                <TableCell align="center">{s.goals_for - s.goals_against}</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 700 }}>{s.points}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </Paper>
-
-      {/* Actual */}
-      <Paper
-        elevation={0}
-        sx={{
-          flex: 1,
-          minWidth: 280,
-          overflow: "hidden",
-          border: (theme) => `1px solid ${theme.palette.divider}`,
-        }}
-      >
-        <Box sx={{ px: 1.5, py: 0.75, bgcolor: "action.hover" }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: "0.8rem" }}>
-            {t("matches.actual_standings")}
-          </Typography>
-        </Box>
-        <Table size="small" sx={{ '& td, & th': { px: 1, py: 0.5, fontSize: '0.75rem' } }}>
-          <TableHead>
-            <TableRow>
-              <TableCell sx={{ width: 28 }}>#</TableCell>
-              <TableCell>{t("matches.team")}</TableCell>
-              <TableCell align="center" sx={{ width: 32 }}>{t("matches.played_short")}</TableCell>
-              <TableCell align="center" sx={{ width: 32 }}>{t("matches.goal_diff_short")}</TableCell>
-              <TableCell align="center" sx={{ width: 36, fontWeight: 700 }}>{t("matches.points_short")}</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {actual.map((s, idx) => (
-              <TableRow key={s.team_id} hover>
-                <TableCell sx={{ fontWeight: 700, color: idx < 2 ? "success.main" : "text.secondary" }}>{idx + 1}</TableCell>
-                <TableCell>{s.flag_emoji} {s.name}</TableCell>
-                <TableCell align="center">{s.played}</TableCell>
-                <TableCell align="center">{s.goals_for - s.goals_against}</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 700 }}>{s.points}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </Paper>
-    </Box>
   );
 }
 
@@ -682,7 +400,6 @@ export default function MatchesPage() {
                     />
                   ))}
                 </TwoColumnGrid>
-                <GroupStandingsTables matches={grpMatches} predictions={predictions} />
               </Box>
             );
           })}
