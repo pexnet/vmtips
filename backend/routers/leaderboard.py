@@ -5,6 +5,7 @@ import math
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
@@ -18,6 +19,149 @@ from security import fetch_current_user
 from scoring import calculate_match_points, calculate_bracket_points, calculate_tournament_bonus_points, BRACKET_ROUND_POINTS
 
 router = APIRouter(prefix="/leaderboard", tags=["leaderboard"])
+
+
+def _empty_score() -> dict:
+    return {
+        "total_points": 0,
+        "match_points": 0,
+        "bracket_points": 0,
+        "tournament_bonus_points": 0,
+        "predictions_made": 0,
+        "perfect_predictions": 0,
+    }
+
+
+def _batch_calculate_scores(
+    db: Session,
+    user_ids: list[int],
+    league_id: int | None = None,
+) -> dict[int, dict]:
+    """Calculate leaderboard score aggregates for many users without per-user queries."""
+    if not user_ids:
+        return {}
+
+    scores = {user_id: _empty_score() for user_id in user_ids}
+
+    pred_filters = [
+        Prediction.user_id.in_(user_ids),
+        Prediction.home_goals.isnot(None),
+        Prediction.away_goals.isnot(None),
+    ]
+    if league_id is not None:
+        pred_filters.append(Prediction.league_id == league_id)
+
+    pred_home_win = Prediction.home_goals > Prediction.away_goals
+    pred_away_win = Prediction.home_goals < Prediction.away_goals
+    pred_draw = Prediction.home_goals == Prediction.away_goals
+    actual_home_win = Match.home_goals > Match.away_goals
+    actual_away_win = Match.home_goals < Match.away_goals
+    actual_draw = Match.home_goals == Match.away_goals
+    outcome_correct = or_(
+        and_(pred_home_win, actual_home_win),
+        and_(pred_away_win, actual_away_win),
+        and_(pred_draw, actual_draw),
+    )
+    scored_match = and_(Match.home_goals.isnot(None), Match.away_goals.isnot(None))
+    perfect = and_(
+        scored_match,
+        outcome_correct,
+        Prediction.home_goals == Match.home_goals,
+        Prediction.away_goals == Match.away_goals,
+    )
+
+    match_rows = (
+        db.query(
+            Prediction.user_id,
+            func.count(Prediction.id).label("predictions_made"),
+            func.coalesce(func.sum(case((and_(scored_match, outcome_correct), 3), else_=0)), 0).label("outcome_points"),
+            func.coalesce(func.sum(case((and_(scored_match, Prediction.home_goals == Match.home_goals), 2), else_=0)), 0).label("home_goal_points"),
+            func.coalesce(func.sum(case((and_(scored_match, Prediction.away_goals == Match.away_goals), 2), else_=0)), 0).label("away_goal_points"),
+            func.coalesce(func.sum(case((perfect, 1), else_=0)), 0).label("perfect_predictions"),
+        )
+        .join(Match, Prediction.match_id == Match.id)
+        .filter(*pred_filters)
+        .group_by(Prediction.user_id)
+        .all()
+    )
+    for row in match_rows:
+        match_points = int(row.outcome_points or 0) + int(row.home_goal_points or 0) + int(row.away_goal_points or 0)
+        scores[row.user_id]["match_points"] = match_points
+        scores[row.user_id]["predictions_made"] = int(row.predictions_made or 0)
+        scores[row.user_id]["perfect_predictions"] = int(row.perfect_predictions or 0)
+
+    actual_advancements = _build_actual_advancements(db)
+    if actual_advancements:
+        bracket_filters = [BracketPrediction.user_id.in_(user_ids)]
+        if league_id is not None:
+            bracket_filters.append(BracketPrediction.league_id == league_id)
+        advancement_filter = or_(*[
+            and_(
+                BracketPrediction.team_id == advancement["team_id"],
+                BracketPrediction.round == advancement["round"],
+            )
+            for advancement in actual_advancements
+        ])
+        bracket_points_case = case(
+            *[
+                (BracketPrediction.round == round_name, points)
+                for round_name, points in BRACKET_ROUND_POINTS.items()
+            ],
+            else_=0,
+        )
+        bracket_rows = (
+            db.query(
+                BracketPrediction.user_id,
+                func.coalesce(func.sum(bracket_points_case), 0).label("bracket_points"),
+            )
+            .filter(*bracket_filters)
+            .filter(advancement_filter)
+            .group_by(BracketPrediction.user_id)
+            .all()
+        )
+        for row in bracket_rows:
+            scores[row.user_id]["bracket_points"] = int(row.bracket_points or 0)
+
+    actual_result = db.query(TournamentResult).first()
+    if actual_result:
+        bonus_filters = [TournamentBonus.user_id.in_(user_ids)]
+        if league_id is not None:
+            bonus_filters.append(TournamentBonus.league_id == league_id)
+
+        def _text_matches(pred_col, actual_value):
+            if actual_value is None:
+                return False
+            return func.lower(func.trim(pred_col)) == actual_value.strip().lower()
+
+        bonus_points = (
+            case((and_(TournamentBonus.winner_team_id.isnot(None), TournamentBonus.winner_team_id == actual_result.winner_team_id), 20), else_=0)
+            + case((_text_matches(TournamentBonus.top_scorer_name, actual_result.top_scorer_name), 20), else_=0)
+            + case((and_(TournamentBonus.bronze_winner_team_id.isnot(None), TournamentBonus.bronze_winner_team_id == actual_result.bronze_winner_team_id), 20), else_=0)
+            + case((and_(TournamentBonus.most_goals_team_id.isnot(None), TournamentBonus.most_goals_team_id == actual_result.most_goals_team_id), 10), else_=0)
+            + case((and_(TournamentBonus.most_conceded_team_id.isnot(None), TournamentBonus.most_conceded_team_id == actual_result.most_conceded_team_id), 10), else_=0)
+            + case((_text_matches(TournamentBonus.custom_bonus_1, actual_result.custom_bonus_1_answer), 10), else_=0)
+            + case((_text_matches(TournamentBonus.custom_bonus_2, actual_result.custom_bonus_2_answer), 10), else_=0)
+        )
+        bonus_rows = (
+            db.query(
+                TournamentBonus.user_id,
+                func.coalesce(func.sum(bonus_points), 0).label("tournament_bonus_points"),
+            )
+            .filter(*bonus_filters)
+            .group_by(TournamentBonus.user_id)
+            .all()
+        )
+        for row in bonus_rows:
+            scores[row.user_id]["tournament_bonus_points"] = int(row.tournament_bonus_points or 0)
+
+    for score in scores.values():
+        score["total_points"] = (
+            score["match_points"]
+            + score["bracket_points"]
+            + score["tournament_bonus_points"]
+        )
+
+    return scores
 
 
 def _calculate_user_score(user_id: int, db: Session, league_id: int | None = None) -> dict:
@@ -194,10 +338,11 @@ def global_leaderboard(
     Otherwise returns the full list (backward compatible).
     """
     users = db.query(User).all()
+    score_by_user_id = _batch_calculate_scores(db, [user.id for user in users])
     entries = []
 
     for user in users:
-        score = _calculate_user_score(user.id, db)
+        score = score_by_user_id[user.id]
         entries.append({
             "user_id": user.id,
             "display_name": user.display_name or user.email,
@@ -258,10 +403,11 @@ def league_leaderboard(
         .filter(LeagueMember.league_id == league_id)
         .all()
     )
+    score_by_user_id = _batch_calculate_scores(db, [member.id for member in members], league_id=league_id)
 
     entries = []
     for user in members:
-        score = _calculate_user_score(user.id, db, league_id=league_id)
+        score = score_by_user_id[user.id]
         entries.append({
             "user_id": user.id,
             "display_name": user.display_name or user.email,
