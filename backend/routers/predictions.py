@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
 from errors import ForbiddenError, ValidationError
@@ -68,6 +68,11 @@ def _can_predict_group(phase: TournamentPhase) -> bool:
 def _can_predict_bracket(phase: TournamentPhase) -> bool:
     """Check if knockout bracket predictions are allowed."""
     if phase.phase == "knockout_open":
+        if phase.knockout_deadline is not None:
+            deadline = phase.knockout_deadline
+            if deadline.tzinfo is None:
+                deadline = deadline.replace(tzinfo=timezone.utc)
+            return datetime.now(timezone.utc) < deadline
         return True
     if phase.phase == "group_closed":
         # Bracket opens when group stage is closed (may have a scheduled open time)
@@ -82,6 +87,8 @@ def _can_predict_bracket(phase: TournamentPhase) -> bool:
 
 def _pred_to_dict(pred: Prediction) -> dict:
     """Serialize a Prediction ORM row."""
+    home = pred.match.home_team
+    away = pred.match.away_team
     return {
         "id": pred.id,
         "league_id": pred.league_id,
@@ -94,8 +101,14 @@ def _pred_to_dict(pred: Prediction) -> dict:
             "match_number": pred.match.match_number,
             "round": pred.match.round,
             "group": pred.match.group,
-            "home_team": {"name": pred.match.home_team.name, "flag_emoji": pred.match.home_team.flag_emoji},
-            "away_team": {"name": pred.match.away_team.name, "flag_emoji": pred.match.away_team.flag_emoji},
+            "home_team": {
+                "name": home.name if home else pred.match.home_team_placeholder or "TBD",
+                "flag_emoji": home.flag_emoji if home else None,
+            },
+            "away_team": {
+                "name": away.name if away else pred.match.away_team_placeholder or "TBD",
+                "flag_emoji": away.flag_emoji if away else None,
+            },
         },
     }
 
@@ -109,7 +122,14 @@ def list_predictions(
     db: Session = Depends(get_db),
 ):
     """Return predictions for the authenticated user, optionally filtered by league."""
-    query = db.query(Prediction).filter(Prediction.user_id == current_user.id)
+    query = (
+        db.query(Prediction)
+        .options(
+            joinedload(Prediction.match).joinedload(Match.home_team),
+            joinedload(Prediction.match).joinedload(Match.away_team),
+        )
+        .filter(Prediction.user_id == current_user.id)
+    )
     if league_id is not None:
         query = query.filter(Prediction.league_id == league_id)
     total = query.count()
@@ -170,7 +190,7 @@ def save_batch(
                 raise ForbiddenError(detail="group_predictions_locked", error_code="group_predictions_locked")
         else:
             # Knockout matches
-            if not _can_predict_bracket(phase) and phase.phase != "group_open":
+            if not _can_predict_bracket(phase):
                 raise ForbiddenError(detail="knockout_predictions_locked", error_code="knockout_predictions_locked")
 
         # Match deadline check
@@ -270,7 +290,7 @@ def save_tournament_bonuses(
     Only allowed during group_open or knockout_open phase (before deadlines).
     """
     phase = _get_phase(db)
-    if phase.phase in ("group_closed", "knockout_closed"):
+    if not (_can_predict_group(phase) or _can_predict_bracket(phase)):
         raise ForbiddenError(detail="bonus_predictions_locked", error_code="bonus_predictions_locked")
 
     league_id = _resolve_league_id(db, current_user.id, payload.league_id)
@@ -292,20 +312,8 @@ def save_tournament_bonuses(
         .first()
     )
     if bonus:
-        if payload.winner_team_id is not None:
-            bonus.winner_team_id = payload.winner_team_id
-        if payload.top_scorer_name is not None:
-            bonus.top_scorer_name = payload.top_scorer_name
-        if payload.bronze_winner_team_id is not None:
-            bonus.bronze_winner_team_id = payload.bronze_winner_team_id
-        if payload.most_goals_team_id is not None:
-            bonus.most_goals_team_id = payload.most_goals_team_id
-        if payload.most_conceded_team_id is not None:
-            bonus.most_conceded_team_id = payload.most_conceded_team_id
-        if payload.custom_bonus_1 is not None:
-            bonus.custom_bonus_1 = payload.custom_bonus_1
-        if payload.custom_bonus_2 is not None:
-            bonus.custom_bonus_2 = payload.custom_bonus_2
+        for field, value in payload.model_dump(exclude_unset=True, exclude={"league_id"}).items():
+            setattr(bonus, field, value)
     else:
         bonus = TournamentBonus(
             user_id=current_user.id,

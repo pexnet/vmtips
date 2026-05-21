@@ -7,7 +7,7 @@ Top 2 from each group + 8 best third-place teams advance to Round of 32.
 """
 from collections import defaultdict
 from typing import Optional
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from models import Prediction, Match, Team, BracketPrediction
 
 
@@ -219,20 +219,42 @@ R32_GROUP_SLOTS = {
     "2D": (88, "home"), "2G": (88, "away"),
 }
 
-# 3rd-place to R32 match mapping (simplified)
-# In WC 2026, 8 of the 12 3rd-place teams advance.
-# The exact match assignment depends on WHICH groups qualify.
-# For auto-generation from predictions, we use rank order assignment.
-R32_THIRD_SLOTS = [
-    (74, "away"),  # 3A/B/C/D/F
-    (77, "away"),  # 3C/D/F/G/H
-    (79, "away"),  # 3C/E/F/H/I
-    (80, "away"),  # 3E/H/I/J/K
-    (81, "away"),  # 3B/E/F/I/J
-    (82, "away"),  # 3A/E/H/I/J
-    (85, "away"),  # 3E/F/G/I/J
-    (87, "away"),  # 3D/E/I/J/L
+R32_THIRD_SLOT_CANDIDATES = [
+    (79, "away", set("CEFHI")),  # 1A vs 3C/E/F/H/I
+    (85, "away", set("EFGIJ")),  # 1B vs 3E/F/G/I/J
+    (81, "away", set("BEFIJ")),  # 1D vs 3B/E/F/I/J
+    (74, "away", set("ABCDF")),  # 1E vs 3A/B/C/D/F
+    (82, "away", set("AEHIJ")),  # 1G vs 3A/E/H/I/J
+    (77, "away", set("CDFGH")),  # 1I vs 3C/D/F/G/H
+    (87, "away", set("DEIJL")),  # 1K vs 3D/E/I/J/L
+    (80, "away", set("EHIJK")),  # 1L vs 3E/H/I/J/K
 ]
+
+
+def _assign_third_place_slots(third_places: list) -> list[tuple[dict, int, str]]:
+    """Assign third-place teams to their FIFA R32 candidate slots.
+
+    The FIFA regulations define a 495-row combination table. The slot candidate
+    sets above are the official bracket constraints; this resolver picks the
+    first valid full assignment while preserving the predicted third-place
+    ranking where multiple valid allocations exist.
+    """
+    teams = third_places[:8]
+
+    def backtrack(i: int, used: set[int], assigned: list[tuple[dict, int, str]]):
+        if i == len(teams):
+            return assigned
+        third = teams[i]
+        group = third["group"]
+        for slot_index, (mn, side, candidates) in enumerate(R32_THIRD_SLOT_CANDIDATES):
+            if slot_index in used or group not in candidates:
+                continue
+            result = backtrack(i + 1, used | {slot_index}, assigned + [(third, mn, side)])
+            if result is not None:
+                return result
+        return None
+
+    return backtrack(0, set(), []) or []
 
 
 def resolve_r32_teams(standings: dict, third_places: list) -> dict:
@@ -263,13 +285,10 @@ def resolve_r32_teams(standings: dict, third_places: list) -> dict:
                 r32[mn][f"{side}_name"] = teams[1]["name"]
                 r32[mn][f"{side}_flag"] = teams[1]["flag_emoji"]
 
-    # Fill 3rd-place teams (top 8 in rank order)
-    for i, third in enumerate(third_places[:8]):
-        if i < len(R32_THIRD_SLOTS):
-            mn, side = R32_THIRD_SLOTS[i]
-            r32[mn][side] = third["team_id"]
-            r32[mn][f"{side}_name"] = third["name"]
-            r32[mn][f"{side}_flag"] = third["flag_emoji"]
+    for third, mn, side in _assign_third_place_slots(third_places):
+        r32[mn][side] = third["team_id"]
+        r32[mn][f"{side}_name"] = third["name"]
+        r32[mn][f"{side}_flag"] = third["flag_emoji"]
 
     return r32
 
@@ -306,6 +325,7 @@ def simulate_full_bracket(
     # Get all knockout matches ordered by match_number
     knockout_matches = (
         db.query(Match)
+        .options(joinedload(Match.home_team), joinedload(Match.away_team))
         .filter(Match.round != "group")
         .order_by(Match.match_number)
         .all()
@@ -460,10 +480,33 @@ def get_bracket_view(db: Session, user_id: int, league_id: int) -> dict:
     # Get all knockout matches with actual results
     knockout_matches = (
         db.query(Match)
+        .options(joinedload(Match.home_team), joinedload(Match.away_team))
         .filter(Match.round != "group")
         .order_by(Match.match_number)
         .all()
     )
+    preds = (
+        db.query(Prediction)
+        .filter(
+            Prediction.user_id == user_id,
+            Prediction.league_id == league_id,
+            Prediction.match_id.in_([m.id for m in knockout_matches]),
+        )
+        .all()
+    )
+    pred_by_match = {p.match_id: p for p in preds}
+    team_ids = {
+        tid
+        for payload in result["r32_teams"].values()
+        for tid in (payload.get("home"), payload.get("away"))
+        if tid
+    } | {
+        tid
+        for tid in list(result["match_winners"].values()) + list(result["match_losers"].values())
+        if tid
+    }
+    teams = db.query(Team).filter(Team.id.in_(team_ids)).all() if team_ids else []
+    team_by_id = {team.id: team for team in teams}
 
     matches_view = []
     for match in knockout_matches:
@@ -489,24 +532,16 @@ def get_bracket_view(db: Session, user_id: int, league_id: int) -> dict:
         actual_away = match.away_team
 
         # User's prediction for this match
-        pred = (
-            db.query(Prediction)
-            .filter(
-                Prediction.user_id == user_id,
-                Prediction.league_id == league_id,
-                Prediction.match_id == match.id,
-            )
-            .first()
-        )
+        pred = pred_by_match.get(match.id)
 
         # Resolve flag emojis for predicted teams (bracket engine predictions)
         pred_home_flag = None
         pred_away_flag = None
         if pred_home_id:
-            pred_home_flag = db.query(Team).filter(Team.id == pred_home_id).first()
+            pred_home_flag = team_by_id.get(pred_home_id)
             pred_home_flag = pred_home_flag.flag_emoji if pred_home_flag else None
         if pred_away_id:
-            pred_away_flag = db.query(Team).filter(Team.id == pred_away_id).first()
+            pred_away_flag = team_by_id.get(pred_away_id)
             pred_away_flag = pred_away_flag.flag_emoji if pred_away_flag else None
 
         # Resolve flag emojis for actual teams
@@ -515,10 +550,10 @@ def get_bracket_view(db: Session, user_id: int, league_id: int) -> dict:
 
         # Resolve flag emojis for predicted team names if only ID available
         if not pred_home_name and pred_home_id:
-            th = db.query(Team).filter(Team.id == pred_home_id).first()
+            th = team_by_id.get(pred_home_id)
             pred_home_name = th.name if th else None
         if not pred_away_name and pred_away_id:
-            ta = db.query(Team).filter(Team.id == pred_away_id).first()
+            ta = team_by_id.get(pred_away_id)
             pred_away_name = ta.name if ta else None
 
         matches_view.append({

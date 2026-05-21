@@ -5,7 +5,7 @@ import math
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
 from errors import NotFoundError, ForbiddenError
@@ -29,7 +29,10 @@ def _calculate_user_score(user_id: int, db: Session, league_id: int | None = Non
     )
     if league_id is not None:
         prediction_query = prediction_query.filter(Prediction.league_id == league_id)
-    predictions = prediction_query.all()
+    predictions = prediction_query.options(
+        joinedload(Prediction.match).joinedload(Match.home_team),
+        joinedload(Prediction.match).joinedload(Match.away_team),
+    ).all()
 
     match_points = []
     total_match_points = 0
