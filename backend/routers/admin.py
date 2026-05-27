@@ -29,6 +29,9 @@ from scoring import (
     calculate_match_points, calculate_bracket_points, calculate_tournament_bonus_points,
     BRACKET_ROUND_POINTS, BONUS_POINTS,
 )
+from fifa_standings import sort_group_teams as _sort_group_teams
+from bracket_engine import compute_third_place_rankings
+from third_place_table import get_annex_c_match_mapping
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -459,7 +462,7 @@ def compute_group_standings(
             else:
                 s["lost"] += 1
 
-    # Group and sort by: points desc, goal_diff desc, goals_for desc
+    # Group by group letter
     groups = {}
     for s in standings.values():
         grp = s["group"]
@@ -467,11 +470,19 @@ def compute_group_standings(
             groups[grp] = []
         groups[grp].append(s)
 
+    # Group and sort using FIFA tiebreakers (head-to-head aware)
     results = []
     for grp in sorted(groups.keys()):
         group_teams = groups[grp]
-        group_teams.sort(key=lambda x: (x["points"], x["goals_for"] - x["goals_against"], x["goals_for"]), reverse=True)
-        for i, s in enumerate(group_teams):
+        # Enrich dicts with gf/ga/gd keys expected by fifa_standings
+        for t in group_teams:
+            t["gf"] = t["goals_for"]
+            t["ga"] = t["goals_against"]
+            t["gd"] = t["goals_for"] - t["goals_against"]
+        # Matches for this group
+        grp_matches = [m for m in finished if m.group == grp]
+        sorted_teams = _sort_group_teams(group_teams, grp_matches)
+        for i, s in enumerate(sorted_teams):
             gd = s["goals_for"] - s["goals_against"]
             gs = GroupStanding(
                 team_id=s["team_id"],
@@ -620,8 +631,27 @@ def resolve_knockout_teams(
     for s in standings:
         position_map[(s.group, s.position)] = s.team_id
 
-    # Best 3rd-place teams logic would go here — for now, use placeholders
-    # This requires the third-place combination logic from Excel
+    standings_by_group = {}
+    for s in standings:
+        standings_by_group.setdefault(s.group, []).append({
+            "team_id": s.team_id,
+            "group": s.group,
+            "position": s.position,
+            "played": s.played,
+            "won": s.won,
+            "drawn": s.drawn,
+            "lost": s.lost,
+            "gf": s.goals_for,
+            "ga": s.goals_against,
+            "gd": s.goal_difference,
+            "points": s.points,
+        })
+    for group in standings_by_group:
+        standings_by_group[group] = sorted(standings_by_group[group], key=lambda row: row["position"])
+
+    third_places = compute_third_place_rankings(standings_by_group)
+    third_by_group = {third["group"]: third for third in third_places[:8]}
+    third_match_mapping = get_annex_c_match_mapping(list(third_by_group.keys())) if len(third_by_group) == 8 else {}
 
     # Get Round of 32 matches that have placeholders
     r32_matches = db.query(Match).filter(
@@ -634,7 +664,7 @@ def resolve_knockout_teams(
 
         # Resolve "1A" style placeholders (group winner/runner-up)
         home_resolved = _resolve_placeholder(match.home_team_placeholder, position_map)
-        away_resolved = _resolve_placeholder(match.away_team_placeholder, position_map)
+        away_resolved = _resolve_placeholder(match.away_team_placeholder, position_map, third_match_mapping, third_by_group, match.match_number)
 
         if home_resolved is not None and match.home_team_id is None:
             match.home_team_id = home_resolved
@@ -647,10 +677,16 @@ def resolve_knockout_teams(
             resolved += 1
 
     db.commit()
-    return {"resolved": resolved, "message": f"Resolved {resolved} Round of 32 matches with known teams. Best 3rd-place teams require manual advancement entry."}
+    return {"resolved": resolved, "message": f"Resolved {resolved} Round of 32 matches from group standings and Annex C third-place assignments."}
 
 
-def _resolve_placeholder(placeholder: str | None, position_map: dict) -> int | None:
+def _resolve_placeholder(
+    placeholder: str | None,
+    position_map: dict,
+    third_match_mapping: dict[int, str] | None = None,
+    third_by_group: dict[str, dict] | None = None,
+    match_number: int | None = None,
+) -> int | None:
     """Resolve a placeholder like '1A', '2B', '3A/B/C/D/F' to a team_id."""
     if not placeholder:
         return None
@@ -663,7 +699,11 @@ def _resolve_placeholder(placeholder: str | None, position_map: dict) -> int | N
 
     # Third-place teams like "3A/B/C/D/F" — cannot auto-resolve without best 3rd logic
     if placeholder.startswith("3"):
-        return None
+        if not third_match_mapping or not third_by_group or match_number is None:
+            return None
+        group = third_match_mapping.get(match_number)
+        third = third_by_group.get(group) if group else None
+        return third["team_id"] if third else None
 
     # Winner/loser of match references like "W73", "L101" — resolve later
     if placeholder.startswith(("W", "L")):

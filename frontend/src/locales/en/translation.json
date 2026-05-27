@@ -84,7 +84,8 @@
     "predicted_teams": "Predicted teams",
     "awaiting_teams": "Awaiting teams",
     "actual_teams": "Actual teams",
-    "your_predictions": "Your predictions"
+    "your_predictions": "Your predictions",
+    "draw_not_supported": "Knockout draws need a winner."
   },
   "predictions": {
     "title": "Your Predictions",

@@ -59,6 +59,7 @@ export interface BracketViewThird {
   points: number;
   gd: number;
   gf: number;
+  qualified: boolean;
 }
 
 export interface BracketViewResponse {

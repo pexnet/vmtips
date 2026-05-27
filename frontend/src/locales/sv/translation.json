@@ -84,7 +84,8 @@
     "predicted_teams": "Tippade lag",
     "awaiting_teams": "Inväntar lag",
     "actual_teams": "Verkliga lag",
-    "your_predictions": "Dina tips"
+    "your_predictions": "Dina tips",
+    "draw_not_supported": "Slutspelsmatcher behöver en vinnare."
   },
   "predictions": {
     "title": "Dina tips",

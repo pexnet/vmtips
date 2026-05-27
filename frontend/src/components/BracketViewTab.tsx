@@ -152,6 +152,10 @@ export default function BracketViewTab() {
       setErrorMsg(t("predictions.no_league_selected"));
       return;
     }
+    if (batch.some((pred) => pred.home_goals === pred.away_goals)) {
+      setErrorMsg(t("knockout.draw_not_supported"));
+      return;
+    }
 
     predictionsApi
       .batch(selectedLeagueId, batch)
@@ -280,6 +284,7 @@ export default function BracketViewTab() {
               const act = m.actual;
               const predFilled = pred.home_goals !== null && pred.away_goals !== null;
               const matchPred = matchPredictions[m.match_id] || { home: "", away: "" };
+              const isDrawPrediction = matchPred.home !== "" && matchPred.home === matchPred.away;
 
               const isFinished = act.status === "finished";
               const isLocked = isMatchLocked(m.match_date, act.status, phaseData?.phase, m.round);
@@ -354,6 +359,7 @@ export default function BracketViewTab() {
                         type="text"
                         placeholder="-"
                         value={matchPred.home}
+                        error={isDrawPrediction}
                         onChange={(e) => {
                           const val = e.target.value;
                           if (val === "" || (/^\d*$/.test(val) && Number(val) <= 15)) {
@@ -381,6 +387,7 @@ export default function BracketViewTab() {
                         type="text"
                         placeholder="-"
                         value={matchPred.away}
+                        error={isDrawPrediction}
                         onChange={(e) => {
                           const val = e.target.value;
                           if (val === "" || (/^\d*$/.test(val) && Number(val) <= 15)) {

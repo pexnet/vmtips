@@ -41,7 +41,8 @@ export default function InfoPage() {
   const totalBracketPts = Object.entries(bracketSlots as Record<string, number>)
     .reduce((sum, [key, slots]) => sum + slots * (bracketPointValues as Record<string, number>)[key], 0);
   const totalBonusPts = 20 + 20 + 20 + 10 + 10 + 10 + 10; // = 100
-  const grandTotal = 504 + totalBracketPts + totalBonusPts;
+  const totalMatchPts = 104 * 7; // 72 group + 32 knockout
+  const grandTotal = totalMatchPts + totalBracketPts + totalBonusPts;
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
@@ -207,8 +208,8 @@ export default function InfoPage() {
             </TableHead>
             <TableBody>
               <TableRow>
-                <TableCell>{t("info.total_group_matches")}</TableCell>
-                <TableCell align="right"><Chip label={504} size="small" variant="outlined" /></TableCell>
+                <TableCell>{t("info.total_matches")}</TableCell>
+                <TableCell align="right"><Chip label={totalMatchPts} size="small" variant="outlined" /></TableCell>
               </TableRow>
               <TableRow>
                 <TableCell>{t("info.total_bracket")}</TableCell>

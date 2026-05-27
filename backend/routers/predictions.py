@@ -192,6 +192,8 @@ def save_batch(
             # Knockout matches
             if not _can_predict_bracket(phase):
                 raise ForbiddenError(detail="knockout_predictions_locked", error_code="knockout_predictions_locked")
+            if pred_create.home_goals == pred_create.away_goals:
+                raise ValidationError(detail="knockout_draws_not_supported", error_code="knockout_draws_not_supported")
 
         # Match deadline check
         kickoff = match.match_date

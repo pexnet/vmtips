@@ -4,11 +4,44 @@ and generates bracket predictions (which teams advance to each knockout round).
 
 Follows the World Cup 2026 48-team format with 12 groups of 4.
 Top 2 from each group + 8 best third-place teams advance to Round of 32.
+
+All tournament fixture data is sourced from match_table.py, which reads
+worldcup2026_fixtures.json as the single source of truth.
 """
 from collections import defaultdict
 from typing import Optional
 from sqlalchemy.orm import Session, joinedload
 from models import Prediction, Match, Team, BracketPrediction
+from fifa_standings import sort_group_teams as _sort_group_teams
+from match_table import (
+    get_group_slot_mapping as _get_group_slot_mapping,
+    get_third_place_slot_candidates as _get_third_place_slot_candidates,
+    get_r32_match_numbers as _get_r32_match_numbers,
+    get_round_order as _get_round_order,
+)
+from third_place_table import get_annex_c_match_mapping
+
+
+# Lazy-loaded lookups from match_table (single source of truth)
+# Imported at module level because match_table is lightweight and fixtures
+# are needed by nearly all downstream functions.
+def _lazy_load_slot_data():
+    """Load slot mappings from match_table — call once at import time."""
+    global R32_GROUP_SLOTS, R32_THIRD_SLOT_CANDIDATES, R32_MATCH_NUMBERS, ROUND_ORDER
+    R32_GROUP_SLOTS = _get_group_slot_mapping()
+    R32_THIRD_SLOT_CANDIDATES = _get_third_place_slot_candidates()
+    R32_MATCH_NUMBERS = _get_r32_match_numbers()
+    ROUND_ORDER = _get_round_order()
+
+
+_lazy_load_slot_data()  # warm up on import
+
+# Expose for backward compatibility
+# After _lazy_load_slot_data() these are populated, not None (pyright ignore)
+#R32_GROUP_SLOTS = None  # type: ignore
+#R32_THIRD_SLOT_CANDIDATES = None  # type: ignore
+#R32_MATCH_NUMBERS = None  # type: ignore
+#ROUND_ORDER = None  # type: ignore
 
 
 def _determine_outcome(home_goals: int, away_goals: int) -> str:
@@ -61,6 +94,7 @@ def compute_predicted_group_standings(db: Session, user_id: int, league_id: int)
         .all()
     )
 
+    predicted_matches_by_group = {g: [] for g in "ABCDEFGHIJKL"}
     for pred in predictions:
         match = pred.match
         if not match.home_team or not match.away_team:
@@ -71,6 +105,13 @@ def compute_predicted_group_standings(db: Session, user_id: int, league_id: int)
         hg = pred.home_goals
         ag = pred.away_goals
         outcome = _determine_outcome(hg, ag)
+        group = str(home.group)
+        predicted_matches_by_group.setdefault(group, []).append({
+            "home_team_id": match.home_team_id,
+            "away_team_id": match.away_team_id,
+            "home_goals": hg,
+            "away_goals": ag,
+        })
 
         for team, is_home, goals_for, goals_against in [
             (home, True, hg, ag),
@@ -98,10 +139,8 @@ def compute_predicted_group_standings(db: Session, user_id: int, league_id: int)
 
     standings = {}
     for group, teams_by_id in group_stats.items():
-        standings[group] = sorted(
-            teams_by_id.values(),
-            key=lambda t: (-t["points"], -t["gd"], -t["gf"], -t["won"], t["name"] or ""),
-        )
+        team_list = list(teams_by_id.values())
+        standings[group] = _sort_group_teams(team_list, predicted_matches_by_group.get(group, []))
 
     return standings
 
@@ -173,11 +212,8 @@ def compute_actual_group_standings(db: Session, league_id: int) -> dict:
 
     standings = {}
     for group, teams in group_stats.items():
-        sorted_teams = sorted(
-            teams.values(),
-            key=lambda t: (-t["points"], -t["gd"], -t["gf"], -t["won"]),
-        )
-        standings[group] = sorted_teams
+        team_list = list(teams.values())
+        standings[group] = _sort_group_teams(team_list, matches)
 
     return standings
 
@@ -193,68 +229,35 @@ def compute_third_place_rankings(standings: dict) -> list:
 
     return sorted(
         third_places,
-        key=lambda t: (-t["points"], -t["gd"], -t["gf"], -t["won"]),
+        key=lambda t: (
+            -t["points"],
+            -t["gd"],
+            -t["gf"],
+            -(t.get("conduct_score", t.get("fair_play_score")) or -10_000),
+            t.get("fifa_ranking") or 10_000,
+            t.get("team_id") or 0,
+            (t.get("name") or "").lower(),
+        ),
     )
-
-
-# Group winner/runner-up to R32 match mapping
-# Each R32 match has a home slot and an away slot.
-# Format: "1A" = winner of group A, "2B" = runner-up of group B
-R32_GROUP_SLOTS = {
-    "2A": (73, "home"), "2B": (73, "away"),
-    "1E": (74, "home"),
-    "2C": (75, "home"), "1F": (75, "away"),
-    "1C": (76, "home"), "2F": (76, "away"),
-    "1I": (77, "home"),
-    "2E": (78, "home"), "2I": (78, "away"),
-    "1A": (79, "home"),
-    "1L": (80, "home"),
-    "1D": (81, "home"),
-    "1G": (82, "home"),
-    "2K": (83, "home"), "2L": (83, "away"),
-    "1H": (84, "home"), "2J": (84, "away"),
-    "1B": (85, "home"),
-    "1J": (86, "home"), "2H": (86, "away"),
-    "1K": (87, "home"),
-    "2D": (88, "home"), "2G": (88, "away"),
-}
-
-R32_THIRD_SLOT_CANDIDATES = [
-    (79, "away", set("CEFHI")),  # 1A vs 3C/E/F/H/I
-    (85, "away", set("EFGIJ")),  # 1B vs 3E/F/G/I/J
-    (81, "away", set("BEFIJ")),  # 1D vs 3B/E/F/I/J
-    (74, "away", set("ABCDF")),  # 1E vs 3A/B/C/D/F
-    (82, "away", set("AEHIJ")),  # 1G vs 3A/E/H/I/J
-    (77, "away", set("CDFGH")),  # 1I vs 3C/D/F/G/H
-    (87, "away", set("DEIJL")),  # 1K vs 3D/E/I/J/L
-    (80, "away", set("EHIJK")),  # 1L vs 3E/H/I/J/K
-]
 
 
 def _assign_third_place_slots(third_places: list) -> list[tuple[dict, int, str]]:
     """Assign third-place teams to their FIFA R32 candidate slots.
 
-    The FIFA regulations define a 495-row combination table. The slot candidate
-    sets above are the official bracket constraints; this resolver picks the
-    first valid full assignment while preserving the predicted third-place
-    ranking where multiple valid allocations exist.
+    The FIFA regulations define a fixed 495-row Annex C lookup. Placement
+    depends only on which eight third-place groups advance, not their ranking.
     """
     teams = third_places[:8]
+    if len(teams) < 8:
+        return []
 
-    def backtrack(i: int, used: set[int], assigned: list[tuple[dict, int, str]]):
-        if i == len(teams):
-            return assigned
-        third = teams[i]
-        group = third["group"]
-        for slot_index, (mn, side, candidates) in enumerate(R32_THIRD_SLOT_CANDIDATES):
-            if slot_index in used or group not in candidates:
-                continue
-            result = backtrack(i + 1, used | {slot_index}, assigned + [(third, mn, side)])
-            if result is not None:
-                return result
-        return None
-
-    return backtrack(0, set(), []) or []
+    third_by_group = {third["group"]: third for third in teams}
+    mapping = get_annex_c_match_mapping(list(third_by_group.keys()))
+    assigned = []
+    for mn in sorted(mapping):
+        group = mapping[mn]
+        assigned.append((third_by_group[group], mn, "away"))
+    return assigned
 
 
 def resolve_r32_teams(standings: dict, third_places: list) -> dict:
@@ -265,7 +268,7 @@ def resolve_r32_teams(standings: dict, third_places: list) -> dict:
     """
     r32 = {m: {"home": None, "away": None, "home_name": None, "away_name": None,
                              "home_flag": None, "away_flag": None}
-           for m in range(73, 89)}
+           for m in R32_MATCH_NUMBERS}
 
     # Fill group winners and runners-up
     for group in "ABCDEFGHIJKL":
@@ -375,9 +378,8 @@ def simulate_full_bracket(
                 match_winners[mn] = away_id
                 match_losers[mn] = home_id
             else:
-                # Draw in knockout: default to home for prediction simulation
-                match_winners[mn] = home_id
-                match_losers[mn] = away_id
+                match_winners[mn] = None
+                match_losers[mn] = None
         else:
             match_winners[mn] = None
             match_losers[mn] = None
@@ -386,7 +388,7 @@ def simulate_full_bracket(
     round_teams = {r: set() for r in round_order}
 
     # R32: all teams assigned to R32 matches
-    for mn in range(73, 89):
+    for mn in R32_MATCH_NUMBERS:
         if mn in r32_teams:
             for side in ["home", "away"]:
                 tid = r32_teams[mn][side]
@@ -427,6 +429,17 @@ def generate_bracket_predictions(db: Session, user_id: int, league_id: int) -> l
                     "source": "group_prediction",
                 })
 
+    # Add world champion (winner of final, match 104)
+    champion_id = result["match_winners"].get(104)
+    if champion_id:
+        entries.append({
+            "user_id": user_id,
+            "league_id": league_id,
+            "team_id": champion_id,
+            "round": "world_champion",
+            "source": "group_prediction",
+        })
+
     return entries
 
 
@@ -461,21 +474,22 @@ def get_bracket_view(db: Session, user_id: int, league_id: int) -> dict:
     Get a full bracket view for a user: predicted teams per match,
     actual teams when available, and points.
     """
-    # Check if group stage has actual results
-    actual_standings = compute_actual_group_standings(db, league_id)
-    has_actual_results = len(actual_standings) > 0
+    finished_group_matches = db.query(Match).filter(
+        Match.round == "group",
+        Match.status == "finished",
+        Match.home_goals.isnot(None),
+        Match.away_goals.isnot(None),
+    ).count()
+    group_stage_complete = finished_group_matches == 72
     
-    # Use actual standings if available, otherwise use predicted
-    if has_actual_results:
-        standings = actual_standings
-        third_places = compute_third_place_rankings(standings)
-        r32_teams = resolve_r32_teams(standings, third_places)
-        result = simulate_full_bracket(db, user_id, league_id, r32_teams)
-    else:
-        standings = compute_predicted_group_standings(db, user_id, league_id)
-        third_places = compute_third_place_rankings(standings)
-        r32_teams = resolve_r32_teams(standings, third_places)
-        result = simulate_full_bracket(db, user_id, league_id, r32_teams)
+    standings = (
+        compute_actual_group_standings(db, league_id)
+        if group_stage_complete
+        else compute_predicted_group_standings(db, user_id, league_id)
+    )
+    third_places = compute_third_place_rankings(standings)
+    r32_teams = resolve_r32_teams(standings, third_places)
+    result = simulate_full_bracket(db, user_id, league_id, r32_teams)
 
     # Get all knockout matches with actual results
     knockout_matches = (
@@ -627,8 +641,9 @@ def get_bracket_view(db: Session, user_id: int, league_id: int) -> dict:
                 "points": t["points"],
                 "gd": t["gd"],
                 "gf": t["gf"],
+                "qualified": i < 8,
             }
-            for i, t in enumerate(third_places[:8])
+            for i, t in enumerate(third_places)
         ],
         "knockout_matches": matches_view,
     }

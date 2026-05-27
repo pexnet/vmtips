@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
@@ -14,6 +14,11 @@ import {
   Alert,
   CircularProgress,
   Autocomplete,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
 } from "@mui/material";
 import { predictionsApi } from "../api/client";
 import { useMatches } from "../hooks/useMatches";
@@ -21,8 +26,10 @@ import { usePredictions, useTournamentBonuses, useTeamsFromMatches } from "../ho
 import { usePhase, isGroupOpen } from "../hooks/usePhase";
 import { useLeague } from "../contexts/LeagueContext";
 import BracketViewTab from "../components/BracketViewTab";
+import { computePredictedStandings, computeThirdPlaceRanking } from "../utils/standings";
 
 import type { Match, Team } from "../types/api";
+import type { StandingTeam } from "../utils/standings";
 
 /** Shape returned by the predictions list endpoint (includes nested match info). */
 interface PredictionWithMatch {
@@ -204,6 +211,89 @@ function TwoColumnGrid({ children }: { children: React.ReactNode }) {
   );
 }
 
+function QualificationStandings({
+  group,
+  teams,
+  thirdPlaceQualified,
+}: {
+  group: string;
+  teams: StandingTeam[];
+  thirdPlaceQualified: Set<number>;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <Paper elevation={1} sx={{ p: 1.5, mb: 1.5 }}>
+      <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700, textTransform: "uppercase" }}>
+        {group} · {t("matches.predicted_standings")}
+      </Typography>
+      <Table size="small" sx={{ tableLayout: "fixed" }}>
+        <TableHead>
+          <TableRow>
+            <TableCell sx={{ width: 36 }}>#</TableCell>
+            <TableCell>{t("matches.team")}</TableCell>
+            <TableCell align="right" sx={{ width: 38 }}>{t("matches.played_short")}</TableCell>
+            <TableCell align="right" sx={{ width: 44 }}>{t("matches.goal_diff_short")}</TableCell>
+            <TableCell align="right" sx={{ width: 44 }}>{t("matches.points_short")}</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {teams.map((team, index) => {
+            const direct = index < 2;
+            const thirdQualified = index === 2 && thirdPlaceQualified.has(team.team_id);
+            const thirdPending = index === 2 && !thirdQualified;
+            return (
+              <TableRow
+                key={team.team_id}
+                sx={{
+                  bgcolor: direct || thirdQualified
+                    ? "success.light"
+                    : thirdPending
+                      ? "warning.light"
+                      : "transparent",
+                  "& td": { py: 0.5 },
+                }}
+              >
+                <TableCell>{index + 1}</TableCell>
+                <TableCell sx={{ minWidth: 0 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, minWidth: 0 }}>
+                    <Typography component="span" sx={{ flexShrink: 0 }}>{team.flag_emoji ?? ""}</Typography>
+                    <Typography variant="body2" noWrap>{team.name}</Typography>
+                  </Box>
+                </TableCell>
+                <TableCell align="right">{team.played}</TableCell>
+                <TableCell align="right">{team.gd}</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700 }}>{team.points}</TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </Paper>
+  );
+}
+
+function BestThirdPlaceStrip({ teams }: { teams: StandingTeam[] }) {
+  return (
+    <Paper elevation={1} sx={{ p: 1.5, mb: 2 }}>
+      <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
+        Best third-place teams
+      </Typography>
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
+        {teams.map((team, index) => (
+          <Chip
+            key={`${team.group}-${team.team_id}`}
+            size="small"
+            color={index < 8 ? "success" : "default"}
+            variant={index < 8 ? "filled" : "outlined"}
+            label={`${index + 1}. ${team.flag_emoji ?? ""} ${team.code || team.name} (${team.points}p, ${team.gd})`}
+          />
+        ))}
+      </Box>
+    </Paper>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────
 
 export default function MatchesPage() {
@@ -329,7 +419,19 @@ export default function MatchesPage() {
   const selectedMostConceded = teams.find((tm: Team) => tm.id === bonuses.most_conceded_team_id) || null;
 
   const groupMatches = matches.filter((m) => m.round === "group");
-  const groups = [...new Set(groupMatches.map((m) => m.group).filter(Boolean))].sort();
+  const groups = [...new Set(groupMatches.map((m) => m.group).filter((group): group is string => Boolean(group)))].sort();
+  const predictedStandings = useMemo(
+    () => computePredictedStandings(matches, predictions),
+    [matches, predictions],
+  );
+  const thirdPlaceRanking = useMemo(
+    () => computeThirdPlaceRanking(predictedStandings),
+    [predictedStandings],
+  );
+  const qualifiedThirdTeamIds = useMemo(
+    () => new Set(thirdPlaceRanking.slice(0, 8).map((team) => team.team_id)),
+    [thirdPlaceRanking],
+  );
 
   const isLoading = matchesLoading || predictionsLoading;
 
@@ -382,13 +484,16 @@ export default function MatchesPage() {
       {/* GROUP STAGE TAB */}
       {tab === 0 && (
         <Box>
+          <BestThirdPlaceStrip teams={thirdPlaceRanking} />
           {groups.map((group) => {
             const grpMatches = groupMatches.filter((m) => m.group === group);
             return (
               <Box key={group} sx={{ mb: 3 }}>
-                <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>
-                  {group}
-                </Typography>
+                <QualificationStandings
+                  group={group}
+                  teams={predictedStandings[group] ?? []}
+                  thirdPlaceQualified={qualifiedThirdTeamIds}
+                />
                 <TwoColumnGrid>
                   {grpMatches.map((m) => (
                     <MatchCard
