@@ -61,7 +61,13 @@ export const teamsApi = {
 export const predictionsApi = {
   list: (leagueId?: number) =>
     api.get(`/predictions${leagueId !== undefined ? `?league_id=${leagueId}` : ""}`),
-  batch: (leagueId: number, predictions: Array<{ match_id: number; home_goals: number; away_goals: number }>) =>
+  batch: (leagueId: number, predictions: Array<{
+    match_id: number;
+    home_goals: number;
+    away_goals: number;
+    knockout_winner_side?: "home" | "away";
+    knockout_resolution?: "extra_time" | "penalties";
+  }>) =>
     api.post("/predictions/batch", { league_id: leagueId, predictions }),
   tournament: (leagueId?: number) =>
     api.get(`/predictions/tournament${leagueId !== undefined ? `?league_id=${leagueId}` : ""}`),

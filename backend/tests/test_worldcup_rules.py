@@ -1,6 +1,11 @@
 from types import SimpleNamespace
 
-from bracket_engine import _assign_third_place_slots, compute_third_place_rankings, get_bracket_view
+from bracket_engine import (
+    _assign_third_place_slots,
+    compute_third_place_rankings,
+    get_bracket_view,
+    simulate_full_bracket,
+)
 from fifa_standings import sort_group_teams
 from models import League, Match, Prediction, User
 from third_place_table import get_annex_c_match_mapping
@@ -111,7 +116,7 @@ def test_bracket_view_uses_predictions_until_all_group_matches_finished(seeded_d
     assert group_a[0]["team_id"] == match.away_team_id
 
 
-def test_knockout_draw_predictions_are_rejected(client, set_phase):
+def test_knockout_draw_predictions_require_winner_marker(client, set_phase):
     set_phase("knockout_open")
     client.post("/auth/register", json={
         "email": "draws@example.com",
@@ -128,4 +133,68 @@ def test_knockout_draw_predictions_are_rejected(client, set_phase):
     )
 
     assert response.status_code == 400
-    assert response.json()["error"] == "knockout_draws_not_supported"
+    assert response.json()["error"] == "knockout_winner_required"
+
+
+def test_knockout_draw_predictions_accept_winner_after_penalties(client, set_phase):
+    set_phase("knockout_open")
+    client.post("/auth/register", json={
+        "email": "pens@example.com",
+        "password": "secret123",
+        "display_name": "Pens",
+    })
+    login = client.post("/auth/login", json={"email": "pens@example.com", "password": "secret123"})
+    token = login.json()["access_token"]
+
+    response = client.post(
+        "/predictions/batch",
+        json={
+            "predictions": [{
+                "match_id": 73,
+                "home_goals": 1,
+                "away_goals": 1,
+                "knockout_winner_side": "away",
+                "knockout_resolution": "penalties",
+            }],
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+
+    listed = client.get("/predictions", headers={"Authorization": f"Bearer {token}"}).json()
+    assert listed[0]["knockout_winner_side"] == "away"
+    assert listed[0]["knockout_resolution"] == "penalties"
+
+
+def test_knockout_draw_marker_drives_bracket_winner(seeded_db):
+    user = seeded_db.query(User).filter(User.email == "admin@vmtips.se").one()
+    league = seeded_db.query(League).filter(League.name == "VM2026").one()
+    match = seeded_db.query(Match).filter(Match.match_number == 73).one()
+
+    seeded_db.add(Prediction(
+        user_id=user.id,
+        league_id=league.id,
+        match_id=match.id,
+        home_goals=2,
+        away_goals=2,
+        knockout_winner_side="away",
+        knockout_resolution="extra_time",
+    ))
+    seeded_db.commit()
+
+    r32_teams = {
+        73: {
+            "home": 1,
+            "away": 2,
+            "home_name": "Home",
+            "away_name": "Away",
+            "home_flag": None,
+            "away_flag": None,
+        },
+    }
+
+    result = simulate_full_bracket(seeded_db, user.id, league.id, r32_teams)
+
+    assert result["match_winners"][73] == 2
+    assert result["match_losers"][73] == 1

@@ -88,6 +88,8 @@ class Prediction(Base):
     match_id = Column(Integer, ForeignKey("matches.id"), nullable=False)
     home_goals = Column(Integer, nullable=False)
     away_goals = Column(Integer, nullable=False)
+    knockout_winner_side = Column(String, nullable=True)  # home / away when knockout full-time score is drawn
+    knockout_resolution = Column(String, nullable=True)  # extra_time / penalties
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 

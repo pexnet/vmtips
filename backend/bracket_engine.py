@@ -377,6 +377,12 @@ def simulate_full_bracket(
             elif outcome == "away":
                 match_winners[mn] = away_id
                 match_losers[mn] = home_id
+            elif pred.knockout_winner_side == "home":
+                match_winners[mn] = home_id
+                match_losers[mn] = away_id
+            elif pred.knockout_winner_side == "away":
+                match_winners[mn] = away_id
+                match_losers[mn] = home_id
             else:
                 match_winners[mn] = None
                 match_losers[mn] = None
@@ -578,6 +584,8 @@ def get_bracket_view(db: Session, user_id: int, league_id: int) -> dict:
             "user_prediction": {
                 "home_goals": pred.home_goals if pred else None,
                 "away_goals": pred.away_goals if pred else None,
+                "knockout_winner_side": pred.knockout_winner_side if pred else None,
+                "knockout_resolution": pred.knockout_resolution if pred else None,
             },
             "predicted": {
                 "home_team_id": pred_home_id,
@@ -590,6 +598,8 @@ def get_bracket_view(db: Session, user_id: int, league_id: int) -> dict:
                 "away_team_placeholder": match.away_team_placeholder,
                 "home_goals": pred.home_goals if pred else None,
                 "away_goals": pred.away_goals if pred else None,
+                "knockout_winner_side": pred.knockout_winner_side if pred else None,
+                "knockout_resolution": pred.knockout_resolution if pred else None,
             },
             "actual": {
                 "home_team_id": actual_home.id if actual_home else None,

@@ -11,6 +11,10 @@ import {
   Divider,
   TextField,
   Button,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import { useBracketView } from "../hooks/useBracketView";
@@ -37,6 +41,13 @@ interface PredictionPointData {
   awayCorrect: boolean;
   perfect: boolean;
 }
+
+type KnockoutMatchPrediction = {
+  home: string;
+  away: string;
+  knockout_winner_side?: "home" | "away";
+  knockout_resolution?: "extra_time" | "penalties";
+};
 
 function calcMatchPoints(
   predHome: number,
@@ -92,18 +103,20 @@ export default function BracketViewTab() {
   const [errorMsg, setErrorMsg] = useState("");
   const [saveMsg, setSaveMsg] = useState("");
   const [matchPredictions, setMatchPredictions] = useState(
-    {} as Record<number, { home: string; away: string }>
+    {} as Record<number, KnockoutMatchPrediction>
   );
 
   // Pre-fill from existing predictions whenever data loads
   useEffect(() => {
     if (data?.knockout_matches) {
-      const prefill: Record<number, { home: string; away: string }> = {};
+      const prefill: Record<number, KnockoutMatchPrediction> = {};
       for (const m of data.knockout_matches) {
         if (m.predicted.home_goals !== null && m.predicted.away_goals !== null) {
           prefill[m.match_id] = {
             home: String(m.predicted.home_goals),
             away: String(m.predicted.away_goals),
+            knockout_winner_side: m.predicted.knockout_winner_side ?? undefined,
+            knockout_resolution: m.predicted.knockout_resolution ?? undefined,
           };
         }
       }
@@ -138,6 +151,17 @@ export default function BracketViewTab() {
     }));
   };
 
+  const handleKnockoutMetaChange = (
+    id: number,
+    field: "knockout_winner_side" | "knockout_resolution",
+    val: "home" | "away" | "extra_time" | "penalties",
+  ) => {
+    setMatchPredictions((prev) => ({
+      ...prev,
+      [id]: { ...prev[id], [field]: val },
+    }));
+  };
+
   const handleSave = () => {
     const batch = Object.entries(matchPredictions)
       .filter(([, v]) => v.home !== "" && v.away !== "")
@@ -145,6 +169,8 @@ export default function BracketViewTab() {
         match_id: Number(id),
         home_goals: Number(v.home),
         away_goals: Number(v.away),
+        knockout_winner_side: v.home === v.away ? v.knockout_winner_side : undefined,
+        knockout_resolution: v.home === v.away ? v.knockout_resolution : undefined,
       }));
 
     if (batch.length === 0) return;
@@ -152,8 +178,8 @@ export default function BracketViewTab() {
       setErrorMsg(t("predictions.no_league_selected"));
       return;
     }
-    if (batch.some((pred) => pred.home_goals === pred.away_goals)) {
-      setErrorMsg(t("knockout.draw_not_supported"));
+    if (batch.some((pred) => pred.home_goals === pred.away_goals && (!pred.knockout_winner_side || !pred.knockout_resolution))) {
+      setErrorMsg(t("knockout.winner_required"));
       return;
     }
 
@@ -285,6 +311,7 @@ export default function BracketViewTab() {
               const predFilled = pred.home_goals !== null && pred.away_goals !== null;
               const matchPred = matchPredictions[m.match_id] || { home: "", away: "" };
               const isDrawPrediction = matchPred.home !== "" && matchPred.home === matchPred.away;
+              const drawMetaMissing = isDrawPrediction && (!matchPred.knockout_winner_side || !matchPred.knockout_resolution);
 
               const isFinished = act.status === "finished";
               const isLocked = isMatchLocked(m.match_date, act.status, phaseData?.phase, m.round);
@@ -359,7 +386,7 @@ export default function BracketViewTab() {
                         type="text"
                         placeholder="-"
                         value={matchPred.home}
-                        error={isDrawPrediction}
+                        error={drawMetaMissing}
                         onChange={(e) => {
                           const val = e.target.value;
                           if (val === "" || (/^\d*$/.test(val) && Number(val) <= 15)) {
@@ -387,7 +414,7 @@ export default function BracketViewTab() {
                         type="text"
                         placeholder="-"
                         value={matchPred.away}
-                        error={isDrawPrediction}
+                        error={drawMetaMissing}
                         onChange={(e) => {
                           const val = e.target.value;
                           if (val === "" || (/^\d*$/.test(val) && Number(val) <= 15)) {
@@ -402,6 +429,33 @@ export default function BracketViewTab() {
                         }}
                       />
                     </Box>
+
+                    {isDrawPrediction && (
+                      <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1, mt: 1 }}>
+                        <FormControl size="small" error={!matchPred.knockout_winner_side} disabled={isDisabled}>
+                          <InputLabel>{t("knockout.winner")}</InputLabel>
+                          <Select
+                            label={t("knockout.winner")}
+                            value={matchPred.knockout_winner_side ?? ""}
+                            onChange={(e) => handleKnockoutMetaChange(m.match_id, "knockout_winner_side", e.target.value as "home" | "away")}
+                          >
+                            <MenuItem value="home">{actualHomeName}</MenuItem>
+                            <MenuItem value="away">{actualAwayName}</MenuItem>
+                          </Select>
+                        </FormControl>
+                        <FormControl size="small" error={!matchPred.knockout_resolution} disabled={isDisabled}>
+                          <InputLabel>{t("knockout.resolution")}</InputLabel>
+                          <Select
+                            label={t("knockout.resolution")}
+                            value={matchPred.knockout_resolution ?? ""}
+                            onChange={(e) => handleKnockoutMetaChange(m.match_id, "knockout_resolution", e.target.value as "extra_time" | "penalties")}
+                          >
+                            <MenuItem value="extra_time">{t("knockout.extra_time")}</MenuItem>
+                            <MenuItem value="penalties">{t("knockout.penalties")}</MenuItem>
+                          </Select>
+                        </FormControl>
+                      </Box>
+                    )}
 
                     {/* ── PREDICTED TEAMS (bracket_engine) shown as info ── */}
                     {(pred.home_team_id !== null || pred.away_team_id !== null) && (

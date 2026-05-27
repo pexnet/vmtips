@@ -50,6 +50,8 @@ export interface Prediction {
   match_id: number;
   home_goals: number;
   away_goals: number;
+  knockout_winner_side: "home" | "away" | null;
+  knockout_resolution: "extra_time" | "penalties" | null;
   created_at: string;
   updated_at: string;
 }

@@ -3,7 +3,7 @@ Pydantic schemas for request/response validation.
 """
 import math
 from datetime import datetime
-from typing import Generic, TypeVar
+from typing import Generic, Literal, TypeVar
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -86,12 +86,16 @@ class PredictionCreate(BaseModel):
     match_id: int
     home_goals: int = Field(..., ge=0, le=15)
     away_goals: int = Field(..., ge=0, le=15)
+    knockout_winner_side: Literal["home", "away"] | None = None
+    knockout_resolution: Literal["extra_time", "penalties"] | None = None
 
 class PredictionOut(BaseModel):
     id: int
     match_id: int
     home_goals: int
     away_goals: int
+    knockout_winner_side: str | None = None
+    knockout_resolution: str | None = None
     created_at: datetime
     updated_at: datetime
 

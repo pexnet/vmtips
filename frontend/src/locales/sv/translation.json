@@ -85,7 +85,11 @@
     "awaiting_teams": "Inväntar lag",
     "actual_teams": "Verkliga lag",
     "your_predictions": "Dina tips",
-    "draw_not_supported": "Slutspelsmatcher behöver en vinnare."
+    "winner_required": "Välj vinnare och avgörande för oavgjorda slutspelstips.",
+    "winner": "Vinnare",
+    "resolution": "Avgörs via",
+    "extra_time": "Förlängning",
+    "penalties": "Straffar"
   },
   "predictions": {
     "title": "Dina tips",

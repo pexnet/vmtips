@@ -85,7 +85,11 @@
     "awaiting_teams": "Awaiting teams",
     "actual_teams": "Actual teams",
     "your_predictions": "Your predictions",
-    "draw_not_supported": "Knockout draws need a winner."
+    "winner_required": "Choose a winner and method for drawn knockout predictions.",
+    "winner": "Winner",
+    "resolution": "Decided by",
+    "extra_time": "Extra time",
+    "penalties": "Penalties"
   },
   "predictions": {
     "title": "Your Predictions",

@@ -17,6 +17,8 @@ export interface BracketViewMatch {
     away_team_placeholder: string | null;
     home_goals: number | null;
     away_goals: number | null;
+    knockout_winner_side: "home" | "away" | null;
+    knockout_resolution: "extra_time" | "penalties" | null;
   };
   actual: {
     home_team_id: number | null;

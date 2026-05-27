@@ -95,6 +95,8 @@ def _pred_to_dict(pred: Prediction) -> dict:
         "match_id": pred.match_id,
         "home_goals": pred.home_goals,
         "away_goals": pred.away_goals,
+        "knockout_winner_side": pred.knockout_winner_side,
+        "knockout_resolution": pred.knockout_resolution,
         "created_at": pred.created_at,
         "updated_at": pred.updated_at,
         "match": {
@@ -188,12 +190,19 @@ def save_batch(
         if match.round == "group":
             if not _can_predict_group(phase):
                 raise ForbiddenError(detail="group_predictions_locked", error_code="group_predictions_locked")
+            if pred_create.knockout_winner_side is not None or pred_create.knockout_resolution is not None:
+                raise ValidationError(detail="knockout_fields_not_allowed_for_group", error_code="knockout_fields_not_allowed_for_group")
         else:
             # Knockout matches
             if not _can_predict_bracket(phase):
                 raise ForbiddenError(detail="knockout_predictions_locked", error_code="knockout_predictions_locked")
             if pred_create.home_goals == pred_create.away_goals:
-                raise ValidationError(detail="knockout_draws_not_supported", error_code="knockout_draws_not_supported")
+                if pred_create.knockout_winner_side not in ("home", "away"):
+                    raise ValidationError(detail="knockout_winner_required", error_code="knockout_winner_required")
+                if pred_create.knockout_resolution not in ("extra_time", "penalties"):
+                    raise ValidationError(detail="knockout_resolution_required", error_code="knockout_resolution_required")
+            elif pred_create.knockout_winner_side is not None or pred_create.knockout_resolution is not None:
+                raise ValidationError(detail="knockout_winner_only_for_draws", error_code="knockout_winner_only_for_draws")
 
         # Match deadline check
         kickoff = match.match_date
@@ -206,6 +215,9 @@ def save_batch(
     saved = 0
     try:
         for pred_create in payload.predictions:
+            match = matches[pred_create.match_id]
+            winner_side = pred_create.knockout_winner_side if match.round != "group" else None
+            resolution = pred_create.knockout_resolution if match.round != "group" else None
             existing = (
                 db.query(Prediction)
                 .filter(
@@ -218,6 +230,8 @@ def save_batch(
             if existing:
                 existing.home_goals = pred_create.home_goals
                 existing.away_goals = pred_create.away_goals
+                existing.knockout_winner_side = winner_side
+                existing.knockout_resolution = resolution
             else:
                 db.add(
                     Prediction(
@@ -226,6 +240,8 @@ def save_batch(
                         match_id=pred_create.match_id,
                         home_goals=pred_create.home_goals,
                         away_goals=pred_create.away_goals,
+                        knockout_winner_side=winner_side,
+                        knockout_resolution=resolution,
                     )
                 )
             saved += 1
