@@ -20,12 +20,12 @@ The 8 group winners that play a third-place team are fixed to these matches/side
 - 1K -> match 87, away side
 - 1L -> match 80, away side
 
-## Combination Table (to be populated by codex or generated from official source)
+## Combination Table
 
-TODO: Generate the full 495 combinations from the official FIFA source.
-This is a large static lookup table that maps every possible set of 8 advancing third-place groups to the exact R32 matchup assignments.
+The full 495-combination table is stored in `backend/third_place_table.py`.
+It maps every possible set of 8 advancing third-place groups to the exact R32 matchup assignments from FIFA Annex C.
 
-For now, the bracket engine uses backtracking resolver `_assign_third_place_slots()` which selects the first valid assignment from candidate sets. Once this table is fully populated, the resolver should perform a direct lookup instead.
+The bracket engine uses that static lookup directly; no generated or ranking-order-based assignment is used at runtime.
 
 ## Candidate Sets Reference
 

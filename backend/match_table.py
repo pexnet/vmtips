@@ -168,7 +168,11 @@ def get_round_order() -> list[str]:
 
 def generate_third_place_combination_table() -> list[dict]:
     """
-    Generate the full 495-row combination table for third-place advancement.
+    Legacy validator for possible 8-group third-place combinations.
+
+    Runtime assignment uses the official static Annex C lookup in
+    third_place_table.py. This helper remains available only for local
+    consistency checks of candidate coverage.
     
     Returns a list of dicts, each representing one valid combination:
     {
@@ -182,8 +186,7 @@ def generate_third_place_combination_table() -> list[dict]:
         }
     }
     
-    Note: the table is pre-generated to avoid runtime computation. The number
-    of combinations is fixed: C(12,8) = 495.
+    The number of combinations is fixed: C(12,8) = 495.
     """
     all_groups = list("ABCDEFGHIJKL")
     r32_slots_with_third = [74, 77, 79, 80, 81, 82, 85, 87]
@@ -195,10 +198,9 @@ def generate_third_place_combination_table() -> list[dict]:
     for advancing in itertools.combinations(all_groups, 8):
         advancing_set = set(advancing)
         
-        # Check: can we assign each of the 8 advancing groups to one of the 8 slots?
+        # Check: can each of the 8 advancing groups fit one of the 8 slots?
         # Each slot has a candidate set; each advancing group must be in at least
-        # one slot's candidate set. This is a bipartite matching problem.
-        # We solve it via backtracking.
+        # one slot's candidate set.
         
         # Build list: for each slot, what groups from advancing_set are eligible?
         slot_eligible = {}
@@ -223,7 +225,6 @@ def generate_third_place_combination_table() -> list[dict]:
         if not valid:
             continue
         
-        # Find a valid assignment via backtracking.
         # We assign slots in order of most constrained (fewest candidates).
         sorted_slots = sorted(r32_slots_with_third, key=lambda s: len(slot_eligible[s]))
         

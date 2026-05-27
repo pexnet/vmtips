@@ -53,14 +53,13 @@ Each group winner that plays a third-place team has a set of candidate third-pla
 
 ### Resolution Logic
 
-Given the 8 advancing third-place teams (ranked by points, goal difference, goals for, wins), assign them to the slots above. The assignment must:
+Given the 8 advancing third-place groups, assign them to the slots above using the fixed FIFA Annex C table. The best third-place ranking is used only to decide which 8 groups advance; placement does not depend on the order of those 8 teams.
 
 1. Each third-place team goes to exactly one slot whose candidate set includes that team's group.
 2. No two teams assigned to the same slot.
-3. Preserve the ranking order where possible (higher-ranked teams should get higher-priority slots, though multiple valid assignments may exist).
-4. The FIFA combination table in Annex C defines the exact assignment for each of the 495 combinations.
+3. The FIFA combination table in Annex C defines the exact assignment for each of the 495 combinations.
 
-The bracket engine uses backtracking in `_assign_third_place_slots()` to find the first valid full assignment, preserving predicted third-place team rankings.
+The bracket engine uses the static `third_place_table.py` Annex C lookup in `_assign_third_place_slots()`.
 
 ## Later Rounds
 

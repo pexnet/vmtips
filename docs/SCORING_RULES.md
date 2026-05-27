@@ -105,21 +105,25 @@ Before the tournament begins, you can make seven long-term predictions. Each cor
 
 ## 6. Tiebreakers for Group Standings
 
-The app uses the following tiebreaker hierarchy to rank teams within each group and to rank the 8 best third-place teams:
+The app uses the FIFA Article 13 hierarchy for group standings:
 
 1. Points obtained in all group matches
-2. Goal difference in all group matches
-3. Goals scored in all group matches
-4. Head-to-head points among tied teams
-5. Head-to-head goal difference among tied teams
-6. Head-to-head goals scored among tied teams
-7. **(Not implemented)** Fair play points (yellow/red cards)
-8. **(Not implemented)** Drawing of lots — falls back to alphabetical team name order
+2. Head-to-head points among teams tied on points
+3. Head-to-head goal difference among those tied teams
+4. Head-to-head goals scored among those tied teams
+5. Re-apply head-to-head criteria to any still-tied subset
+6. Goal difference in all group matches
+7. Goals scored in all group matches
+8. Fair play/team conduct score, if available
+9. FIFA ranking, if available
+10. App-only deterministic fallback by team ID when unavailable data leaves teams tied
 
-> **Note:** Fair play points require card data which is not currently tracked in the application. The admin can override standings manually if needed.
+For best third-place ranking, the app uses points, goal difference, goals scored, conduct score if available, FIFA ranking if available, then the same deterministic fallback. Wins are not a tiebreaker.
+
+> **Note:** Conduct score and FIFA ranking data are not currently tracked in the application. The admin can override standings manually if needed.
 
 ---
 
 ## 7. Best Third-Place Teams (Annex C)
 
-From the 12 groups, the 8 best third-placed teams advance to the Round of 32. Their slot assignments in the knockout bracket depend on which specific 8 groups produce a third-place team. The app pre-computes all 495 valid combinations and resolves the correct mapping at runtime.
+From the 12 groups, the 8 best third-placed teams advance to the Round of 32. Their slot assignments in the knockout bracket depend on which specific 8 groups produce a third-place team. The app stores the official 495-row FIFA Annex C lookup and resolves the exact mapping at runtime.
