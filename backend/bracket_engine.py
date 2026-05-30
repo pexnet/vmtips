@@ -5,8 +5,8 @@ and generates bracket predictions (which teams advance to each knockout round).
 Follows the World Cup 2026 48-team format with 12 groups of 4.
 Top 2 from each group + 8 best third-place teams advance to Round of 32.
 
-All tournament fixture data is sourced from match_table.py, which reads
-worldcup2026_fixtures.json as the single source of truth.
+Knockout slot definitions are sourced from match_table.py. Match records and
+kickoff times are seeded from worldcup2026_fixtures.json.
 """
 from collections import defaultdict
 from typing import Optional
@@ -15,34 +15,19 @@ from models import Prediction, Match, Team, BracketPrediction
 from fifa_standings import sort_group_teams as _sort_group_teams
 from match_table import (
     get_group_slot_mapping as _get_group_slot_mapping,
-    get_third_place_slot_candidates as _get_third_place_slot_candidates,
     get_r32_match_numbers as _get_r32_match_numbers,
-    get_round_order as _get_round_order,
 )
 from third_place_table import get_annex_c_match_mapping
 
 
-# Lazy-loaded lookups from match_table (single source of truth)
-# Imported at module level because match_table is lightweight and fixtures
-# are needed by nearly all downstream functions.
 def _lazy_load_slot_data():
     """Load slot mappings from match_table — call once at import time."""
-    global R32_GROUP_SLOTS, R32_THIRD_SLOT_CANDIDATES, R32_MATCH_NUMBERS, ROUND_ORDER
+    global R32_GROUP_SLOTS, R32_MATCH_NUMBERS
     R32_GROUP_SLOTS = _get_group_slot_mapping()
-    R32_THIRD_SLOT_CANDIDATES = _get_third_place_slot_candidates()
     R32_MATCH_NUMBERS = _get_r32_match_numbers()
-    ROUND_ORDER = _get_round_order()
 
 
 _lazy_load_slot_data()  # warm up on import
-
-# Expose for backward compatibility
-# After _lazy_load_slot_data() these are populated, not None (pyright ignore)
-#R32_GROUP_SLOTS = None  # type: ignore
-#R32_THIRD_SLOT_CANDIDATES = None  # type: ignore
-#R32_MATCH_NUMBERS = None  # type: ignore
-#ROUND_ORDER = None  # type: ignore
-
 
 def _determine_outcome(home_goals: int, away_goals: int) -> str:
     if home_goals > away_goals:

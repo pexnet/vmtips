@@ -80,6 +80,9 @@ export default function InfoPage() {
         <Typography variant="body2" sx={{ mb: 2 }}>
           {t("info.match_desc")}
         </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          {t("info.match_detail")}
+        </Typography>
         <TableContainer>
           <Table size="small">
             <TableHead>
@@ -150,6 +153,9 @@ export default function InfoPage() {
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
           {t("info.bracket_per_team_note")}
         </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          {t("info.knockout_match_note")}
+        </Typography>
       </Paper>
 
       {/* ── Bonus question scoring ────────────────────── */}
@@ -162,6 +168,9 @@ export default function InfoPage() {
         </Box>
         <Typography variant="body2" sx={{ mb: 2 }}>
           {t("info.bonus_desc")}
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          {t("info.bonus_matching_note")}
         </Typography>
         <TableContainer>
           <Table size="small">
@@ -208,7 +217,7 @@ export default function InfoPage() {
             </TableHead>
             <TableBody>
               <TableRow>
-                <TableCell>{t("info.total_matches")}</TableCell>
+                <TableCell>{t("info.total_match_results")}</TableCell>
                 <TableCell align="right"><Chip label={totalMatchPts} size="small" variant="outlined" /></TableCell>
               </TableRow>
               <TableRow>

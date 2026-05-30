@@ -269,12 +269,13 @@
   },
   "info": {
     "title": "Så räknas poängen",
-    "intro": "Här förklarar vi hur poängen beräknas i VMTips. Spelet består av tre delar: gruppspel, slutspel och bonusfrågor.",
+    "intro": "Här förklaras exakt hur dina poäng räknas i VMTips. Din totalpoäng består av matchpoäng, slutspelsbracket-poäng och bonusfrågor.",
     "phases_title": "Spelets två faser",
-    "phase1_desc": "Fas 1 – Gruppspel: Innan turneringen börjar tippar du alla gruppspelsmatcher och svarar på bonusfrågorna. När gruppspelet är klart låses tipsen och poängen beräknas.",
-    "phase2_desc": "Fas 2 – Slutspel: När gruppspelet är klart fyller admin i vilka lag som gått vidare. Då tippas slutspelsbracket med de korrekta lagen ifyllda. Ju längre ett lag går, desto mer poäng får du om du tippat rätt.",
+    "phase1_desc": "Fas 1 - Gruppspel: Innan turneringen börjar tippar du alla gruppspelsmatcher och svarar på bonusfrågorna. När gruppspelet startar låses de tipsen.",
+    "phase2_desc": "Fas 2 - Slutspel: Efter gruppspelet bekräftar admin vilka lag som gått vidare. Då tippar du slutspelsbracket och slutspelsmatchernas resultat. När slutspelet startar låses de tipsen.",
     "match_title": "Matchpoäng",
-    "match_desc": "Varje match kan ge upp till 7 poäng. Poängen delas ut enligt:",
+    "match_desc": "Varje match kan ge upp till 7 poäng. De tre delarna nedan läggs ihop:",
+    "match_detail": "Exempel: ett exakt 2-1-tips ger 3p för rätt utfall, 2p för hemmalagets mål och 2p för bortalagets mål = 7p. Om utfallet är fel men ett lags målantal är rätt får du ändå de 2 poängen.",
     "match": {
       "outcome": "Rätt utfall (1X2)",
       "home_goals": "Rätt hemmamål",
@@ -282,7 +283,7 @@
       "max": "Max per match"
     },
     "bracket_title": "Slutspelspoäng",
-    "bracket_desc": "För varje lag du tippat i slutspelstabacken som faktiskt når den rundan får du poäng:",
+    "bracket_desc": "För varje lag du tippat i slutspelsbracket som faktiskt når exakt den rundan får du poäng:",
     "bracket": {
       "r32": "Sextondelsfinal (32-lag)",
       "r16": "Åttondelsfinal (16-lag)",
@@ -297,7 +298,7 @@
     "bonus": {
       "champion": "Vem vinner VM?",
       "top_scorer": "Vem blir skytteligavinnare?",
-      "bronze_winner": "Vem vinner Bronsmatch?",
+      "bronze_winner": "Vem vinner bronsmatchen?",
       "most_goals": "Vilket lag gör flest mål?",
       "most_conceded": "Vilket lag släpper in flest mål?",
       "custom1": "Vilken målvakt gör flest räddningar?",
@@ -308,12 +309,14 @@
     "column_round": "Omgång",
     "column_question": "Fråga",
     "phase_lock_note": "Gruppspelstips låses när gruppspelet startar. Slutspelstips låses när slutspelet startar. Du kan inte ändra dina tips efter att fasen stängts.",
-    "bracket_per_team_note": "Poäng ges per korrekt lag per omgång.",
+    "bracket_per_team_note": "Bracket-poäng ges per korrekt lag per runda.",
+    "knockout_match_note": "Poäng för resultat i slutspelsmatcher är separata från bracket-poäng. Du kan få matchpoäng för en slutspelsplats även om lagen i platsen inte är samma som i din tippade bracket.",
+    "bonus_matching_note": "Lagsvar måste vara exakt rätt lag. Textsvar, till exempel skyttekung och egna frågor, bortser från stora/små bokstäver men måste i övrigt matcha admins slutliga svar.",
     "total_title": "Total poängfördelning",
-    "total_group_matches": "Gruppspelsmatcher (72 × 7p)",
+    "total_match_results": "Matchresultat (104 × 7p: 72 gruppspel + 32 slutspel)",
     "total_bracket": "Slutspelsbracket",
     "total_bonuses": "Bonusfrågor",
-    "grand_total": "Grand total"
+    "grand_total": "Totalpoäng"
   },
   "bracket": {
     "view_tab": "Slutspel",

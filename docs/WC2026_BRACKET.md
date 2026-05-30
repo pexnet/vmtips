@@ -1,13 +1,13 @@
 # FIFA World Cup 2026 Bracket — Official Specification
 
-This document records the official FIFA 2026 World Cup knockout bracket structure as published by FIFA and documented on Wikipedia. It serves as the authoritative reference for the VMTips bracket engine implementation.
+This document records the FIFA World Cup 2026 bracket structure used by VMTips. It covers the official 48-team format, fixed knockout slots, and the Annex C third-place assignment lookup implemented in the backend.
 
 ## Tournament Format
 
 - **48 teams** in **12 groups** (A–L), 4 teams per group.
 - Group stage: round-robin, top 2 from each group advance automatically (24 teams).
 - **8 best third-placed teams** also advance, giving **32 teams** in the knockout stage.
-- Knockout stage: single-elimination Round of 32 through to the Final.
+- Knockout stage: single-elimination Round of 32 through to the Final, plus a match for third place.
 
 ## Round of 32 (Matches 73–88)
 
@@ -99,15 +99,23 @@ The bracket engine uses the static `third_place_table.py` Annex C lookup in `_as
 | 103 | Loser 101 vs Loser 102 (Bronze) | July 18 |
 | 104 | Winner 101 vs Winner 102 (Final) | July 19 |
 
-## Sources
+## Implementation
 
-- [FIFA World Cup 2026 knockout stage match schedule](https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/knockout-stage-match-schedule-bracket)
-- [Wikipedia: 2026 FIFA World Cup knockout stage](https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_knockout_stage)
-- [Wikipedia: Third-place combination table (495 combinations)](https://en.wikipedia.org/wiki/Template:2026_FIFA_World_Cup_third-place_table)
-- FIFA Regulations Annex C — Full 495-row combination table.
+- `backend/data/worldcup2026_fixtures.json` seeds all 104 match records and kickoff times.
+- `backend/match_table.py` defines the knockout slot placeholders and Round of 32 candidate sets.
+- `backend/fifa_standings.py` ranks teams within groups.
+- `backend/bracket_engine.py` computes predicted/actual R32 teams and propagates knockout winners.
+- `backend/third_place_table.py` stores the full 495-row Annex C assignment lookup.
 
-## Implementation Notes
+## Notes
 
 - The bracket is seeded so that `match_for_third_place` (match 103) is resolved **before** the `final` (match 104) in rendering order. Bronze medal match first, then the final.
 - The `admin.py` endpoint `resolve-r32-placeholders` must compute actual group standings, determine the 8 best third-place teams, and use `_assign_third_place_slots()` or equivalent combination logic to populate the R32 matches with correct third-place opponents.
 - The bracket engine's `resolve_r32_teams()` handles both **predicted** and **actual** standings via the same code path.
+
+## Sources
+
+- [FIFA: World Cup 2026 format](https://gpcustomersupportfwc2026.tickets.fifa.com/hc/en-gb/articles/28784798873117-8-What-is-the-format-for-the-FIFA-World-Cup-26-tournament)
+- [FIFA: knockout stage match schedule](https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/articles/knockout-stage-match-schedule-bracket)
+- FIFA Regulations Annex C: third-place assignment table.
+- [Wikipedia template mirror of Annex C](https://en.wikipedia.org/wiki/Template:2026_FIFA_World_Cup_third-place_table), used as the extraction source for `backend/third_place_table.py`.

@@ -56,6 +56,7 @@ For production, store `JWT_SECRET_KEY`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` in y
 ## Features
 
 - Predict all 104 World Cup 2026 matches (72 group stage + 32 knockout)
+- FIFA World Cup 2026 format support: 12 groups, 8 best third-place teams, Round of 32 bracket, and Annex C third-place placement
 - Tournament bonus questions (winner, top scorer, top assist, total goals)
 - Private leagues with invite codes
 - Live leaderboard (global, per-league, personal)
@@ -90,8 +91,11 @@ vmtips/
 ├── backend/          FastAPI app
 │   ├── routers/      API endpoints
 │   ├── models.py     SQLAlchemy ORM
-│   ├── seed.py       World Cup 2026 data
-│   └── tests/        pytest suite (67 tests)
+│   ├── seed.py       World Cup 2026 teams and fixtures
+│   ├── fifa_standings.py
+│   ├── bracket_engine.py
+│   ├── third_place_table.py
+│   └── tests/        pytest suite
 ├── frontend/         React SPA
 │   ├── src/pages/    Route components
 │   ├── src/locales/  i18n translations
@@ -101,6 +105,13 @@ vmtips/
 └── scripts/
     └── dev.sh        Development helper
 ```
+
+## Documentation
+
+- [Scoring rules](docs/SCORING_RULES.md)
+- [World Cup 2026 bracket implementation](docs/WC2026_BRACKET.md)
+- [Third-place Annex C mapping](docs/WC2026_THIRD_PLACE_COMBINATIONS.md)
+- [Deployment guide](docs/DEPLOY.md)
 
 ## CI/CD
 

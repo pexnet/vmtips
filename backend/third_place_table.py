@@ -1,7 +1,7 @@
-"""Official FIFA World Cup 2026 Annex C third-place assignment table.
+"""FIFA World Cup 2026 Annex C third-place assignment table.
 Keys are the eight advancing third-place group letters in alphabetical order.
 Values are assigned third-place group letters for columns 1A, 1B, 1D, 1E, 1G, 1I, 1K, 1L.
-Source: https://en.wikipedia.org/wiki/Template:2026_FIFA_World_Cup_third-place_table
+Extraction source: https://en.wikipedia.org/wiki/Template:2026_FIFA_World_Cup_third-place_table
 """
 
 ANNEX_C_COLUMN_TO_MATCH: dict[str, int] = {

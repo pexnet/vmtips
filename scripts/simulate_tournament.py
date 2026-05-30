@@ -59,10 +59,11 @@ from seed import (  # noqa: E402
     seed_tournament_result,
 )
 from bracket_engine import (  # noqa: E402
-    R32_GROUP_SLOTS,
-    R32_THIRD_SLOTS,
+    compute_third_place_rankings,
+    resolve_r32_teams,
     save_generated_bracket,
 )
+from fifa_standings import sort_group_teams  # noqa: E402
 
 
 TEST_EMAIL = "test@vmtips.se"
@@ -296,13 +297,17 @@ def compute_group_standings(db) -> dict[str, list[dict]]:
     standings = {
         team.id: {
             "team_id": team.id,
+            "name": team.name,
+            "code": team.code,
+            "flag_emoji": team.flag_emoji,
             "group": team.group,
             "played": 0,
             "won": 0,
             "drawn": 0,
             "lost": 0,
-            "goals_for": 0,
-            "goals_against": 0,
+            "gf": 0,
+            "ga": 0,
+            "gd": 0,
             "points": 0,
         }
         for team in teams
@@ -318,8 +323,9 @@ def compute_group_standings(db) -> dict[str, list[dict]]:
         ]:
             row = standings[team_id]
             row["played"] += 1
-            row["goals_for"] += goals_for
-            row["goals_against"] += goals_against
+            row["gf"] += goals_for
+            row["ga"] += goals_against
+            row["gd"] = row["gf"] - row["ga"]
             if goals_for > goals_against:
                 row["won"] += 1
                 row["points"] += 3
@@ -333,16 +339,9 @@ def compute_group_standings(db) -> dict[str, list[dict]]:
     for row in standings.values():
         groups.setdefault(row["group"], []).append(row)
 
-    for group_rows in groups.values():
-        group_rows.sort(
-            key=lambda r: (
-                r["points"],
-                r["goals_for"] - r["goals_against"],
-                r["goals_for"],
-                r["won"],
-            ),
-            reverse=True,
-        )
+    group_matches = db.query(Match).filter(Match.round == "group", Match.status == "finished").all()
+    for group, group_rows in groups.items():
+        groups[group] = sort_group_teams(group_rows, group_matches)
 
     for group, group_rows in groups.items():
         for index, row in enumerate(group_rows, start=1):
@@ -355,9 +354,9 @@ def compute_group_standings(db) -> dict[str, list[dict]]:
                     won=row["won"],
                     drawn=row["drawn"],
                     lost=row["lost"],
-                    goals_for=row["goals_for"],
-                    goals_against=row["goals_against"],
-                    goal_difference=row["goals_for"] - row["goals_against"],
+                    goals_for=row["gf"],
+                    goals_against=row["ga"],
+                    goal_difference=row["gd"],
                     points=row["points"],
                 )
             )
@@ -367,35 +366,8 @@ def compute_group_standings(db) -> dict[str, list[dict]]:
 
 
 def populate_round_of_32(db, groups: dict[str, list[dict]]) -> None:
-    r32 = {match_number: {"home": None, "away": None} for match_number in ROUND_MATCHES["round_of_32"]}
-
-    for group in "ABCDEFGHIJKL":
-        rows = groups.get(group, [])
-        if len(rows) >= 1 and f"1{group}" in R32_GROUP_SLOTS:
-            match_number, side = R32_GROUP_SLOTS[f"1{group}"]
-            r32[match_number][side] = rows[0]["team_id"]
-        if len(rows) >= 2 and f"2{group}" in R32_GROUP_SLOTS:
-            match_number, side = R32_GROUP_SLOTS[f"2{group}"]
-            r32[match_number][side] = rows[1]["team_id"]
-
-    third_places = []
-    for group, rows in groups.items():
-        if len(rows) >= 3:
-            row = rows[2]
-            third_places.append(
-                {
-                    "team_id": row["team_id"],
-                    "points": row["points"],
-                    "gd": row["goals_for"] - row["goals_against"],
-                    "gf": row["goals_for"],
-                    "group": group,
-                }
-            )
-    third_places.sort(key=lambda r: (-r["points"], -r["gd"], -r["gf"], r["group"]))
-
-    for index, row in enumerate(third_places[:8]):
-        match_number, side = R32_THIRD_SLOTS[index]
-        r32[match_number][side] = row["team_id"]
+    third_places = compute_third_place_rankings(groups)
+    r32 = resolve_r32_teams(groups, third_places)
 
     for match_number, sides in r32.items():
         match = db.query(Match).filter(Match.match_number == match_number).first()

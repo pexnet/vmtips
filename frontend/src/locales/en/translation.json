@@ -269,12 +269,13 @@
   },
   "info": {
     "title": "How Scoring Works",
-    "intro": "This page explains how points are calculated in VMTips. The game has three parts: group stage matches, knockout bracket, and bonus questions.",
+    "intro": "This page explains exactly how your score is calculated in VMTips. Your total comes from match result points, knockout bracket points, and bonus questions.",
     "phases_title": "Two-Phase Game",
-    "phase1_desc": "Phase 1 – Group Stage: Before the tournament starts, you predict all group stage matches and answer bonus questions. Once the group stage begins, predictions are locked and points are calculated.",
-    "phase2_desc": "Phase 2 – Knockout Stage: When the group stage ends, admin fills in which teams advanced. You then predict the knockout bracket with the correct teams pre-filled. The further a team goes, the more points you earn for correct predictions.",
+    "phase1_desc": "Phase 1 - Group Stage: Before the tournament starts, you predict all group stage matches and answer the bonus questions. When the group stage starts, those predictions are locked.",
+    "phase2_desc": "Phase 2 - Knockout Stage: After the group stage, the admin confirms which teams advanced. You then predict the knockout bracket and knockout match scores. When the knockout stage starts, those predictions are locked.",
     "match_title": "Match Points",
-    "match_desc": "Each match can earn up to 7 points. Points are awarded as follows:",
+    "match_desc": "Each match can earn up to 7 points. The three checks below are added together:",
+    "match_detail": "Example: an exact 2-1 prediction gives 3p for the correct outcome, 2p for the home team's goals, and 2p for the away team's goals = 7p. If the outcome is wrong but one team's goal count is correct, you still get those 2p.",
     "match": {
       "outcome": "Correct outcome (1X2)",
       "home_goals": "Correct home goals",
@@ -282,7 +283,7 @@
       "max": "Maximum per match"
     },
     "bracket_title": "Knockout Bracket Points",
-    "bracket_desc": "For each team you predicted in the knockout bracket that actually reaches that round, you earn points:",
+    "bracket_desc": "For each team you predicted in the knockout bracket that actually reaches that exact round, you earn points:",
     "bracket": {
       "r32": "Round of 32",
       "r16": "Round of 16",
@@ -294,6 +295,7 @@
     },
     "bonus_title": "Bonus Questions",
     "bonus_desc": "You answer bonus questions in Phase 1. Each correct answer earns points as follows:",
+    "bonus_matching_note": "Team answers must match the exact team. Text answers, such as top scorer and custom questions, ignore upper/lower case but must otherwise match the admin's final answer.",
     "bonus": {
       "champion": "Who wins the World Cup?",
       "top_scorer": "Who wins the Golden Boot?",
@@ -308,9 +310,10 @@
     "column_round": "Round",
     "column_question": "Question",
     "phase_lock_note": "Group stage predictions lock when the group stage begins. Knockout predictions lock when the knockout stage begins. You cannot change predictions after a phase closes.",
-    "bracket_per_team_note": "Points are awarded per correct team per round.",
+    "bracket_per_team_note": "Bracket points are awarded per correct team per round.",
+    "knockout_match_note": "Knockout match score points are separate from bracket points. You can earn match score points for a knockout match slot even if the teams in that slot differ from your predicted bracket.",
     "total_title": "Total Points Available",
-    "total_group_matches": "Group stage matches (72 × 7p)",
+    "total_match_results": "Match results (104 × 7p: 72 group + 32 knockout)",
     "total_bracket": "Knockout bracket",
     "total_bonuses": "Bonus questions",
     "grand_total": "Grand total"

@@ -2,14 +2,14 @@
 
 > **Document Version:** 3.0  
 > **Purpose:** Single source of truth for all scoring rules. This document reflects the actual engine implemented in `backend/scoring.py` and the recalculation logic in `backend/routers/admin.py`.  
-> **Important:** Group-stage tiebreakers beyond points, goal difference, and goals scored are not fully automated (see Tiebreakers section).
+> **Important:** FIFA group-stage and best-third-place rules are implemented for the data the app stores. Fair play/team conduct score and FIFA ranking are supported by the ranking helpers if present, but they are not currently stored in the database.
 
 ---
 
 ## 1. Tournament Structure
 
 - **Group Stage:** 12 groups (A–L), 4 teams per group. Top 2 + 8 best third-placed teams advance to the knockout stage.
-- **Knockout Stage:** Round of 32 → Round of 16 → Quarterfinal → Semifinal → Match for Third Place → Final.
+- **Knockout Stage:** Round of 32 -> Round of 16 -> Quarterfinal -> Semifinal -> Match for Third Place -> Final.
 - **Prediction happens in two phases:**
   1. **Phase 1:** Predict all 72 group stage matches before the WC deadline (save incrementally).
   2. **Phase 2:** Predict the entire knockout stage (bracket + matches) after the group stage ends.
@@ -120,10 +120,22 @@ The app uses the FIFA Article 13 hierarchy for group standings:
 
 For best third-place ranking, the app uses points, goal difference, goals scored, conduct score if available, FIFA ranking if available, then the same deterministic fallback. Wins are not a tiebreaker.
 
-> **Note:** Conduct score and FIFA ranking data are not currently tracked in the application. The admin can override standings manually if needed.
+> **Note:** Conduct score and FIFA ranking data are not currently tracked in the database, so real unresolved ties fall back to deterministic team ID ordering unless those fields are added.
 
 ---
 
 ## 7. Best Third-Place Teams (Annex C)
 
 From the 12 groups, the 8 best third-placed teams advance to the Round of 32. Their slot assignments in the knockout bracket depend on which specific 8 groups produce a third-place team. The app stores the official 495-row FIFA Annex C lookup and resolves the exact mapping at runtime.
+
+Implementation references:
+
+- `backend/fifa_standings.py` ranks each group with FIFA-style head-to-head recursion.
+- `backend/bracket_engine.py` ranks third-place teams and resolves predicted bracket paths.
+- `backend/third_place_table.py` contains the full 495-row Annex C lookup.
+
+## 8. Sources
+
+- [FIFA: groups, qualification rules and tie-breakers](https://www.fifa.com/en/articles/groups-how-teams-qualify-tie-breakers)
+- [FIFA: World Cup 2026 format](https://gpcustomersupportfwc2026.tickets.fifa.com/hc/en-gb/articles/28784798873117-8-What-is-the-format-for-the-FIFA-World-Cup-26-tournament)
+- FIFA Regulations Annex C: third-place assignment table.

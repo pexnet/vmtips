@@ -624,7 +624,10 @@ def resolve_knockout_teams(
     # Get group standings
     standings = db.query(GroupStanding).order_by(GroupStanding.group, GroupStanding.position).all()
     if not standings:
-        return {"error": "No group standings computed yet. Call POST /admin/compute-standings first."}
+        raise HTTPException(
+            status_code=400,
+            detail="No group standings computed yet. Call POST /admin/compute-standings first.",
+        )
 
     # Build lookup: (group, position) -> team_id
     position_map = {}
@@ -651,7 +654,12 @@ def resolve_knockout_teams(
 
     third_places = compute_third_place_rankings(standings_by_group)
     third_by_group = {third["group"]: third for third in third_places[:8]}
-    third_match_mapping = get_annex_c_match_mapping(list(third_by_group.keys())) if len(third_by_group) == 8 else {}
+    if len(third_by_group) != 8:
+        raise HTTPException(
+            status_code=400,
+            detail="Unable to resolve eight advancing third-place teams from group standings.",
+        )
+    third_match_mapping = get_annex_c_match_mapping(list(third_by_group.keys()))
 
     # Get Round of 32 matches that have placeholders
     r32_matches = db.query(Match).filter(

@@ -1,14 +1,14 @@
 # FIFA World Cup 2026 — Official Third-Place Combination Table
 
-This file contains the official 495-row combination table from FIFA Regulations Annex C for which third-place teams advance to which Round of 32 slots.
+This document explains how VMTips applies the FIFA Regulations Annex C table for assigning the eight advancing third-place teams to Round of 32 slots.
 
-Source: https://en.wikipedia.org/wiki/Template:2026_FIFA_World_Cup_third-place_table
+The full table is stored in `backend/third_place_table.py`. The Wikipedia template mirror was used as the extraction source for the code table.
 
 ## Format
 
 Each combination defines:
-- ` advancing_groups`: set of 8 groups (A-L) whose third-place teams advance
-- `assignments`: dict mapping match_number -> side -> specific 3rd-place team
+- `advancing_groups`: set of 8 groups (A-L) whose third-place teams advance
+- `assignments`: mapping from match number to the specific third-place group assigned to that slot
 
 The 8 group winners that play a third-place team are fixed to these matches/sides:
 - 1A -> match 79, away side
@@ -29,7 +29,7 @@ The bracket engine uses that static lookup directly; no generated or ranking-ord
 
 ## Candidate Sets Reference
 
-These are the official candidate sets per FIFA:
+These are the candidate sets:
 - match 79 away (1A): groups C, E, F, H, I
 - match 85 away (1B): groups E, F, G, I, J
 - match 81 away (1D): groups B, E, F, I, J
@@ -39,7 +39,7 @@ These are the official candidate sets per FIFA:
 - match 87 away (1K): groups D, E, I, J, L
 - match 80 away (1L): groups E, H, I, J, K
 
-## How to use
+## Runtime Flow
 
 When actual group-stage results are known:
 1. Compute the 12 third-place teams and rank them.
@@ -47,3 +47,8 @@ When actual group-stage results are known:
 3. Look up the combination by those 8 groups in this table.
 4. Assign each third-place team to its exact match/side per the table.
 5. Admin API can then populate the actual R32 matches with real team IDs.
+
+## Sources
+
+- FIFA Regulations Annex C: third-place assignment table.
+- https://en.wikipedia.org/wiki/Template:2026_FIFA_World_Cup_third-place_table

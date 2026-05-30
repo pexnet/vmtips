@@ -108,3 +108,16 @@ class TestAdminRecalculate:
             headers={"Authorization": f"Bearer {user_token}"},
         )
         assert r.status_code == 403
+
+
+class TestAdminKnockoutResolution:
+    def test_resolve_knockout_requires_computed_standings(self, client):
+        token = _login_admin(client)
+
+        r = client.post(
+            "/admin/resolve-knockout-teams",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert r.status_code == 400
+        assert "No group standings computed" in r.json()["detail"]
