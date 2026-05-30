@@ -17,7 +17,7 @@ from errors import NotFoundError, ForbiddenError
 from models import (
     Match, User, Prediction, Score, BracketPrediction, TournamentResult,
     TournamentBonus, TournamentPhase, GroupStanding, KnockoutAdvancement, Team,
-    League, LeagueMember, SyncConfig,
+    League, LeagueMember, SyncConfig, LeagueBonusAnswer, LeagueBonusQuestion,
 )
 from schemas import (
     MatchResultUpdate, TournamentResultUpdate, PhaseUpdate,
@@ -238,7 +238,7 @@ def recalculate_scores(
       - match_points: from match prediction scoring (outcome 3p + correct home/away 2p each, max 7p)
       - bracket_points: from knockout bracket team placement scoring
       - tournament_bonus_points: from tournament bonus predictions (Excel scoring)
-      - league_bonus_points: unchanged here (managed per league)
+      - league_bonus_points: from league bonus answers
 
     Then sets total_points = match_points + bracket_points + tournament_bonus_points + league_bonus_points
     """
@@ -305,13 +305,37 @@ def recalculate_scores(
         )
         user_bonus_points[(bonus.user_id, bonus.league_id)] = result["points"]
 
-    # ── 4. Update Score rows ────────────────────────────────────────
-    all_score_keys = set(user_match_points) | set(user_bracket_points) | set(user_bonus_points)
+    # ── 4. League bonus points ──────────────────────────────────────
+    user_league_bonus_points = {}
+    league_bonus_rows = (
+        db.query(
+            LeagueBonusAnswer.user_id,
+            LeagueBonusQuestion.league_id,
+            LeagueBonusAnswer.points_awarded,
+        )
+        .join(LeagueBonusQuestion, LeagueBonusAnswer.question_id == LeagueBonusQuestion.id)
+        .filter(LeagueBonusAnswer.points_awarded.isnot(None))
+        .all()
+    )
+    for user_id, league_id, points_awarded in league_bonus_rows:
+        key = (user_id, league_id)
+        user_league_bonus_points[key] = user_league_bonus_points.get(key, 0) + int(points_awarded or 0)
+
+    # ── 5. Update Score rows ────────────────────────────────────────
+    all_score_keys = (
+        set(user_match_points)
+        | set(user_bracket_points)
+        | set(user_bonus_points)
+        | set(user_league_bonus_points)
+    )
 
     # Include users with existing scores who may have 0 points in all categories
     existing_scores = db.query(Score).all()
     for score_row in existing_scores:
         all_score_keys.add((score_row.user_id, score_row.league_id))
+    memberships = db.query(LeagueMember).all()
+    for membership in memberships:
+        all_score_keys.add((membership.user_id, membership.league_id))
 
     total_updated = 0
 
@@ -319,6 +343,7 @@ def recalculate_scores(
         mp = user_match_points.get((user_id, league_id), 0)
         bp = user_bracket_points.get((user_id, league_id), 0)
         tbp = user_bonus_points.get((user_id, league_id), 0)
+        lbp = user_league_bonus_points.get((user_id, league_id), 0)
 
         score_row = (
             db.query(Score)
@@ -329,17 +354,17 @@ def recalculate_scores(
             score_row.match_points = mp
             score_row.bracket_points = bp
             score_row.tournament_bonus_points = tbp
-            score_row.total_points = (
-                mp + bp + tbp + score_row.league_bonus_points
-            )
+            score_row.league_bonus_points = lbp
+            score_row.total_points = mp + bp + tbp + lbp
         else:
-            total = mp + bp + tbp
+            total = mp + bp + tbp + lbp
             score_row = Score(
                 user_id=user_id,
                 league_id=league_id,
                 match_points=mp,
                 bracket_points=bp,
                 tournament_bonus_points=tbp,
+                league_bonus_points=lbp,
                 total_points=total,
             )
             db.add(score_row)
@@ -354,6 +379,7 @@ def recalculate_scores(
         "total_match_points": sum(user_match_points.values()),
         "total_bracket_points": sum(user_bracket_points.values()),
         "total_tournament_bonus_points": sum(user_bonus_points.values()),
+        "total_league_bonus_points": sum(user_league_bonus_points.values()),
     }
 
 

@@ -9,8 +9,9 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from errors import NotFoundError, ForbiddenError, ValidationError
-from models import League, LeagueBonusQuestion, LeagueMember, User
+from models import League, LeagueBonusAnswer, LeagueBonusQuestion, LeagueMember, User
 from schemas import (
+    LeagueBonusAnswerCreate,
     LeagueBonusQuestionCreate,
     LeagueBonusQuestionUpdate,
     LeagueBonusQuestionOut,
@@ -43,16 +44,24 @@ def _verify_member(league_id: int, user: User, db: Session):
         raise ForbiddenError(detail="not_a_member", error_code="not_a_member")
 
 
-def _question_to_dict(q: LeagueBonusQuestion) -> dict:
+def _question_to_dict(q: LeagueBonusQuestion, include_answer: bool = True) -> dict:
     """Serialize a LeagueBonusQuestion row."""
     return {
         "id": q.id,
         "league_id": q.league_id,
         "question_text": q.question_text,
         "points_value": q.points_value,
-        "answer": q.answer,
+        "answer": q.answer if include_answer else None,
         "created_at": q.created_at.isoformat() if q.created_at else None,
     }
+
+
+def _score_answer(question: LeagueBonusQuestion, answer_text: str) -> tuple[bool | None, int | None]:
+    """Score a member answer if the admin answer has been set."""
+    if question.answer is None or not question.answer.strip():
+        return None, None
+    is_correct = answer_text.strip().lower() == question.answer.strip().lower()
+    return is_correct, question.points_value if is_correct else 0
 
 
 @router.post(
@@ -77,6 +86,7 @@ def create_bonus_question(
         league_id=league_id,
         question_text=payload.question_text,
         points_value=payload.points_value,
+        answer=payload.answer,
     )
     db.add(question)
     db.commit()
@@ -107,7 +117,8 @@ def list_bonus_questions(
         .order_by(LeagueBonusQuestion.id)
         .all()
     )
-    return [_question_to_dict(q) for q in questions]
+    include_answer = league.admin_user_id == current_user.id
+    return [_question_to_dict(q, include_answer=include_answer) for q in questions]
 
 
 @router.get(
@@ -141,7 +152,8 @@ def get_bonus_question(
             error_code="bonus_question_not_found",
         )
 
-    return _question_to_dict(question)
+    include_answer = league.admin_user_id == current_user.id
+    return _question_to_dict(question, include_answer=include_answer)
 
 
 @router.patch(
@@ -186,6 +198,12 @@ def update_bonus_question(
     for field, value in update_data.items():
         setattr(question, field, value)
 
+    if "answer" in update_data:
+        for member_answer in question.answers:
+            is_correct, points_awarded = _score_answer(question, member_answer.answer_text)
+            member_answer.is_correct = is_correct
+            member_answer.points_awarded = points_awarded
+
     db.commit()
     db.refresh(question)
 
@@ -227,3 +245,123 @@ def delete_bonus_question(
     db.commit()
 
     return {"deleted": True, "question_id": question_id}
+
+
+@router.put(
+    "/{league_id}/bonus-questions/{question_id}/answer",
+    status_code=200,
+)
+def save_bonus_answer(
+    league_id: int,
+    question_id: int,
+    payload: LeagueBonusAnswerCreate,
+    current_user: User = Depends(fetch_current_user),
+    db: Session = Depends(get_db),
+):
+    """Save or update the current member's answer for a league bonus question."""
+    league = db.query(League).filter(League.id == league_id).first()
+    if not league:
+        raise NotFoundError(detail="league_not_found", error_code="league_not_found")
+
+    _verify_member(league_id, current_user, db)
+
+    question = (
+        db.query(LeagueBonusQuestion)
+        .filter(
+            LeagueBonusQuestion.id == question_id,
+            LeagueBonusQuestion.league_id == league_id,
+        )
+        .first()
+    )
+    if not question:
+        raise NotFoundError(
+            detail="bonus_question_not_found",
+            error_code="bonus_question_not_found",
+        )
+
+    answer_text = payload.answer_text.strip()
+    is_correct, points_awarded = _score_answer(question, answer_text)
+
+    answer = (
+        db.query(LeagueBonusAnswer)
+        .filter(
+            LeagueBonusAnswer.question_id == question_id,
+            LeagueBonusAnswer.user_id == current_user.id,
+        )
+        .first()
+    )
+    if answer:
+        answer.answer_text = answer_text
+        answer.is_correct = is_correct
+        answer.points_awarded = points_awarded
+    else:
+        answer = LeagueBonusAnswer(
+            question_id=question_id,
+            user_id=current_user.id,
+            answer_text=answer_text,
+            is_correct=is_correct,
+            points_awarded=points_awarded,
+        )
+        db.add(answer)
+
+    db.commit()
+    return {
+        "question_id": question_id,
+        "answer_text": answer.answer_text,
+        "is_correct": answer.is_correct,
+        "points_awarded": answer.points_awarded,
+    }
+
+
+@router.get(
+    "/{league_id}/bonus-questions/{question_id}/answer",
+    status_code=200,
+)
+def get_my_bonus_answer(
+    league_id: int,
+    question_id: int,
+    current_user: User = Depends(fetch_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return the current member's answer for a league bonus question."""
+    league = db.query(League).filter(League.id == league_id).first()
+    if not league:
+        raise NotFoundError(detail="league_not_found", error_code="league_not_found")
+
+    _verify_member(league_id, current_user, db)
+
+    question = (
+        db.query(LeagueBonusQuestion)
+        .filter(
+            LeagueBonusQuestion.id == question_id,
+            LeagueBonusQuestion.league_id == league_id,
+        )
+        .first()
+    )
+    if not question:
+        raise NotFoundError(
+            detail="bonus_question_not_found",
+            error_code="bonus_question_not_found",
+        )
+
+    answer = (
+        db.query(LeagueBonusAnswer)
+        .filter(
+            LeagueBonusAnswer.question_id == question_id,
+            LeagueBonusAnswer.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not answer:
+        return {
+            "question_id": question_id,
+            "answer_text": None,
+            "is_correct": None,
+            "points_awarded": None,
+        }
+    return {
+        "question_id": question_id,
+        "answer_text": answer.answer_text,
+        "is_correct": answer.is_correct,
+        "points_awarded": answer.points_awarded,
+    }

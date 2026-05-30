@@ -13,7 +13,7 @@ from errors import NotFoundError, ForbiddenError
 from models import (
     User, Prediction, Match, League, LeagueMember, Score,
     BracketPrediction, TournamentResult, TournamentBonus,
-    KnockoutAdvancement,
+    KnockoutAdvancement, LeagueBonusAnswer, LeagueBonusQuestion,
 )
 from security import fetch_current_user
 from scoring import calculate_match_points, calculate_bracket_points, calculate_tournament_bonus_points, BRACKET_ROUND_POINTS
@@ -27,15 +27,29 @@ def _empty_score() -> dict:
         "match_points": 0,
         "bracket_points": 0,
         "tournament_bonus_points": 0,
+        "league_bonus_points": 0,
         "predictions_made": 0,
         "perfect_predictions": 0,
     }
 
 
+def _resolve_user_league_id(db: Session, user_id: int, league_id: int | None = None) -> int | None:
+    """Resolve an omitted league_id to the user's most recently joined league."""
+    if league_id is not None:
+        return league_id
+    membership = (
+        db.query(LeagueMember)
+        .filter(LeagueMember.user_id == user_id)
+        .order_by(LeagueMember.joined_at.desc(), LeagueMember.id.desc())
+        .first()
+    )
+    return membership.league_id if membership else None
+
+
 def _batch_calculate_scores(
     db: Session,
     user_ids: list[int],
-    league_id: int | None = None,
+    league_id: int,
 ) -> dict[int, dict]:
     """Calculate leaderboard score aggregates for many users without per-user queries."""
     if not user_ids:
@@ -48,8 +62,7 @@ def _batch_calculate_scores(
         Prediction.home_goals.isnot(None),
         Prediction.away_goals.isnot(None),
     ]
-    if league_id is not None:
-        pred_filters.append(Prediction.league_id == league_id)
+    pred_filters.append(Prediction.league_id == league_id)
 
     pred_home_win = Prediction.home_goals > Prediction.away_goals
     pred_away_win = Prediction.home_goals < Prediction.away_goals
@@ -92,9 +105,10 @@ def _batch_calculate_scores(
 
     actual_advancements = _build_actual_advancements(db)
     if actual_advancements:
-        bracket_filters = [BracketPrediction.user_id.in_(user_ids)]
-        if league_id is not None:
-            bracket_filters.append(BracketPrediction.league_id == league_id)
+        bracket_filters = [
+            BracketPrediction.user_id.in_(user_ids),
+            BracketPrediction.league_id == league_id,
+        ]
         advancement_filter = or_(*[
             and_(
                 BracketPrediction.team_id == advancement["team_id"],
@@ -124,9 +138,10 @@ def _batch_calculate_scores(
 
     actual_result = db.query(TournamentResult).first()
     if actual_result:
-        bonus_filters = [TournamentBonus.user_id.in_(user_ids)]
-        if league_id is not None:
-            bonus_filters.append(TournamentBonus.league_id == league_id)
+        bonus_filters = [
+            TournamentBonus.user_id.in_(user_ids),
+            TournamentBonus.league_id == league_id,
+        ]
 
         def _text_matches(pred_col, actual_value):
             if actual_value is None:
@@ -154,11 +169,29 @@ def _batch_calculate_scores(
         for row in bonus_rows:
             scores[row.user_id]["tournament_bonus_points"] = int(row.tournament_bonus_points or 0)
 
+    league_bonus_rows = (
+        db.query(
+            LeagueBonusAnswer.user_id,
+            func.coalesce(func.sum(LeagueBonusAnswer.points_awarded), 0).label("league_bonus_points"),
+        )
+        .join(LeagueBonusQuestion, LeagueBonusAnswer.question_id == LeagueBonusQuestion.id)
+        .filter(
+            LeagueBonusQuestion.league_id == league_id,
+            LeagueBonusAnswer.user_id.in_(user_ids),
+            LeagueBonusAnswer.points_awarded.isnot(None),
+        )
+        .group_by(LeagueBonusAnswer.user_id)
+        .all()
+    )
+    for row in league_bonus_rows:
+        scores[row.user_id]["league_bonus_points"] = int(row.league_bonus_points or 0)
+
     for score in scores.values():
         score["total_points"] = (
             score["match_points"]
             + score["bracket_points"]
             + score["tournament_bonus_points"]
+            + score["league_bonus_points"]
         )
 
     return scores
@@ -166,13 +199,22 @@ def _batch_calculate_scores(
 
 def _calculate_user_score(user_id: int, db: Session, league_id: int | None = None) -> dict:
     """Calculate a user's total score and breakdown from predictions + match results + bracket."""
+    league_id = _resolve_user_league_id(db, user_id, league_id)
+    if league_id is None:
+        return _empty_score() | {
+            "league_id": None,
+            "matches_scored": 0,
+            "tournament_bonus_details": {},
+            "bracket_details": [],
+            "breakdown": [],
+        }
+
     prediction_query = db.query(Prediction).filter(
         Prediction.user_id == user_id,
+        Prediction.league_id == league_id,
         Prediction.home_goals.isnot(None),
         Prediction.away_goals.isnot(None),
     )
-    if league_id is not None:
-        prediction_query = prediction_query.filter(Prediction.league_id == league_id)
     predictions = prediction_query.options(
         joinedload(Prediction.match).joinedload(Match.home_team),
         joinedload(Prediction.match).joinedload(Match.away_team),
@@ -211,9 +253,10 @@ def _calculate_user_score(user_id: int, db: Session, league_id: int | None = Non
 
     # ── Bracket points ──
     actual_advancements = _build_actual_advancements(db)
-    bracket_query = db.query(BracketPrediction).filter(BracketPrediction.user_id == user_id)
-    if league_id is not None:
-        bracket_query = bracket_query.filter(BracketPrediction.league_id == league_id)
+    bracket_query = db.query(BracketPrediction).filter(
+        BracketPrediction.user_id == user_id,
+        BracketPrediction.league_id == league_id,
+    )
     bracket_preds = bracket_query.all()
     bracket_result = calculate_bracket_points(
         predictions=[{"team_id": bp.team_id, "round": bp.round} for bp in bracket_preds],
@@ -223,9 +266,10 @@ def _calculate_user_score(user_id: int, db: Session, league_id: int | None = Non
 
     # ── Tournament bonus points ──
     actual_result = db.query(TournamentResult).first()
-    bonus_query = db.query(TournamentBonus).filter(TournamentBonus.user_id == user_id)
-    if league_id is not None:
-        bonus_query = bonus_query.filter(TournamentBonus.league_id == league_id)
+    bonus_query = db.query(TournamentBonus).filter(
+        TournamentBonus.user_id == user_id,
+        TournamentBonus.league_id == league_id,
+    )
     tb = bonus_query.first()
 
     actual_winner_id = actual_result.winner_team_id if actual_result else None
@@ -275,13 +319,27 @@ def _calculate_user_score(user_id: int, db: Session, league_id: int | None = Non
             "custom_bonus_2_correct": tb_result.get("custom_bonus_2_correct", False),
         }
 
-    total_points = total_match_points + total_bracket_points + tournament_bonus_points
+    league_bonus_points = (
+        db.query(func.coalesce(func.sum(LeagueBonusAnswer.points_awarded), 0))
+        .join(LeagueBonusQuestion, LeagueBonusAnswer.question_id == LeagueBonusQuestion.id)
+        .filter(
+            LeagueBonusAnswer.user_id == user_id,
+            LeagueBonusQuestion.league_id == league_id,
+            LeagueBonusAnswer.points_awarded.isnot(None),
+        )
+        .scalar()
+    )
+    league_bonus_points = int(league_bonus_points or 0)
+
+    total_points = total_match_points + total_bracket_points + tournament_bonus_points + league_bonus_points
 
     return {
+        "league_id": league_id,
         "total_points": total_points,
         "match_points": total_match_points,
         "bracket_points": total_bracket_points,
         "tournament_bonus_points": tournament_bonus_points,
+        "league_bonus_points": league_bonus_points,
         "tournament_bonus_details": tournament_bonus_details,
         "predictions_made": len(predictions),
         "matches_scored": len(match_points),
@@ -328,17 +386,40 @@ def _build_actual_advancements(db) -> list[dict]:
 
 @router.get("/global")
 def global_leaderboard(
+    league_id: Optional[int] = Query(None, description="League to rank; defaults to VM2026/first league"),
     page: Optional[int] = Query(None, ge=1, description="Page number (1-indexed)"),
     per_page: Optional[int] = Query(None, ge=1, le=200, description="Items per page"),
     db: Session = Depends(get_db),
 ):
-    """Return the global leaderboard across all users, sorted by total points.
+    """Return a league leaderboard for backward compatibility with old clients.
     
     If page and per_page are provided, returns a paginated response.
     Otherwise returns the full list (backward compatible).
     """
-    users = db.query(User).all()
-    score_by_user_id = _batch_calculate_scores(db, [user.id for user in users])
+    league = None
+    if league_id is not None:
+        league = db.query(League).filter(League.id == league_id).first()
+        if not league:
+            raise NotFoundError(detail="league_not_found", error_code="league_not_found")
+    if league is None:
+        league = (
+            db.query(League)
+            .filter(League.name == "VM2026")
+            .order_by(League.id)
+            .first()
+        )
+    if league is None:
+        league = db.query(League).order_by(League.id).first()
+    if not league:
+        return {"leaderboard": []}
+
+    users = (
+        db.query(User)
+        .join(LeagueMember, User.id == LeagueMember.user_id)
+        .filter(LeagueMember.league_id == league.id)
+        .all()
+    )
+    score_by_user_id = _batch_calculate_scores(db, [user.id for user in users], league_id=league.id)
     entries = []
 
     for user in users:
@@ -357,7 +438,7 @@ def global_leaderboard(
 
     # If no pagination params given, return full response (backward compatible)
     if page is None or per_page is None:
-        return {"leaderboard": entries}
+        return {"leaderboard": entries, "league_id": league.id, "league_name": league.name}
 
     # Paginated response
     total = len(entries)
@@ -367,6 +448,8 @@ def global_leaderboard(
 
     return {
         "leaderboard": paginated_entries,
+        "league_id": league.id,
+        "league_name": league.name,
         "total": total,
         "page": page,
         "per_page": per_page,
@@ -450,6 +533,7 @@ def my_scores(
         "match_points": score["match_points"],
         "bracket_points": score["bracket_points"],
         "tournament_bonus_points": score["tournament_bonus_points"],
+        "league_bonus_points": score["league_bonus_points"],
         "tournament_bonus_details": score["tournament_bonus_details"],
         "predictions_made": score["predictions_made"],
         "matches_scored": score["matches_scored"],

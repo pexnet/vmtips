@@ -144,11 +144,15 @@ class BracketPredictionOut(BaseModel):
 class LeagueBonusQuestionCreate(BaseModel):
     question_text: str = Field(..., min_length=1, max_length=500)
     points_value: int = Field(..., ge=1)
+    answer: str | None = None
 
 class LeagueBonusQuestionUpdate(BaseModel):
     question_text: str | None = Field(None, min_length=1, max_length=500)
     points_value: int | None = Field(None, ge=1)
     answer: str | None = None
+
+class LeagueBonusAnswerCreate(BaseModel):
+    answer_text: str = Field(..., min_length=1, max_length=500)
 
 class LeagueBonusQuestionOut(BaseModel):
     id: int
@@ -157,6 +161,15 @@ class LeagueBonusQuestionOut(BaseModel):
     points_value: int
     answer: str | None = None
     created_at: datetime | None = None
+
+    class Config:
+        from_attributes = True
+
+class LeagueBonusAnswerOut(BaseModel):
+    question_id: int
+    answer_text: str | None = None
+    is_correct: bool | None = None
+    points_awarded: int | None = None
 
     class Config:
         from_attributes = True

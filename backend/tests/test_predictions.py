@@ -104,6 +104,19 @@ def test_tournament_bonuses(client):
     assert data["custom_bonus_2"] == "Brazil"
 
 
+def test_tournament_bonuses_locked_after_group_phase(client, set_phase):
+    """Tournament bonus predictions are Phase 1-only."""
+    set_phase("knockout_open")
+    token = _register_and_login(client, "lockedbonus@example.com", "secret123", "LockedBonus")
+    response = client.post(
+        "/predictions/tournament",
+        json={"top_scorer_name": "Mbappe"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "bonus_predictions_locked"
+
+
 def test_predictions_require_auth(client):
     """GET /predictions without token returns 401."""
     response = client.get("/predictions")

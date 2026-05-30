@@ -16,12 +16,16 @@ def _register_and_login(client, email, password, name):
     return r.json()["access_token"]
 
 
-def _save_predictions(client, token, predictions):
-    client.post(
+def _save_predictions(client, token, predictions, league_id=None):
+    payload = {"predictions": predictions}
+    if league_id is not None:
+        payload["league_id"] = league_id
+    response = client.post(
         "/predictions/batch",
-        json={"predictions": predictions},
+        json=payload,
         headers={"Authorization": f"Bearer {token}"},
     )
+    assert response.status_code == 200
 
 
 class TestGlobalLeaderboard:
@@ -62,6 +66,35 @@ class TestGlobalLeaderboard:
         assert bob["total_points"] == 3
         assert bob["rank"] == 2
 
+    def test_global_endpoint_uses_one_league_not_all_user_leagues(self, client, set_match_result):
+        """Backward-compatible global endpoint must not sum a user's points across leagues."""
+        set_match_result(1, 2, 1)
+
+        token = _register_and_login(client, "multi@example.com", "secret123", "Multi")
+        leagues = client.get("/leagues", headers={"Authorization": f"Bearer {token}"}).json()
+        default_league_id = next(l["id"] for l in leagues if l["name"] == "VM2026")
+
+        custom = client.post(
+            "/leagues",
+            json={"name": "Custom"},
+            headers={"Authorization": f"Bearer {token}"},
+        ).json()
+        custom_league_id = custom["id"]
+
+        _save_predictions(client, token, [{"match_id": 1, "home_goals": 2, "away_goals": 1}], league_id=default_league_id)
+        _save_predictions(client, token, [{"match_id": 1, "home_goals": 1, "away_goals": 0}], league_id=custom_league_id)
+
+        global_data = client.get("/leaderboard/global").json()
+        row = next(u for u in global_data["leaderboard"] if u["display_name"] == "Multi")
+        assert row["total_points"] == 7
+
+        custom_data = client.get(
+            f"/leaderboard/league/{custom_league_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        ).json()
+        custom_row = next(u for u in custom_data["leaderboard"] if u["display_name"] == "Multi")
+        assert custom_row["total_points"] == 3
+
 
 class TestPersonalScores:
     def test_my_scores(self, client, set_match_result):
@@ -93,6 +126,24 @@ class TestPersonalScores:
         assert len(data["breakdown"]) == 2
         assert data["breakdown"][0]["perfect"] is True
         assert data["breakdown"][0]["points"] == 7
+
+    def test_my_scores_defaults_to_one_league(self, client, set_match_result):
+        set_match_result(1, 2, 1)
+        token = _register_and_login(client, "me-multi@example.com", "secret123", "MeMulti")
+        default_league_id = client.get("/leagues", headers={"Authorization": f"Bearer {token}"}).json()[0]["id"]
+        custom_league_id = client.post(
+            "/leagues",
+            json={"name": "My Other League"},
+            headers={"Authorization": f"Bearer {token}"},
+        ).json()["id"]
+
+        _save_predictions(client, token, [{"match_id": 1, "home_goals": 2, "away_goals": 1}], league_id=default_league_id)
+        _save_predictions(client, token, [{"match_id": 1, "home_goals": 1, "away_goals": 0}], league_id=custom_league_id)
+
+        default_score = client.get(f"/leaderboard/me?league_id={default_league_id}", headers={"Authorization": f"Bearer {token}"}).json()
+        current_score = client.get("/leaderboard/me", headers={"Authorization": f"Bearer {token}"}).json()
+        assert default_score["total_points"] == 7
+        assert current_score["total_points"] == 3
 
     def test_my_scores_no_auth(self, client):
         """GET /leaderboard/me without token returns 401."""

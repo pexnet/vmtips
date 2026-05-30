@@ -305,10 +305,10 @@ def save_tournament_bonuses(
 ):
     """Save or update the authenticated user's tournament bonus predictions for a league.
 
-    Only allowed during group_open or knockout_open phase (before deadlines).
+    Only allowed during group_open phase before the group deadline.
     """
     phase = _get_phase(db)
-    if not (_can_predict_group(phase) or _can_predict_bracket(phase)):
+    if not _can_predict_group(phase):
         raise ForbiddenError(detail="bonus_predictions_locked", error_code="bonus_predictions_locked")
 
     league_id = _resolve_league_id(db, current_user.id, payload.league_id)

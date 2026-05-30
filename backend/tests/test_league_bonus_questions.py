@@ -125,6 +125,33 @@ def test_list_bonus_questions_not_member(client):
     assert r.status_code == 403
 
 
+def test_list_bonus_questions_hides_answer_from_members(client):
+    """Members can see the question but not the admin's answer."""
+    admin_token = _register_and_login(client, "adminhide@example.com", "secret123", "AdminHide")
+    league_id, invite_code = _create_league(client, token=admin_token)
+    create_r = client.post(
+        f"/leagues/{league_id}/bonus-questions",
+        json={"question_text": "Secret?", "points_value": 3, "answer": "France"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert create_r.status_code == 201
+    assert create_r.json()["answer"] == "France"
+
+    member_token = _register_and_login(client, "memberhide@example.com", "secret123", "MemberHide")
+    client.post(
+        f"/leagues/{league_id}/join",
+        json={"invite_code": invite_code},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+
+    listed = client.get(
+        f"/leagues/{league_id}/bonus-questions",
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert listed.status_code == 200
+    assert listed.json()[0]["answer"] is None
+
+
 # ── Get ────────────────────────────────────────────────────────
 
 
@@ -229,6 +256,42 @@ def test_update_bonus_question_set_answer(client):
     )
     assert r.status_code == 200
     assert r.json()["answer"] == "France"
+
+
+def test_member_can_answer_bonus_question_and_earn_points(client, set_match_result):
+    """League bonus answers are scored and included in league leaderboard totals."""
+    admin_token = _register_and_login(client, "bonusadmin@example.com", "secret123", "BonusAdmin")
+    league_id, invite_code = _create_league(client, token=admin_token)
+    create_r = client.post(
+        f"/leagues/{league_id}/bonus-questions",
+        json={"question_text": "Winner?", "points_value": 5, "answer": "France"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    question_id = create_r.json()["id"]
+
+    member_token = _register_and_login(client, "bonusmember@example.com", "secret123", "BonusMember")
+    client.post(
+        f"/leagues/{league_id}/join",
+        json={"invite_code": invite_code},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+
+    answer_r = client.put(
+        f"/leagues/{league_id}/bonus-questions/{question_id}/answer",
+        json={"answer_text": "france"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert answer_r.status_code == 200
+    assert answer_r.json()["is_correct"] is True
+    assert answer_r.json()["points_awarded"] == 5
+
+    score_r = client.get(
+        f"/leaderboard/me?league_id={league_id}",
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert score_r.status_code == 200
+    assert score_r.json()["league_bonus_points"] == 5
+    assert score_r.json()["total_points"] == 5
 
 
 def test_update_bonus_question_not_admin(client):

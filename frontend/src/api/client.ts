@@ -102,12 +102,16 @@ export const leaguesApi = {
     api.patch(`/leagues/${league_id}/bonus-questions/${question_id}`, payload),
   deleteBonusQuestion: (league_id: number, question_id: number) =>
     api.delete(`/leagues/${league_id}/bonus-questions/${question_id}`),
+  getMyBonusAnswer: (league_id: number, question_id: number) =>
+    api.get(`/leagues/${league_id}/bonus-questions/${question_id}/answer`),
+  saveBonusAnswer: (league_id: number, question_id: number, answer_text: string) =>
+    api.put(`/leagues/${league_id}/bonus-questions/${question_id}/answer`, { answer_text }),
 };
 
 // Leaderboard
 export const leaderboardApi = {
-  global: () => api.get("/leaderboard/global"),
-  me: () => api.get("/leaderboard/me"),
+  global: (leagueId?: number) => api.get(`/leaderboard/global${leagueId !== undefined ? `?league_id=${leagueId}` : ""}`),
+  me: (leagueId?: number) => api.get(`/leaderboard/me${leagueId !== undefined ? `?league_id=${leagueId}` : ""}`),
   league: (id: number) => api.get(`/leaderboard/league/${id}`),
 };
 

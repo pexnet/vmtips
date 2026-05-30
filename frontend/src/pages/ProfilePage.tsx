@@ -19,9 +19,9 @@ import {
 import PersonIcon from "@mui/icons-material/Person";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import { useAuth } from "../contexts/AuthContext";
-import { usePersonalScore } from "../hooks/useLeaderboard";
+import { useLeague } from "../contexts/LeagueContext";
+import { useLeagueLeaderboard, usePersonalScore } from "../hooks/useLeaderboard";
 import type { ScoreBreakdown, BracketDetail } from "../types/api";
-import { useGlobalLeaderboard } from "../hooks/useLeaderboard";
 
 /** Format a bracket round key into a human-readable label. */
 function formatRound(round: string, t: (key: string) => string): string {
@@ -39,12 +39,13 @@ function formatRound(round: string, t: (key: string) => string): string {
 export default function ProfilePage() {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { selectedLeagueId } = useLeague();
 
-  const { data: personal, isLoading, error } = usePersonalScore();
-  const { data: globalEntries } = useGlobalLeaderboard();
+  const { data: personal, isLoading, error } = usePersonalScore(true, selectedLeagueId);
+  const { data: leagueData } = useLeagueLeaderboard(selectedLeagueId);
 
-  // Derive the user's global rank from the global leaderboard
-  const rank = globalEntries?.find(
+  // Derive the user's rank in the selected league.
+  const rank = leagueData?.leaderboard.find(
     (entry) => entry.user_id === user?.id
   )?.rank;
 
@@ -104,7 +105,7 @@ export default function ProfilePage() {
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
           <Chip
             icon={<EmojiEventsIcon />}
-            label={`${t("profile.rank")}: ${rank ? `#${rank}` : "—"}`}
+            label={`${t("profile.rank")}: ${rank ? `#${rank}` : "-"}`}
             color="primary"
             variant="outlined"
           />
@@ -118,6 +119,10 @@ export default function ProfilePage() {
           />
           <Chip
             label={`${t("profile.bracket_points")}: ${personal.bracket_points}`}
+            variant="outlined"
+          />
+          <Chip
+            label={`${t("admin.league_bonus_points")}: ${personal.league_bonus_points ?? 0}`}
             variant="outlined"
           />
           <Chip

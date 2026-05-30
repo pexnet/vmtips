@@ -21,7 +21,11 @@ export function isGroupOpen(phase: PhaseInfo | undefined): boolean {
 
 /** Convenience: is the knockout stage open for predictions? */
 export function isKnockoutOpen(phase: PhaseInfo | undefined): boolean {
-  return phase?.phase === "knockout_open";
+  if (!phase) return false;
+  if (phase.phase === "knockout_open") return true;
+  if (phase.phase !== "group_closed" || !phase.knockout_opens_at) return false;
+  const opensAt = new Date(phase.knockout_opens_at);
+  return !Number.isNaN(opensAt.getTime()) && opensAt <= new Date();
 }
 
 /** Convenience: is the group stage closed (no more group predictions)? */

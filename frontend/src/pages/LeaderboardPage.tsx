@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useTranslation } from "react-i18next";
 import {
@@ -19,16 +19,23 @@ import {
   Chip,
 } from "@mui/material";
 
-import { useGlobalLeaderboard, usePersonalScore, useLeagueLeaderboard } from "../hooks/useLeaderboard";
+import { usePersonalScore, useLeagueLeaderboard } from "../hooks/useLeaderboard";
 import { useLeagues } from "../hooks/useLeagues";
 import { useAuth } from "../contexts/AuthContext";
+import { useLeague } from "../contexts/LeagueContext";
 import type { LeaderboardEntry, ScoreBreakdown, League } from "../types/api";
 
 function LeagueLeaderboardSection() {
   const { t } = useTranslation();
   const { data: leagues = [] } = useLeagues();
-  const [selectedLeagueId, setSelectedLeagueId] = useState<number | null>(null);
+  const { selectedLeagueId, setSelectedLeagueId } = useLeague();
   const { data: leagueData, isLoading } = useLeagueLeaderboard(selectedLeagueId);
+
+  useEffect(() => {
+    if (!selectedLeagueId && leagues.length > 0) {
+      setSelectedLeagueId(leagues[0].id);
+    }
+  }, [leagues, selectedLeagueId, setSelectedLeagueId]);
 
   return (
     <Box>
@@ -97,11 +104,11 @@ export default function LeaderboardPage() {
   const { t } = useTranslation();
   const [tab, setTab] = useState(0);
   const { isLoggedIn } = useAuth();
+  const { selectedLeagueId } = useLeague();
 
-  const { data: global = [], isLoading: globalLoading, error: globalError } = useGlobalLeaderboard();
-  const { data: personal } = usePersonalScore(isLoggedIn);
+  const { data: personal, isLoading: personalLoading } = usePersonalScore(isLoggedIn, selectedLeagueId);
 
-  if (globalLoading) {
+  if (personalLoading && tab === 1) {
     return (
       <Container sx={{ mt: 8, textAlign: "center" }}>
         <CircularProgress />
@@ -112,21 +119,17 @@ export default function LeaderboardPage() {
   return (
     <Container sx={{ mt: 4, mb: 8 }}>
       <Typography variant="h4" gutterBottom>{t("leaderboard.title")}</Typography>
-      {globalError && <Alert severity="error" sx={{ mb: 2 }}>{t("common.error")}</Alert>}
 
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
-        <Tab label={t("leaderboard.global")} />
         <Tab label={t("leaderboard.league")} />
         <Tab label={t("nav.profile")} />
       </Tabs>
 
-      {tab === 0 && <LeaderTable data={global} />}
-
-      {tab === 1 && (
+      {tab === 0 && (
         <LeagueLeaderboardSection />
       )}
 
-      {tab === 2 && personal && (
+      {tab === 1 && personal && (
         <Box>
           <Paper elevation={2} sx={{ p: 3, mb: 2 }}>
             <Typography variant="h6">{personal.display_name}</Typography>

@@ -123,6 +123,7 @@ export interface PersonalScore {
   total_points: number;
   match_points: number;
   bracket_points: number;
+  league_bonus_points: number;
   predictions_made: number;
   matches_scored: number;
   perfect_predictions: number;
@@ -144,6 +145,8 @@ export interface PersonalScore {
 
 export interface GlobalLeaderboardResponse {
   leaderboard: LeaderboardEntry[];
+  league_id?: number;
+  league_name?: string;
 }
 
 export interface LeagueLeaderboardResponse {

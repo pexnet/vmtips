@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 import {
@@ -21,7 +21,37 @@ import {
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
-import { useLeagueDetail, useLeagueBonusQuestions, useCreateBonusQuestion, useUpdateBonusQuestion, useDeleteBonusQuestion } from "../hooks/useLeagues";
+import { useLeagueDetail, useLeagueBonusQuestions, useCreateBonusQuestion, useUpdateBonusQuestion, useDeleteBonusQuestion, useMyBonusAnswer, useSaveBonusAnswer } from "../hooks/useLeagues";
+
+function BonusAnswerForm({ leagueId, questionId }: { leagueId: number; questionId: number }) {
+  const { t } = useTranslation();
+  const { data: answer } = useMyBonusAnswer(leagueId, questionId);
+  const saveMutation = useSaveBonusAnswer();
+  const [answerText, setAnswerText] = useState("");
+
+  useEffect(() => {
+    setAnswerText(answer?.answer_text ?? "");
+  }, [answer?.answer_text]);
+
+  return (
+    <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
+      <TextField
+        size="small"
+        label={t("leagues.answer")}
+        value={answerText}
+        onChange={(e) => setAnswerText(e.target.value)}
+        fullWidth
+      />
+      <Button
+        variant="outlined"
+        onClick={() => saveMutation.mutate({ leagueId, questionId, answerText: answerText.trim() })}
+        disabled={!answerText.trim()}
+      >
+        {t("common.save")}
+      </Button>
+    </Box>
+  );
+}
 
 export default function LeagueBonusQuestionsPage() {
   const { t } = useTranslation();
@@ -151,6 +181,7 @@ export default function LeagueBonusQuestionsPage() {
                   secondary={`${t("leagues.points")}: ${q.points_value}${q.answer ? ` | ${t("leagues.answer")}: ${q.answer}` : ""}`}
                 />
               </ListItem>
+              {!isAdmin && id && <BonusAnswerForm leagueId={id} questionId={q.id} />}
             </Paper>
           ))}
         </List>

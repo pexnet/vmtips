@@ -2,22 +2,22 @@ import { useQuery } from "@tanstack/react-query";
 import { leaderboardApi } from "../api/client";
 import type { LeaderboardEntry, PersonalScore, GlobalLeaderboardResponse } from "../types/api";
 
-export function useGlobalLeaderboard() {
+export function useGlobalLeaderboard(leagueId?: number | null) {
   return useQuery<LeaderboardEntry[]>({
-    queryKey: ["leaderboard", "global"],
+    queryKey: ["leaderboard", "global", leagueId],
     queryFn: async () => {
-      const res = await leaderboardApi.global();
+      const res = await leaderboardApi.global(leagueId ?? undefined);
       const data = res.data as GlobalLeaderboardResponse;
       return data.leaderboard;
     },
   });
 }
 
-export function usePersonalScore(enabled = true) {
+export function usePersonalScore(enabled = true, leagueId?: number | null) {
   return useQuery<PersonalScore>({
-    queryKey: ["leaderboard", "me"],
+    queryKey: ["leaderboard", "me", leagueId],
     queryFn: async () => {
-      const res = await leaderboardApi.me();
+      const res = await leaderboardApi.me(leagueId ?? undefined);
       return res.data as PersonalScore;
     },
     enabled,

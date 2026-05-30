@@ -95,6 +95,37 @@ export function useDeleteBonusQuestion() {
   });
 }
 
+export function useMyBonusAnswer(leagueId: number | null, questionId: number | null) {
+  return useQuery({
+    queryKey: ["leagues", leagueId, "bonus-questions", questionId, "answer"],
+    queryFn: async () => {
+      if (!leagueId || !questionId) return null;
+      const res = await leaguesApi.getMyBonusAnswer(leagueId, questionId);
+      return res.data as {
+        question_id: number;
+        answer_text: string | null;
+        is_correct: boolean | null;
+        points_awarded: number | null;
+      };
+    },
+    enabled: !!leagueId && !!questionId,
+  });
+}
+
+export function useSaveBonusAnswer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ leagueId, questionId, answerText }: { leagueId: number; questionId: number; answerText: string }) => {
+      const res = await leaguesApi.saveBonusAnswer(leagueId, questionId, answerText);
+      return res.data;
+    },
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["leagues", vars.leagueId, "bonus-questions", vars.questionId, "answer"] });
+      queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
+    },
+  });
+}
+
 export function usePublicLeagues() {
   return useQuery<League[]>({
     queryKey: ["leagues", "public"],
