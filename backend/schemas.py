@@ -31,6 +31,14 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=6, max_length=72)
     display_name: str = Field(..., min_length=1, max_length=50)
+    first_name: str | None = Field(None, max_length=50)
+    last_name: str | None = Field(None, max_length=50)
+
+class UserProfileUpdate(BaseModel):
+    email: EmailStr
+    first_name: str = Field("", max_length=50)
+    last_name: str = Field("", max_length=50)
+    display_name: str = Field(..., min_length=1, max_length=50)
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -44,6 +52,8 @@ class UserOut(BaseModel):
     id: int
     email: str
     display_name: str
+    first_name: str | None = None
+    last_name: str | None = None
     avatar_url: str | None = None
     is_admin: bool = False
 
@@ -188,6 +198,8 @@ class LeagueJoin(BaseModel):
 class LeagueMemberOut(BaseModel):
     id: int
     display_name: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
     avatar_url: str | None = None
 
 class LeagueOut(BaseModel):

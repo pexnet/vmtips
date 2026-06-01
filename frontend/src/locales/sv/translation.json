@@ -176,7 +176,13 @@
     "no_breakdown": "Inga matcher har poängsatts ännu.",
     "tournament_bonus_points": "Bonuspoäng",
     "upload_avatar": "Ladda upp avatar",
-    "remove_avatar": "Ta bort avatar"
+    "remove_avatar": "Ta bort avatar",
+    "first_name": "Förnamn",
+    "last_name": "Efternamn",
+    "email": "E-postadress",
+    "nickname": "Nickname",
+    "save_profile": "Spara profil",
+    "profile_saved": "Profilen sparad."
   },
   "admin": {
     "title": "Adminpanel",

@@ -88,6 +88,8 @@ function LeaderTable({ data }: { data: LeaderboardEntry[] }) {
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <UserAvatar
                     displayName={row.display_name}
+                    firstName={row.first_name}
+                    lastName={row.last_name}
                     avatarUrl={row.avatar_url}
                     sx={{ width: 30, height: 30, fontSize: "0.75rem" }}
                   />
@@ -145,6 +147,8 @@ export default function LeaderboardPage() {
             <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
               <UserAvatar
                 displayName={personal.display_name}
+                firstName={personal.first_name}
+                lastName={personal.last_name}
                 avatarUrl={personal.avatar_url}
                 sx={{ width: 42, height: 42 }}
               />

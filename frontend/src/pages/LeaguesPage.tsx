@@ -224,6 +224,8 @@ export default function LeaguesPage() {
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
                   <UserAvatar
                     displayName={m.display_name}
+                    firstName={m.first_name}
+                    lastName={m.last_name}
                     avatarUrl={m.avatar_url}
                     sx={{ width: 34, height: 34, fontSize: "0.8rem" }}
                   />

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from errors import ConflictError, UnauthorizedError, ValidationError
 from models import User
-from schemas import UserCreate, UserLogin, Token, UserOut
+from schemas import UserCreate, UserLogin, UserProfileUpdate, Token, UserOut
 from security import get_password_hash, verify_password, create_access_token, fetch_current_user
 from rate_limit import limiter
 
@@ -45,6 +45,8 @@ def register(request: Request, payload: UserCreate, db: Session = Depends(get_db
             email=email,
             password_hash=get_password_hash(payload.password),
             display_name=payload.display_name,
+            first_name=payload.first_name,
+            last_name=payload.last_name,
         )
         db.add(user)
         db.flush()
@@ -95,6 +97,35 @@ def login(request: Request, payload: UserLogin, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserOut)
 def me(current_user: User = Depends(_fetch_current_user)):
     """Return the currently authenticated user."""
+    return current_user
+
+
+@router.patch("/me", response_model=UserOut)
+def update_me(
+    payload: UserProfileUpdate,
+    current_user: User = Depends(_fetch_current_user),
+    db: Session = Depends(get_db),
+):
+    """Update profile identity fields for the current user."""
+    email = payload.email.lower()
+    display_name = payload.display_name.strip()
+    if not display_name:
+        raise ValidationError(detail="nickname_required", error_code="nickname_required")
+
+    existing = (
+        db.query(User)
+        .filter(func.lower(User.email) == email, User.id != current_user.id)
+        .first()
+    )
+    if existing:
+        raise ConflictError(detail="email_already_registered", error_code="email_already_registered")
+
+    current_user.email = email
+    current_user.first_name = payload.first_name.strip() or None
+    current_user.last_name = payload.last_name.strip() or None
+    current_user.display_name = display_name
+    db.commit()
+    db.refresh(current_user)
     return current_user
 
 

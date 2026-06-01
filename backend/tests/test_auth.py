@@ -89,6 +89,38 @@ def test_me_endpoint(client):
     assert me.json()["avatar_url"] is None
 
 
+def test_update_profile_fields(client):
+    """The /me endpoint supports first name, last name, email, and nickname updates."""
+    client.post("/auth/register", json={
+        "email": "profile@example.com",
+        "password": "secret123",
+        "display_name": "Profile",
+    })
+    login = client.post("/auth/login", json={
+        "email": "profile@example.com",
+        "password": "secret123",
+    })
+    token = login.json()["access_token"]
+
+    response = client.patch(
+        "/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "email": "new-profile@example.com",
+            "first_name": "Ada",
+            "last_name": "Lovelace",
+            "display_name": "Countess",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["email"] == "new-profile@example.com"
+    assert data["first_name"] == "Ada"
+    assert data["last_name"] == "Lovelace"
+    assert data["display_name"] == "Countess"
+
+
 def test_upload_and_delete_avatar(client):
     """The current user can upload and remove an optional avatar."""
     client.post("/auth/register", json={

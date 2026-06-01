@@ -11,6 +11,8 @@ function initialsFor(name?: string | null, email?: string | null): string {
 
 interface UserAvatarProps {
   displayName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
   email?: string | null;
   avatarUrl?: string | null;
   sx?: SxProps<Theme>;
@@ -18,6 +20,8 @@ interface UserAvatarProps {
 
 export default function UserAvatar({
   displayName,
+  firstName,
+  lastName,
   email,
   avatarUrl,
   sx,
@@ -37,7 +41,9 @@ export default function UserAvatar({
       ]}
       {...props}
     >
-      {initialsFor(displayName, email)}
+      {firstName && lastName
+        ? `${firstName[0]}${lastName[0]}`.toUpperCase()
+        : initialsFor(displayName, email)}
     </Avatar>
   );
 }

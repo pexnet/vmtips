@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Container,
@@ -16,6 +16,7 @@ import {
   Alert,
   Divider,
   Button,
+  TextField,
 } from "@mui/material";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import { authApi } from "../api/client";
@@ -44,9 +45,28 @@ export default function ProfilePage() {
   const { selectedLeagueId } = useLeague();
   const [avatarError, setAvatarError] = useState("");
   const [avatarSaving, setAvatarSaving] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [profileSaved, setProfileSaved] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    first_name: "",
+    last_name: "",
+    email: "",
+    display_name: "",
+  });
 
   const { data: personal, isLoading, error } = usePersonalScore(true, selectedLeagueId);
   const { data: leagueData } = useLeagueLeaderboard(selectedLeagueId);
+
+  useEffect(() => {
+    if (!user) return;
+    setProfileForm({
+      first_name: user.first_name || "",
+      last_name: user.last_name || "",
+      email: user.email || "",
+      display_name: user.display_name || "",
+    });
+  }, [user]);
 
   // Derive the user's rank in the selected league.
   const rank = leagueData?.leaderboard.find(
@@ -112,6 +132,24 @@ export default function ProfilePage() {
     }
   };
 
+  const handleProfileSave = async () => {
+    setProfileError("");
+    setProfileSaved(false);
+    setProfileSaving(true);
+    try {
+      await authApi.updateMe(profileForm);
+      await refreshUser();
+      setProfileSaved(true);
+    } catch (err) {
+      setProfileError(getErrorDetail(err) || t("common.error"));
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const displayName = user?.display_name || personal.display_name;
+  const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(" ");
+
   return (
     <Container sx={{ mt: 4, mb: 8 }}>
       <Typography variant="h4" gutterBottom>
@@ -122,13 +160,20 @@ export default function ProfilePage() {
       <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, flexWrap: "wrap" }}>
           <UserAvatar
-            displayName={personal.display_name}
+            displayName={displayName}
+            firstName={user?.first_name}
+            lastName={user?.last_name}
             email={user?.email}
             avatarUrl={user?.avatar_url}
             sx={{ width: 64, height: 64, fontSize: "1.35rem" }}
           />
           <Box>
-            <Typography variant="h5">{personal.display_name}</Typography>
+            <Typography variant="h5">{displayName}</Typography>
+            {fullName && (
+              <Typography variant="body1" color="text.secondary">
+                {fullName}
+              </Typography>
+            )}
             {user?.email && (
               <Typography variant="body2" color="text.secondary">
                 {user.email}
@@ -164,6 +209,62 @@ export default function ProfilePage() {
           </Box>
         </Box>
         {avatarError && <Alert severity="error" sx={{ mb: 2 }}>{avatarError}</Alert>}
+        {profileError && <Alert severity="error" sx={{ mb: 2 }}>{profileError}</Alert>}
+        {profileSaved && <Alert severity="success" sx={{ mb: 2 }}>{t("profile.profile_saved")}</Alert>}
+
+        <Box
+          component="form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            handleProfileSave();
+          }}
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+            gap: 2,
+            mt: 2,
+          }}
+        >
+          <TextField
+            label={t("profile.first_name")}
+            value={profileForm.first_name}
+            onChange={(event) => setProfileForm((current) => ({ ...current, first_name: event.target.value }))}
+            slotProps={{ htmlInput: { maxLength: 50 } }}
+          />
+          <TextField
+            label={t("profile.last_name")}
+            value={profileForm.last_name}
+            onChange={(event) => setProfileForm((current) => ({ ...current, last_name: event.target.value }))}
+            slotProps={{ htmlInput: { maxLength: 50 } }}
+          />
+          <TextField
+            label={t("profile.email")}
+            type="email"
+            value={profileForm.email}
+            onChange={(event) => setProfileForm((current) => ({ ...current, email: event.target.value }))}
+            required
+          />
+          <TextField
+            label={t("profile.nickname")}
+            value={profileForm.display_name}
+            onChange={(event) => setProfileForm((current) => ({ ...current, display_name: event.target.value }))}
+            slotProps={{ htmlInput: { maxLength: 50 } }}
+            required
+          />
+          <Box sx={{ gridColumn: { xs: "1", sm: "1 / -1" } }}>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={
+                profileSaving ||
+                !profileForm.email.trim() ||
+                !profileForm.display_name.trim()
+              }
+            >
+              {t("profile.save_profile")}
+            </Button>
+          </Box>
+        </Box>
 
         <Divider sx={{ my: 2 }} />
 

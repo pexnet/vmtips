@@ -94,6 +94,8 @@ export default function Navbar() {
             <Button color="inherit" onClick={logout} sx={{ gap: 1 }}>
               <UserAvatar
                 displayName={user?.display_name}
+                firstName={user?.first_name}
+                lastName={user?.last_name}
                 email={user?.email}
                 avatarUrl={user?.avatar_url}
                 sx={{ width: 28, height: 28, fontSize: "0.75rem" }}

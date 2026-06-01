@@ -177,6 +177,8 @@ def get_league(
             {
                 "id": u.id,
                 "display_name": u.display_name,
+                "first_name": u.first_name,
+                "last_name": u.last_name,
                 "avatar_url": u.avatar_url,
             }
             for u in members

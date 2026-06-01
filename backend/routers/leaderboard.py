@@ -427,6 +427,8 @@ def global_leaderboard(
         entries.append({
             "user_id": user.id,
             "display_name": user.display_name or user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
             "avatar_url": user.avatar_url,
             "total_points": score["total_points"],
             "predictions_made": score["predictions_made"],
@@ -495,6 +497,8 @@ def league_leaderboard(
         entries.append({
             "user_id": user.id,
             "display_name": user.display_name or user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
             "avatar_url": user.avatar_url,
             "total_points": score["total_points"],
             "predictions_made": score["predictions_made"],
@@ -531,6 +535,8 @@ def my_scores(
     return {
         "user_id": current_user.id,
         "display_name": current_user.display_name or current_user.email,
+        "first_name": current_user.first_name,
+        "last_name": current_user.last_name,
         "avatar_url": current_user.avatar_url,
         "total_points": score["total_points"],
         "match_points": score["match_points"],

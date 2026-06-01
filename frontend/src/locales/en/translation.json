@@ -176,7 +176,13 @@
     "no_breakdown": "No matches have been scored yet.",
     "tournament_bonus_points": "Bonus Points",
     "upload_avatar": "Upload avatar",
-    "remove_avatar": "Remove avatar"
+    "remove_avatar": "Remove avatar",
+    "first_name": "First name",
+    "last_name": "Last name",
+    "email": "Email address",
+    "nickname": "Nickname",
+    "save_profile": "Save profile",
+    "profile_saved": "Profile saved."
   },
   "admin": {
     "title": "Admin Panel",
