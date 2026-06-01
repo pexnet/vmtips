@@ -9,6 +9,7 @@ interface AuthContextType {
   isLoggedIn: boolean;
   login: (token: string) => void;
   logout: () => void;
+  refreshUser: () => Promise<User | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,6 +24,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     navigate("/login");
   }, [navigate]);
+
+  const refreshUser = useCallback(async () => {
+    const res = await authApi.me();
+    const nextUser = res.data as User;
+    setUser(nextUser);
+    return nextUser;
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -49,15 +57,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = (token: string) => {
     localStorage.setItem("token", token);
-    authApi.me().then((res) => {
-      setUser(res.data as User);
+    refreshUser().then(() => {
       navigate("/leaderboard");
     });
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, isLoggedIn: !!user, login, logout }}
+      value={{ user, isLoading, isLoggedIn: !!user, login, logout, refreshUser }}
     >
       {children}
     </AuthContext.Provider>

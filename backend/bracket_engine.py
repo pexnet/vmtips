@@ -472,15 +472,11 @@ def get_bracket_view(db: Session, user_id: int, league_id: int) -> dict:
         Match.away_goals.isnot(None),
     ).count()
     group_stage_complete = finished_group_matches == 72
-    
-    standings = (
-        compute_actual_group_standings(db, league_id)
-        if group_stage_complete
-        else compute_predicted_group_standings(db, user_id, league_id)
-    )
-    third_places = compute_third_place_rankings(standings)
-    r32_teams = resolve_r32_teams(standings, third_places)
-    result = simulate_full_bracket(db, user_id, league_id, r32_teams)
+
+    predicted_standings = compute_predicted_group_standings(db, user_id, league_id)
+    predicted_third_places = compute_third_place_rankings(predicted_standings)
+    predicted_r32_teams = resolve_r32_teams(predicted_standings, predicted_third_places)
+    predicted_result = simulate_full_bracket(db, user_id, league_id, predicted_r32_teams)
 
     # Get all knockout matches with actual results
     knockout_matches = (
@@ -502,12 +498,12 @@ def get_bracket_view(db: Session, user_id: int, league_id: int) -> dict:
     pred_by_match = {p.match_id: p for p in preds}
     team_ids = {
         tid
-        for payload in result["r32_teams"].values()
+        for payload in predicted_result["r32_teams"].values()
         for tid in (payload.get("home"), payload.get("away"))
         if tid
     } | {
         tid
-        for tid in list(result["match_winners"].values()) + list(result["match_losers"].values())
+        for tid in list(predicted_result["match_winners"].values()) + list(predicted_result["match_losers"].values())
         if tid
     }
     teams = db.query(Team).filter(Team.id.in_(team_ids)).all() if team_ids else []
@@ -519,16 +515,16 @@ def get_bracket_view(db: Session, user_id: int, league_id: int) -> dict:
         rnd = match.round
 
         # Predicted teams for this match
-        if mn in result["r32_teams"]:
-            pred_home_id = result["r32_teams"][mn]["home"]
-            pred_away_id = result["r32_teams"][mn]["away"]
-            pred_home_name = result["r32_teams"][mn]["home_name"]
-            pred_away_name = result["r32_teams"][mn]["away_name"]
+        if mn in predicted_result["r32_teams"]:
+            pred_home_id = predicted_result["r32_teams"][mn]["home"]
+            pred_away_id = predicted_result["r32_teams"][mn]["away"]
+            pred_home_name = predicted_result["r32_teams"][mn]["home_name"]
+            pred_away_name = predicted_result["r32_teams"][mn]["away_name"]
         else:
             home_ph = match.home_team_placeholder
             away_ph = match.away_team_placeholder
-            pred_home_id = _resolve_placeholder(home_ph, result["match_winners"], result["match_losers"])
-            pred_away_id = _resolve_placeholder(away_ph, result["match_winners"], result["match_losers"])
+            pred_home_id = _resolve_placeholder(home_ph, predicted_result["match_winners"], predicted_result["match_losers"])
+            pred_away_id = _resolve_placeholder(away_ph, predicted_result["match_winners"], predicted_result["match_losers"])
             pred_home_name = None
             pred_away_name = None
 
@@ -603,7 +599,7 @@ def get_bracket_view(db: Session, user_id: int, league_id: int) -> dict:
 
     # Group standings view
     group_view = {}
-    for group, teams in standings.items():
+    for group, teams in predicted_standings.items():
         group_view[group] = [
             {
                 "position": i + 1,
@@ -638,7 +634,7 @@ def get_bracket_view(db: Session, user_id: int, league_id: int) -> dict:
                 "gf": t["gf"],
                 "qualified": i < 8,
             }
-            for i, t in enumerate(third_places)
+            for i, t in enumerate(predicted_third_places)
         ],
         "knockout_matches": matches_view,
     }

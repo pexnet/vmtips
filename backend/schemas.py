@@ -44,6 +44,7 @@ class UserOut(BaseModel):
     id: int
     email: str
     display_name: str
+    avatar_url: str | None = None
     is_admin: bool = False
 
     class Config:
@@ -187,6 +188,7 @@ class LeagueJoin(BaseModel):
 class LeagueMemberOut(BaseModel):
     id: int
     display_name: str | None = None
+    avatar_url: str | None = None
 
 class LeagueOut(BaseModel):
     id: int

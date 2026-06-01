@@ -28,6 +28,7 @@ import type { League } from "../types/api";
 import { getErrorDetail } from "../types/api";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import UserAvatar from "../components/UserAvatar";
 
 export default function LeaguesPage() {
   const { t } = useTranslation();
@@ -220,7 +221,14 @@ export default function LeaguesPage() {
           <List>
             {detailLeague?.members?.map((m) => (
               <ListItem key={m.id}>
-                <ListItemText primary={m.display_name} />
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                  <UserAvatar
+                    displayName={m.display_name}
+                    avatarUrl={m.avatar_url}
+                    sx={{ width: 34, height: 34, fontSize: "0.8rem" }}
+                  />
+                  <ListItemText primary={m.display_name} />
+                </Box>
               </ListItem>
             )) || <Typography color="text.secondary">{t("leagues.no_members")}</Typography>}
           </List>

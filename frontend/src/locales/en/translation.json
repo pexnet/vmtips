@@ -51,6 +51,7 @@
     "goal_diff": "GD",
     "standing_points": "Pts",
     "points": "Points",
+    "points_earned": "{{points}}p",
     "played_short": "P",
     "goal_diff_short": "GD",
     "points_short": "Pts",
@@ -106,7 +107,9 @@
     "custom_bonus_2": "Custom Bonus 2",
     "no_predictions": "No predictions saved yet. Go to Matches to start predicting!",
     "no_league_selected": "No league selected.",
-    "tournament_bonus_points": "Bonus Points"
+    "tournament_bonus_points": "Bonus Points",
+    "scoring_help_title": "How scoring works",
+    "scoring_help_text": "Group-stage and knockout match scores can earn up to 7 points per match: 3 pts for the correct outcome, 2 pts for the correct home goals, and 2 pts for the correct away goals. In the knockout stage you also earn team advancement points for teams predicted in the correct round, from 1 pt in the Round of 32 to 20 pts for the world champion. Bonus questions can add up to 100 pts."
   },
   "phase": {
     "group_open": "Group Stage Open",
@@ -171,7 +174,9 @@
     "team_id": "Team",
     "match_breakdown": "Match-by-Match Breakdown",
     "no_breakdown": "No matches have been scored yet.",
-    "tournament_bonus_points": "Bonus Points"
+    "tournament_bonus_points": "Bonus Points",
+    "upload_avatar": "Upload avatar",
+    "remove_avatar": "Remove avatar"
   },
   "admin": {
     "title": "Admin Panel",

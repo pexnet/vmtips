@@ -1,3 +1,4 @@
+import { useState, type ChangeEvent } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Container,
@@ -14,14 +15,15 @@ import {
   CircularProgress,
   Alert,
   Divider,
-  Avatar,
+  Button,
 } from "@mui/material";
-import PersonIcon from "@mui/icons-material/Person";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
+import { authApi } from "../api/client";
 import { useAuth } from "../contexts/AuthContext";
 import { useLeague } from "../contexts/LeagueContext";
 import { useLeagueLeaderboard, usePersonalScore } from "../hooks/useLeaderboard";
-import type { ScoreBreakdown, BracketDetail } from "../types/api";
+import UserAvatar from "../components/UserAvatar";
+import { getErrorDetail, type ScoreBreakdown, type BracketDetail } from "../types/api";
 
 /** Format a bracket round key into a human-readable label. */
 function formatRound(round: string, t: (key: string) => string): string {
@@ -38,8 +40,10 @@ function formatRound(round: string, t: (key: string) => string): string {
 
 export default function ProfilePage() {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { selectedLeagueId } = useLeague();
+  const [avatarError, setAvatarError] = useState("");
+  const [avatarSaving, setAvatarSaving] = useState(false);
 
   const { data: personal, isLoading, error } = usePersonalScore(true, selectedLeagueId);
   const { data: leagueData } = useLeagueLeaderboard(selectedLeagueId);
@@ -78,6 +82,36 @@ export default function ProfilePage() {
       ? ((personal.perfect_predictions / personal.matches_scored) * 100).toFixed(1)
       : "0.0";
 
+  const handleAvatarUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setAvatarError("");
+    setAvatarSaving(true);
+    try {
+      await authApi.uploadAvatar(file);
+      await refreshUser();
+    } catch (err) {
+      setAvatarError(getErrorDetail(err) || t("common.error"));
+    } finally {
+      setAvatarSaving(false);
+    }
+  };
+
+  const handleAvatarRemove = async () => {
+    setAvatarError("");
+    setAvatarSaving(true);
+    try {
+      await authApi.deleteAvatar();
+      await refreshUser();
+    } catch (err) {
+      setAvatarError(getErrorDetail(err) || t("common.error"));
+    } finally {
+      setAvatarSaving(false);
+    }
+  };
+
   return (
     <Container sx={{ mt: 4, mb: 8 }}>
       <Typography variant="h4" gutterBottom>
@@ -86,10 +120,13 @@ export default function ProfilePage() {
 
       {/* ── User info header ────────────────────────────────────── */}
       <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
-          <Avatar sx={{ width: 56, height: 56 }}>
-            <PersonIcon fontSize="large" />
-          </Avatar>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, flexWrap: "wrap" }}>
+          <UserAvatar
+            displayName={personal.display_name}
+            email={user?.email}
+            avatarUrl={user?.avatar_url}
+            sx={{ width: 64, height: 64, fontSize: "1.35rem" }}
+          />
           <Box>
             <Typography variant="h5">{personal.display_name}</Typography>
             {user?.email && (
@@ -97,8 +134,36 @@ export default function ProfilePage() {
                 {user.email}
               </Typography>
             )}
+            <Box sx={{ display: "flex", gap: 1, mt: 1, flexWrap: "wrap" }}>
+              <Button
+                component="label"
+                variant="outlined"
+                size="small"
+                disabled={avatarSaving}
+              >
+                {t("profile.upload_avatar")}
+                <input
+                  hidden
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  onChange={handleAvatarUpload}
+                />
+              </Button>
+              {user?.avatar_url && (
+                <Button
+                  variant="text"
+                  size="small"
+                  color="inherit"
+                  disabled={avatarSaving}
+                  onClick={handleAvatarRemove}
+                >
+                  {t("profile.remove_avatar")}
+                </Button>
+              )}
+            </Box>
           </Box>
         </Box>
+        {avatarError && <Alert severity="error" sx={{ mb: 2 }}>{avatarError}</Alert>}
 
         <Divider sx={{ my: 2 }} />
 

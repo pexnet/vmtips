@@ -49,6 +49,29 @@ interface PredictionWithMatch {
 
 // ── MatchCard ─────────────────────────────────────────────
 
+function calculateMatchPoints(
+  predHome: string,
+  predAway: string,
+  actualHome: number | null,
+  actualAway: number | null,
+) {
+  if (predHome === "" || predAway === "" || actualHome === null || actualAway === null) {
+    return null;
+  }
+
+  const predictedHome = Number(predHome);
+  const predictedAway = Number(predAway);
+  const predictedOutcome = Math.sign(predictedHome - predictedAway);
+  const actualOutcome = Math.sign(actualHome - actualAway);
+
+  let points = 0;
+  if (predictedOutcome === actualOutcome) points += 3;
+  if (predictedHome === actualHome) points += 2;
+  if (predictedAway === actualAway) points += 2;
+
+  return points;
+}
+
 function MatchCard({
   match,
   predictions,
@@ -67,6 +90,9 @@ function MatchCard({
   const isFinished = match.status === "finished";
   const isLocked = new Date(match.match_date) <= new Date();
   const isDisabled = disabled || isFinished || isLocked;
+  const points = isFinished
+    ? calculateMatchPoints(pred.home, pred.away, match.home_goals, match.away_goals)
+    : null;
 
   const kickoff = new Date(match.match_date).toLocaleString(i18n.language, {
     weekday: "short",
@@ -92,9 +118,7 @@ function MatchCard({
           {match.group || match.round.toUpperCase()} · {kickoff}
         </Typography>
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-          {isFinished ? (
-            <Chip size="small" label={t("matches.result")} color="success" />
-          ) : isLocked ? (
+          {isLocked && !isFinished ? (
             <Chip size="small" label={t("matches.locked")} color="error" />
           ) : null}
         </Box>
@@ -183,6 +207,18 @@ function MatchCard({
         </Box>
       )}
 
+      {points !== null && (
+        <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+          <Chip
+            size="small"
+            label={t("matches.points_earned", { points })}
+            color={points > 0 ? "primary" : "default"}
+            variant="outlined"
+            sx={{ minWidth: 48 }}
+          />
+        </Box>
+      )}
+
       {isLocked && (
         <Typography variant="caption" color="text.secondary" align="center">
           {t("matches.no_prediction")}
@@ -225,7 +261,16 @@ function QualificationStandings({
   const { t } = useTranslation();
 
   return (
-    <Paper elevation={1} sx={{ p: 1.5, mb: 1.5 }}>
+    <Paper
+      elevation={0}
+      sx={{
+        p: 1.5,
+        mt: 1.5,
+        bgcolor: "background.default",
+        border: 1,
+        borderColor: "divider",
+      }}
+    >
       <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700, textTransform: "uppercase" }}>
         {group} · {t("matches.predicted_standings")}
       </Typography>
@@ -248,12 +293,24 @@ function QualificationStandings({
               <TableRow
                 key={team.team_id}
                 sx={{
-                  bgcolor: direct || thirdQualified
-                    ? "success.light"
-                    : thirdPending
-                      ? "warning.light"
-                      : "transparent",
-                  "& td": { py: 0.5 },
+                  "& td": {
+                    py: 0.5,
+                    bgcolor: "background.paper",
+                    borderBottomColor: "divider",
+                  },
+                  "& td:first-of-type": {
+                    borderLeft: 3,
+                    borderLeftColor: direct || thirdQualified
+                      ? "primary.main"
+                      : thirdPending
+                        ? "warning.main"
+                        : "transparent",
+                    bgcolor: direct || thirdQualified
+                      ? "rgba(25, 118, 210, 0.08)"
+                      : thirdPending
+                        ? "rgba(237, 108, 2, 0.06)"
+                        : "background.paper",
+                  },
                 }}
               >
                 <TableCell>{index + 1}</TableCell>
@@ -477,6 +534,15 @@ export default function MatchesPage() {
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {saveMsg && <Alert severity="success" sx={{ mb: 2 }}>{saveMsg}</Alert>}
 
+      <Alert severity="info" sx={{ mb: 2 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+          {t("predictions.scoring_help_title")}
+        </Typography>
+        <Typography variant="body2">
+          {t("predictions.scoring_help_text")}
+        </Typography>
+      </Alert>
+
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
         {tabs.map((label, idx) => (
           <Tab key={idx} label={label} />
@@ -490,12 +556,25 @@ export default function MatchesPage() {
           {groups.map((group) => {
             const grpMatches = groupMatches.filter((m) => m.group === group);
             return (
-              <Box key={group} sx={{ mb: 3 }}>
-                <QualificationStandings
-                  group={group}
-                  teams={predictedStandings[group] ?? []}
-                  thirdPlaceQualified={qualifiedThirdTeamIds}
-                />
+              <Paper
+                key={group}
+                elevation={0}
+                sx={{
+                  p: { xs: 1.25, sm: 1.75 },
+                  mb: 3,
+                  border: 1,
+                  borderColor: "divider",
+                  borderLeft: 4,
+                  borderLeftColor: "text.disabled",
+                  bgcolor: "background.paper",
+                }}
+              >
+                <Typography
+                  variant="subtitle1"
+                  sx={{ mb: 1.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.4 }}
+                >
+                  {group}
+                </Typography>
                 <TwoColumnGrid>
                   {grpMatches.map((m) => (
                     <MatchCard
@@ -507,7 +586,12 @@ export default function MatchesPage() {
                     />
                   ))}
                 </TwoColumnGrid>
-              </Box>
+                <QualificationStandings
+                  group={group}
+                  teams={predictedStandings[group] ?? []}
+                  thirdPlaceQualified={qualifiedThirdTeamIds}
+                />
+              </Paper>
             );
           })}
         </Box>
@@ -595,7 +679,7 @@ export default function MatchesPage() {
               }
               handleSave();
             }}
-            disabled={Object.keys(predictions).length === 0}
+            disabled={groupLocked || Object.keys(predictions).length === 0}
           >
             {t("matches.save_predictions")}
           </Button>

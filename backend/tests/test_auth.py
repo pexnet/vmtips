@@ -86,6 +86,56 @@ def test_me_endpoint(client):
     assert me.status_code == 200
     assert me.json()["email"] == "eve@example.com"
     assert me.json()["display_name"] == "Eve"
+    assert me.json()["avatar_url"] is None
+
+
+def test_upload_and_delete_avatar(client):
+    """The current user can upload and remove an optional avatar."""
+    client.post("/auth/register", json={
+        "email": "avatar@example.com",
+        "password": "secret123",
+        "display_name": "Avatar User",
+    })
+    login = client.post("/auth/login", json={
+        "email": "avatar@example.com",
+        "password": "secret123",
+    })
+    token = login.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    upload = client.post(
+        "/auth/me/avatar",
+        headers=headers,
+        files={"file": ("avatar.png", b"\x89PNG\r\n\x1a\n", "image/png")},
+    )
+    assert upload.status_code == 200
+    assert upload.json()["avatar_url"].startswith("data:image/png;base64,")
+
+    delete = client.delete("/auth/me/avatar", headers=headers)
+    assert delete.status_code == 200
+    assert delete.json()["avatar_url"] is None
+
+
+def test_upload_avatar_rejects_non_image(client):
+    """Avatar uploads only allow supported image content types."""
+    client.post("/auth/register", json={
+        "email": "avatar-invalid@example.com",
+        "password": "secret123",
+        "display_name": "Invalid Avatar",
+    })
+    login = client.post("/auth/login", json={
+        "email": "avatar-invalid@example.com",
+        "password": "secret123",
+    })
+    token = login.json()["access_token"]
+
+    upload = client.post(
+        "/auth/me/avatar",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("avatar.txt", b"not an image", "text/plain")},
+    )
+    assert upload.status_code == 400
+    assert upload.json()["detail"] == "avatar_file_type_not_supported"
 
 
 def test_me_no_token(client):

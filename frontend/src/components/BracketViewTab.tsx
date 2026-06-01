@@ -16,8 +16,10 @@ import {
   MenuItem,
   Select,
 } from "@mui/material";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import Grid from "@mui/material/Grid";
 import { useBracketView } from "../hooks/useBracketView";
+import { BRACKET_ROUND_POINTS } from "../hooks/useBracket";
 import { useLeague } from "../contexts/LeagueContext";
 import { predictionsApi } from "../api/client";
 import { usePhase, isKnockoutOpen, isGroupClosed, isTournamentClosed } from "../hooks/usePhase";
@@ -66,6 +68,35 @@ function calcMatchPoints(
   if (homeCorrect) points += 2;
   if (awayCorrect) points += 2;
   return { points, outcome: outcomeCorrect, homeCorrect, awayCorrect, perfect };
+}
+
+function calcBracketCardPoints(
+  round: string,
+  predictedTeamIds: Array<number | null>,
+  actualTeamIds: Array<number | null>,
+): number {
+  const roundPoints = BRACKET_ROUND_POINTS[round as keyof typeof BRACKET_ROUND_POINTS] ?? 0;
+  if (roundPoints === 0) return 0;
+
+  const actualSet = new Set(actualTeamIds.filter((teamId): teamId is number => teamId !== null));
+  return predictedTeamIds.reduce<number>((total, teamId) => {
+    if (teamId === null || !actualSet.has(teamId)) return total;
+    return total + roundPoints;
+  }, 0);
+}
+
+function hasResolvedActualTeams(actualTeamIds: Array<number | null>): boolean {
+  return actualTeamIds.some((teamId) => teamId !== null);
+}
+
+function predictedWinnerSide(prediction: KnockoutMatchPrediction): "home" | "away" | null {
+  if (prediction.home === "" || prediction.away === "") return null;
+
+  const homeGoals = Number(prediction.home);
+  const awayGoals = Number(prediction.away);
+  if (homeGoals > awayGoals) return "home";
+  if (homeGoals < awayGoals) return "away";
+  return prediction.knockout_winner_side ?? null;
 }
 
 /** Check if a specific knockout match is locked based on phase + kickoff + status. */
@@ -205,9 +236,10 @@ export default function BracketViewTab() {
     }))
     .filter((r) => r.matches.length > 0);
 
-  const knockoutOpen = isKnockoutOpen(phaseData);
   const groupClosed = isGroupClosed(phaseData);
   const tournamentClosed = isTournamentClosed(phaseData);
+  const knockoutEditable = groupClosed && !tournamentClosed;
+  const knockoutOpen = isKnockoutOpen(phaseData);
 
   return (
     <Box>
@@ -245,13 +277,26 @@ export default function BracketViewTab() {
                   </Typography>
                   <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
                     {teams.map((tm, idx) => (
-                      <Box key={tm.team_id} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Box
+                        key={tm.team_id}
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                        }}
+                      >
                         <Typography
                           variant="body2"
                           sx={{
                             fontWeight: 700,
                             width: 20,
-                            color: idx < 2 ? "success.main" : idx === 2 ? "warning.main" : "text.secondary",
+                            color: idx < 2
+                              ? "success.main"
+                              : idx === 2
+                                ? third_places.some((tp) => tp.team_id === tm.team_id && tp.qualified)
+                                  ? "warning.main"
+                                  : "text.disabled"
+                                : "text.secondary",
                           }}
                         >
                           {idx + 1}
@@ -312,10 +357,11 @@ export default function BracketViewTab() {
               const matchPred = matchPredictions[m.match_id] || { home: "", away: "" };
               const isDrawPrediction = matchPred.home !== "" && matchPred.home === matchPred.away;
               const drawMetaMissing = isDrawPrediction && (!matchPred.knockout_winner_side || !matchPred.knockout_resolution);
+              const winnerSide = predictedWinnerSide(matchPred);
 
               const isFinished = act.status === "finished";
               const isLocked = isMatchLocked(m.match_date, act.status, phaseData?.phase, m.round);
-              const isDisabled = isLocked || !knockoutOpen;
+              const isDisabled = isLocked || !knockoutEditable;
 
               const kickoff = m.match_date
                 ? new Date(m.match_date).toLocaleString(i18n.language, {
@@ -339,6 +385,13 @@ export default function BracketViewTab() {
                 }
                 return null;
               })();
+              const bracketPoints = calcBracketCardPoints(
+                m.round,
+                [pred.home_team_id, pred.away_team_id],
+                [act.home_team_id, act.away_team_id],
+              );
+              const totalCardPoints = bracketPoints + (pointsData?.points ?? 0);
+              const showPointsPill = pointsData !== null || hasResolvedActualTeams([act.home_team_id, act.away_team_id]);
 
               // Helper to get actual team display
               const actualHomeName = act.home_team_name ?? act.home_team_placeholder ?? t("matches.round");
@@ -347,87 +400,133 @@ export default function BracketViewTab() {
               return (
                 <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={m.match_number}>
                   <Paper
-                    elevation={2}
+                    elevation={1}
                     sx={{
                       p: 1.5,
-                      borderLeft: isFinished ? 4 : 0,
-                      borderColor: isFinished ? "success.main" : "transparent",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 1,
+                      minHeight: 120,
                     }}
                   >
-                    {/* Header */}
-                    <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <Typography variant="caption" color="text.secondary">
                         #{m.match_number}
                         {kickoff ? ` · ${kickoff}` : ""}
                       </Typography>
-                      <Box sx={{ display: "flex", gap: 0.5 }}>
-                        {isFinished && (
-                          <Chip size="small" label={t("matches.result")} color="success" />
-                        )}
-                        {isLocked && !isFinished && (
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                        {isLocked && !isFinished ? (
                           <Chip size="small" label={t("matches.locked")} color="error" />
-                        )}
-                        {predFilled && !isFinished && (
-                          <Chip size="small" label={t("matches.predicted")} color="info" variant="outlined" />
-                        )}
+                        ) : null}
                       </Box>
                     </Box>
 
-                    {/* ── ACTUAL TEAMS (resolved / real teams) ── */}
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
-                      <Typography variant="body2" sx={{ fontSize: "1.1rem", flexShrink: 0 }}>
-                        {act.home_team_flag ?? "🏳️"}
-                      </Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 500, flex: 1 }} noWrap>
-                        {actualHomeName}
-                      </Typography>
-                      <TextField
-                        size="small"
-                        type="text"
-                        placeholder="-"
-                        value={matchPred.home}
-                        error={drawMetaMissing}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val === "" || (/^\d*$/.test(val) && Number(val) <= 15)) {
-                            handleChange(m.match_id, "home", val);
-                          }
-                        }}
-                        disabled={isDisabled}
-                        sx={{
-                          width: 48,
-                          '& input': { textAlign: 'center' },
-                          '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': { WebkitAppearance: 'none' }
-                        }}
-                      />
+                    <Box sx={{ display: "flex", alignItems: "center" }}>
+                      <Box sx={{ flex: 1 }} />
+                      <Box sx={{ display: "grid", gridTemplateColumns: "56px 56px", gap: 1, width: 120, flexShrink: 0 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ textAlign: "center" }}>
+                          {t("matches.predicted")}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ textAlign: "center" }}>
+                          {t("matches.result")}
+                        </Typography>
+                      </Box>
                     </Box>
 
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
-                      <Typography variant="body2" sx={{ fontSize: "1.1rem", flexShrink: 0 }}>
-                        {act.away_team_flag ?? "🏳️"}
-                      </Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 500, flex: 1 }} noWrap>
-                        {actualAwayName}
-                      </Typography>
-                      <TextField
-                        size="small"
-                        type="text"
-                        placeholder="-"
-                        value={matchPred.away}
-                        error={drawMetaMissing}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val === "" || (/^\d*$/.test(val) && Number(val) <= 15)) {
-                            handleChange(m.match_id, "away", val);
-                          }
-                        }}
-                        disabled={isDisabled}
-                        sx={{
-                          width: 48,
-                          '& input': { textAlign: 'center' },
-                          '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': { WebkitAppearance: 'none' }
-                        }}
-                      />
+                    <Box sx={{ display: "flex", alignItems: "center" }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flex: 1, minWidth: 0 }}>
+                        <Typography variant="body2" sx={{ fontSize: "1.1rem", flexShrink: 0 }}>
+                          {act.home_team_flag ?? "🏳️"}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 500, lineHeight: 1.25, whiteSpace: "normal", overflowWrap: "anywhere" }}
+                        >
+                          {actualHomeName}
+                        </Typography>
+                        {winnerSide === "home" && (
+                          <CheckCircleIcon color="success" sx={{ fontSize: 16, flexShrink: 0 }} />
+                        )}
+                      </Box>
+                      <Box sx={{ display: "grid", gridTemplateColumns: "56px 56px", gap: 1, width: 120, flexShrink: 0 }}>
+                        <TextField
+                          size="small"
+                          type="text"
+                          placeholder="-"
+                          value={matchPred.home}
+                          error={drawMetaMissing}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === "" || (/^\d*$/.test(val) && Number(val) <= 15)) {
+                              handleChange(m.match_id, "home", val);
+                            }
+                          }}
+                          disabled={isDisabled}
+                          sx={{
+                            width: 56,
+                            textAlign: "center",
+                            "& input": { textAlign: "center" },
+                            "& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button": { WebkitAppearance: "none" },
+                          }}
+                        />
+                        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
+                          {isFinished && act.home_goals !== null ? (
+                            <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                              {act.home_goals}
+                            </Typography>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">-</Typography>
+                          )}
+                        </Box>
+                      </Box>
+                    </Box>
+
+                    <Box sx={{ display: "flex", alignItems: "center" }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flex: 1, minWidth: 0 }}>
+                        <Typography variant="body2" sx={{ fontSize: "1.1rem", flexShrink: 0 }}>
+                          {act.away_team_flag ?? "🏳️"}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 500, lineHeight: 1.25, whiteSpace: "normal", overflowWrap: "anywhere" }}
+                        >
+                          {actualAwayName}
+                        </Typography>
+                        {winnerSide === "away" && (
+                          <CheckCircleIcon color="success" sx={{ fontSize: 16, flexShrink: 0 }} />
+                        )}
+                      </Box>
+                      <Box sx={{ display: "grid", gridTemplateColumns: "56px 56px", gap: 1, width: 120, flexShrink: 0 }}>
+                        <TextField
+                          size="small"
+                          type="text"
+                          placeholder="-"
+                          value={matchPred.away}
+                          error={drawMetaMissing}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === "" || (/^\d*$/.test(val) && Number(val) <= 15)) {
+                              handleChange(m.match_id, "away", val);
+                            }
+                          }}
+                          disabled={isDisabled}
+                          sx={{
+                            width: 56,
+                            textAlign: "center",
+                            "& input": { textAlign: "center" },
+                            "& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button": { WebkitAppearance: "none" },
+                          }}
+                        />
+                        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
+                          {isFinished && act.away_goals !== null ? (
+                            <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                              {act.away_goals}
+                            </Typography>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">-</Typography>
+                          )}
+                        </Box>
+                      </Box>
                     </Box>
 
                     {isDrawPrediction && (
@@ -457,10 +556,22 @@ export default function BracketViewTab() {
                       </Box>
                     )}
 
+                    {showPointsPill && (
+                      <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                        <Chip
+                          size="small"
+                          label={t("matches.points_earned", { points: totalCardPoints })}
+                          color={totalCardPoints > 0 ? "primary" : "default"}
+                          variant="outlined"
+                          sx={{ minWidth: 48 }}
+                        />
+                      </Box>
+                    )}
+
                     {/* ── PREDICTED TEAMS (bracket_engine) shown as info ── */}
                     {(pred.home_team_id !== null || pred.away_team_id !== null) && (
                       <>
-                        <Divider sx={{ my: 0.75 }}>
+                        <Divider sx={{ my: 0.25 }}>
                           <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.65rem" }}>
                             {t("bracket.predicted")}
                           </Typography>
@@ -469,40 +580,33 @@ export default function BracketViewTab() {
                           <Typography variant="body2" sx={{ fontSize: "1.1rem", flexShrink: 0 }}>
                             {pred.home_team_flag ?? ""}
                           </Typography>
-                          <Typography variant="body2" color="text.secondary" noWrap sx={{ flex: 1 }}>
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{ flex: 1, lineHeight: 1.25, whiteSpace: "normal", overflowWrap: "anywhere" }}
+                          >
                             {pred.home_team_name ?? pred.home_team_placeholder ?? "?"}
                           </Typography>
-                          {pred.home_goals !== null && (
-                            <Typography variant="body2" sx={{ fontWeight: 700, minWidth: 28, textAlign: "right", color: "text.secondary" }}>
-                              {pred.home_goals}
-                            </Typography>
-                          )}
                         </Box>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
                           <Typography variant="body2" sx={{ fontSize: "1.1rem", flexShrink: 0 }}>
                             {pred.away_team_flag ?? ""}
                           </Typography>
-                          <Typography variant="body2" color="text.secondary" noWrap sx={{ flex: 1 }}>
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{ flex: 1, lineHeight: 1.25, whiteSpace: "normal", overflowWrap: "anywhere" }}
+                          >
                             {pred.away_team_name ?? pred.away_team_placeholder ?? "?"}
                           </Typography>
-                          {pred.away_goals !== null && (
-                            <Typography variant="body2" sx={{ fontWeight: 700, minWidth: 28, textAlign: "right", color: "text.secondary" }}>
-                              {pred.away_goals}
-                            </Typography>
-                          )}
                         </Box>
                       </>
                     )}
 
-                    {/* Points display if finished and predicted */}
-                    {pointsData && (
-                      <Box sx={{ mt: 1, pt: 0.5, borderTop: 1, borderColor: "divider" }}>
-                        <Typography variant="caption" sx={{ display: "block", textAlign: "right" }}>
-                          {pointsData.perfect
-                            ? `${t("matches.perfect")} — ${pointsData.points}p`
-                            : `${pointsData.points}p ${pointsData.outcome ? "✓ " + t("matches.outcome") : ""}${pointsData.homeCorrect ? " ✓ " + t("matches.home_goals") : ""}${pointsData.awayCorrect ? " ✓ " + t("matches.away_goals") : ""}`}
-                        </Typography>
-                      </Box>
+                    {isLocked && !isFinished && (
+                      <Typography variant="caption" color="text.secondary" align="center">
+                        {t("matches.no_prediction")}
+                      </Typography>
                     )}
                   </Paper>
                 </Grid>
@@ -518,7 +622,7 @@ export default function BracketViewTab() {
           variant="contained"
           size="large"
           onClick={handleSave}
-          disabled={!knockoutOpen || Object.keys(matchPredictions).length === 0}
+          disabled={!knockoutEditable || Object.keys(matchPredictions).length === 0}
         >
           {t("matches.save_predictions")}
         </Button>

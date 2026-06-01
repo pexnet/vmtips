@@ -23,6 +23,7 @@ import { usePersonalScore, useLeagueLeaderboard } from "../hooks/useLeaderboard"
 import { useLeagues } from "../hooks/useLeagues";
 import { useAuth } from "../contexts/AuthContext";
 import { useLeague } from "../contexts/LeagueContext";
+import UserAvatar from "../components/UserAvatar";
 import type { LeaderboardEntry, ScoreBreakdown, League } from "../types/api";
 
 function LeagueLeaderboardSection() {
@@ -83,7 +84,16 @@ function LeaderTable({ data }: { data: LeaderboardEntry[] }) {
           {data.map((row) => (
             <TableRow key={row.rank}>
               <TableCell><strong>#{row.rank}</strong></TableCell>
-              <TableCell>{row.display_name}</TableCell>
+              <TableCell>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <UserAvatar
+                    displayName={row.display_name}
+                    avatarUrl={row.avatar_url}
+                    sx={{ width: 30, height: 30, fontSize: "0.75rem" }}
+                  />
+                  {row.display_name}
+                </Box>
+              </TableCell>
               <TableCell align="right"><strong>{row.total_points}</strong></TableCell>
               <TableCell align="right">{row.predictions_made}</TableCell>
               <TableCell align="right"><Chip size="small" label={row.perfect_predictions} color="success" /></TableCell>
@@ -132,7 +142,14 @@ export default function LeaderboardPage() {
       {tab === 1 && personal && (
         <Box>
           <Paper elevation={2} sx={{ p: 3, mb: 2 }}>
-            <Typography variant="h6">{personal.display_name}</Typography>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+              <UserAvatar
+                displayName={personal.display_name}
+                avatarUrl={personal.avatar_url}
+                sx={{ width: 42, height: 42 }}
+              />
+              <Typography variant="h6">{personal.display_name}</Typography>
+            </Box>
             <Box sx={{ display: "flex", gap: 2, mt: 1 }}>
               <Chip label={`${t("leaderboard.points")}: ${personal.total_points}`} color="primary" />
               <Chip label={`${t("leaderboard.predictions")}: ${personal.predictions_made}`} />

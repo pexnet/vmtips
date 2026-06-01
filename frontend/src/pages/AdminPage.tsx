@@ -44,9 +44,8 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
 
   // ── Match result state ──
-  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
-  const [homeGoals, setHomeGoals] = useState("");
-  const [awayGoals, setAwayGoals] = useState("");
+  const [resultDrafts, setResultDrafts] = useState<Record<number, { home: string; away: string }>>({});
+  const [savingMatchId, setSavingMatchId] = useState<number | null>(null);
 
   // ── Tournament result state (new fields) ──
   const [tournamentResult, setTournamentResult] = useState({
@@ -77,7 +76,7 @@ export default function AdminPage() {
   // ── Knockout advancement state ──
   const [advancements, setAdvancements] = useState<{ id: number; team_id: number; team_name: string; team_code: string; round: string; match_number: number | null }[]>([]);
   const [advancementLoading, setAdvancementLoading] = useState(false);
-  const [advForm, setAdvForm] = useState({ team_id: null as number | null, round: "round_of_32", match_number: "" });
+  const [advancementDrafts, setAdvancementDrafts] = useState<Record<number, { team_id: number | null; round: string }>>({});
 
   // ── Scoring overview state ──
   const [scoringOverview, setScoringOverview] = useState<ScoringOverviewEntry[]>([]);
@@ -89,7 +88,7 @@ export default function AdminPage() {
       display_name: string;
       match_predictions: { match_id: number; match_number: number; group: string; round: string; home_team: string; home_flag: string; away_team: string; away_flag: string; home_goals: number | null; away_goals: number | null }[];
       bracket_predictions: { team_id: number; team_name: string; team_flag: string; round: string; points: number }[];
-      tournament_bonuses: { winner_team_id: number | null; winner_team_name: string; winner_team_flag: string; top_scorer_name: string; bronze_winner_team_id: number | null; bronze_winner_team_name: string; most_goals_team_id: number | null; most_goals_team_name: string; most_conceded_team_id: number | null; most_conceded_team_name: string; custom_bonus_1: string; custom_bonus_2: string };
+      tournament_bonuses: { winner_team_id: number | null; winner_team_name: string | null; winner_team_flag: string | null; top_scorer_name: string | null; bronze_winner_team_id: number | null; bronze_winner_team_name: string | null; most_goals_team_id: number | null; most_goals_team_name: string | null; most_conceded_team_id: number | null; most_conceded_team_name: string | null; custom_bonus_1: string | null; custom_bonus_2: string | null } | null;
     }[];
   } | null>(null);
   const [allPredictionsLoading, setAllPredictionsLoading] = useState(false);
@@ -131,15 +130,48 @@ export default function AdminPage() {
     setSuccess("");
   }
 
+  useEffect(() => {
+    setResultDrafts((prev) => {
+      const next = { ...prev };
+      matches.forEach((match) => {
+        if (next[match.id]) return;
+        next[match.id] = {
+          home: match.home_goals === null ? "" : String(match.home_goals),
+          away: match.away_goals === null ? "" : String(match.away_goals),
+        };
+      });
+      return next;
+    });
+  }, [matches]);
+
   // ── Match result handlers ──
-  function handleSaveResult() {
-    if (!selectedMatch) return;
+  function handleResultDraftChange(matchId: number, side: "home" | "away", value: string) {
+    if (value !== "" && !/^\d+$/.test(value)) return;
+    setResultDrafts((prev) => ({
+      ...prev,
+      [matchId]: {
+        home: prev[matchId]?.home ?? "",
+        away: prev[matchId]?.away ?? "",
+        [side]: value,
+      },
+    }));
+  }
+
+  function handleSaveResult(match: Match) {
+    const draft = resultDrafts[match.id];
+    if (!draft || draft.home === "" || draft.away === "") return;
     clearMessages();
-    setLoading(true);
-    adminApi.setResult(selectedMatch.id, { home_goals: Number(homeGoals), away_goals: Number(awayGoals) })
-      .then(() => { setSuccess(t("admin.result_updated")); setHomeGoals(""); setAwayGoals(""); queryClient.invalidateQueries({ queryKey: ["matches"] }); })
+    setSavingMatchId(match.id);
+    adminApi.setResult(match.id, { home_goals: Number(draft.home), away_goals: Number(draft.away) })
+      .then(() => {
+        setSuccess(t("admin.result_updated"));
+        queryClient.invalidateQueries({ queryKey: ["matches"] });
+        if (match.round === "group") {
+          return adminApi.computeStandings().then(() => loadStandings());
+        }
+      })
       .catch((err: unknown) => setError(getErrorDetail(err)))
-      .finally(() => setLoading(false));
+      .finally(() => setSavingMatchId(null));
   }
 
   // ── Tournament result handlers ──
@@ -248,14 +280,22 @@ export default function AdminPage() {
       .catch(() => setAdvancements([]));
   }
 
-  function handleSetAdvancement() {
-    if (!advForm.team_id) return;
+  function handleAdvancementDraftChange(matchId: number, teamId: number | null, round: string) {
+    setAdvancementDrafts((prev) => ({
+      ...prev,
+      [matchId]: { team_id: teamId, round },
+    }));
+  }
+
+  function handleSetAdvancement(match: Match) {
+    const draft = advancementDrafts[match.id];
+    if (!draft?.team_id) return;
     clearMessages();
     setAdvancementLoading(true);
     adminApi.setAdvancement({
-      team_id: advForm.team_id,
-      round: advForm.round,
-      match_number: advForm.match_number ? Number(advForm.match_number) : undefined,
+      team_id: draft.team_id,
+      round: draft.round,
+      match_number: match.match_number,
     })
       .then(() => { setSuccess(t("admin.advancement_set")); loadAdvancements(); })
       .catch((err: unknown) => setError(getErrorDetail(err)))
@@ -287,6 +327,7 @@ export default function AdminPage() {
         const payload = res.data as { users?: NonNullable<typeof allPredictions>["users"] };
         if (payload.users) {
           setAllPredictions({ users: payload.users });
+          setSelectedPredUserId((current) => current ?? payload.users?.[0]?.user_id ?? null);
         } else {
           setAllPredictions(null);
         }
@@ -354,9 +395,21 @@ export default function AdminPage() {
   const selectedBronzeWinner = teams.find((tm: Team) => tm.id === tournamentResult.bronze_winner_team_id) || null;
   const selectedMostGoals = teams.find((tm: Team) => tm.id === tournamentResult.most_goals_team_id) || null;
   const selectedMostConceded = teams.find((tm: Team) => tm.id === tournamentResult.most_conceded_team_id) || null;
-  const selectedAdvTeam = teams.find((tm: Team) => tm.id === advForm.team_id) || null;
-
+  const orderedMatches = [...matches].sort((a, b) => a.match_number - b.match_number);
+  const knockoutMatches = orderedMatches.filter((m) => m.round !== "group");
   const groupLetters = [...new Set(standings.map((s) => s.group))].sort();
+
+  function nextAdvancementRound(round: string) {
+    const map: Record<string, string> = {
+      round_of_32: "round_of_16",
+      round_of_16: "quarter_final",
+      quarter_final: "semi_final",
+      semi_final: "final",
+      final: "world_champion",
+      match_for_third_place: "match_for_third_place",
+    };
+    return map[round] ?? round;
+  }
 
   if (matchesLoading) {
     return <Container sx={{ mt: 8, textAlign: "center" }}><CircularProgress /></Container>;
@@ -371,9 +424,9 @@ export default function AdminPage() {
 
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }} variant="scrollable" scrollButtons="auto">
         <Tab label={t("admin.enter_result")} />
+        <Tab label={t("admin.group_standings")} />
         <Tab label={t("admin.tournament_result")} />
         <Tab label={t("admin.phase_management")} />
-        <Tab label={t("admin.group_standings")} />
         <Tab label={t("admin.knockout_advancements")} />
         <Tab label={t("admin.scoring_overview")} />
         <Tab label={t("admin.score_management")} />
@@ -385,32 +438,170 @@ export default function AdminPage() {
       {tab === 0 && (
         <Paper elevation={2} sx={{ p: 3 }}>
           <Typography variant="h6" gutterBottom>{t("admin.enter_result")}</Typography>
-          <Autocomplete
-            options={matches}
-            getOptionLabel={(m) => `#${m.match_number} ${m.home_team?.name ?? m.home_team_placeholder ?? "?"} vs ${m.away_team?.name ?? m.away_team_placeholder ?? "?"}`}
-            value={selectedMatch}
-            onChange={(_, v) => setSelectedMatch(v)}
-            renderInput={(params) => <TextField {...params} label={t("admin.select_match")} />}
-          />
-          {selectedMatch && (
-            <Box sx={{ display: "flex", gap: 2, mt: 2, alignItems: "center" }}>
-              <TextField label={selectedMatch.home_team?.name ?? "Home"} type="text" value={homeGoals}
-                onChange={(e) => { const v = e.target.value; if (v === "" || /^\d+$/.test(v)) setHomeGoals(v); }}
-                sx={{ width: 120 }} />
-              <Typography>—</Typography>
-              <TextField label={selectedMatch.away_team?.name ?? "Away"} type="text" value={awayGoals}
-                onChange={(e) => { const v = e.target.value; if (v === "" || /^\d+$/.test(v)) setAwayGoals(v); }}
-                sx={{ width: 120 }} />
-            </Box>
-          )}
-          <Button variant="contained" sx={{ mt: 2 }} onClick={handleSaveResult} disabled={!selectedMatch || loading}>
-            {loading ? <CircularProgress size={20} /> : t("admin.save_result")}
-          </Button>
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>#</TableCell>
+                  <TableCell>{t("matches.round")}</TableCell>
+                  <TableCell>{t("matches.home")}</TableCell>
+                  <TableCell align="center">{t("admin.enter_result")}</TableCell>
+                  <TableCell>{t("matches.away")}</TableCell>
+                  <TableCell align="center">Status</TableCell>
+                  <TableCell align="right">{t("common.actions")}</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {orderedMatches.map((match) => {
+                  const draft = resultDrafts[match.id] ?? { home: "", away: "" };
+                  const homeName = match.home_team?.name ?? match.home_team_placeholder ?? "?";
+                  const awayName = match.away_team?.name ?? match.away_team_placeholder ?? "?";
+                  const canSave = draft.home !== "" && draft.away !== "";
+
+                  return (
+                    <TableRow key={match.id} hover>
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>{match.match_number}</TableCell>
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>
+                        {match.round === "group" ? `${t("matches.group")} ${match.group ?? ""}` : t(`matches.${match.round}`)}
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                          <Typography component="span">{match.home_team?.flag_emoji ?? ""}</Typography>
+                          <Typography variant="body2">{homeName}</Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1 }}>
+                          <TextField
+                            size="small"
+                            value={draft.home}
+                            onChange={(e) => handleResultDraftChange(match.id, "home", e.target.value)}
+                            sx={{ width: 58, "& input": { textAlign: "center" } }}
+                            slotProps={{ input: { inputMode: "numeric" } }}
+                          />
+                          <Typography color="text.secondary">-</Typography>
+                          <TextField
+                            size="small"
+                            value={draft.away}
+                            onChange={(e) => handleResultDraftChange(match.id, "away", e.target.value)}
+                            sx={{ width: 58, "& input": { textAlign: "center" } }}
+                            slotProps={{ input: { inputMode: "numeric" } }}
+                          />
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                          <Typography component="span">{match.away_team?.flag_emoji ?? ""}</Typography>
+                          <Typography variant="body2">{awayName}</Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell align="center">{match.status}</TableCell>
+                      <TableCell align="right">
+                        <Button
+                          size="small"
+                          variant="contained"
+                          onClick={() => handleSaveResult(match)}
+                          disabled={!canSave || savingMatchId === match.id}
+                        >
+                          {savingMatchId === match.id ? <CircularProgress size={18} /> : t("admin.save_result")}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
         </Paper>
       )}
 
-      {/* ═══ TAB 1: TOURNAMENT RESULT ═══ */}
+      {/* ═══ TAB 1: GROUP STANDINGS ═══ */}
       {tab === 1 && (
+        <Paper elevation={2} sx={{ p: 3 }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+            <Typography variant="h6">{t("admin.group_standings")}</Typography>
+            <Button variant="outlined" onClick={handleComputeStandings} disabled={standingsLoading}>
+              {standingsLoading ? <CircularProgress size={20} /> : t("admin.compute_standings")}
+            </Button>
+          </Box>
+          {groupLetters.length === 0 ? (
+            <Alert severity="info">No standings computed yet. Click &quot;{t("admin.compute_standings")}&quot; to generate.</Alert>
+          ) : (
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 2 }}>
+              {groupLetters.map((group) => (
+                <Paper
+                  key={group}
+                  elevation={0}
+                  sx={{
+                    p: 1.5,
+                    border: 1,
+                    borderColor: "divider",
+                    bgcolor: "background.default",
+                  }}
+                >
+                  <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1 }}>
+                    Group {group}
+                  </Typography>
+                  <TableContainer>
+                    <Table size="small" sx={{ tableLayout: "fixed" }}>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ width: 40 }}>#</TableCell>
+                          <TableCell>Team</TableCell>
+                          <TableCell align="right" sx={{ width: 38 }}>P</TableCell>
+                          <TableCell align="right" sx={{ width: 44 }}>GD</TableCell>
+                          <TableCell align="right" sx={{ width: 44 }}>Pts</TableCell>
+                          <TableCell align="right" sx={{ width: 72 }}>W-D-L</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {standings.filter((s) => s.group === group).sort((a, b) => (a.position ?? 99) - (b.position ?? 99)).map((s, idx) => (
+                          <TableRow
+                            key={s.team_id}
+                            sx={{
+                              "& td": {
+                                py: 0.75,
+                                borderBottomColor: "divider",
+                              },
+                              "& td:first-of-type": {
+                                borderLeft: 3,
+                                borderLeftColor: idx < 2
+                                  ? "success.main"
+                                  : idx === 2
+                                    ? "warning.main"
+                                    : "transparent",
+                              },
+                            }}
+                          >
+                            <TableCell sx={{ fontWeight: 700 }}>{s.position ?? "-"}</TableCell>
+                            <TableCell sx={{ minWidth: 0 }}>
+                              <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
+                                {s.team_code} {s.team_name}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                GF {s.goals_for} · GA {s.goals_against}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="right">{s.played}</TableCell>
+                            <TableCell align="right">{s.goal_difference}</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 800 }}>{s.points}</TableCell>
+                            <TableCell align="right" sx={{ color: "text.secondary" }}>
+                              {s.won}-{s.drawn}-{s.lost}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Paper>
+              ))}
+            </Box>
+          )}
+        </Paper>
+      )}
+
+      {/* ═══ TAB 2: TOURNAMENT RESULT ═══ */}
+      {tab === 2 && (
         <Paper elevation={2} sx={{ p: 3 }}>
           <Typography variant="h6" gutterBottom>{t("admin.tournament_result")}</Typography>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
@@ -439,8 +630,8 @@ export default function AdminPage() {
         </Paper>
       )}
 
-      {/* ═══ TAB 2: PHASE MANAGEMENT ═══ */}
-      {tab === 2 && (
+      {/* ═══ TAB 3: PHASE MANAGEMENT ═══ */}
+      {tab === 3 && (
         <Paper elevation={2} sx={{ p: 3 }}>
           <Typography variant="h6" gutterBottom>{t("admin.phase_management")}</Typography>
           {phase && (
@@ -472,113 +663,118 @@ export default function AdminPage() {
         </Paper>
       )}
 
-      {/* ═══ TAB 3: GROUP STANDINGS ═══ */}
-      {tab === 3 && (
-        <Paper elevation={2} sx={{ p: 3 }}>
-          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-            <Typography variant="h6">{t("admin.group_standings")}</Typography>
-            <Button variant="outlined" onClick={handleComputeStandings} disabled={standingsLoading}>
-              {standingsLoading ? <CircularProgress size={20} /> : t("admin.compute_standings")}
-            </Button>
-          </Box>
-          {groupLetters.length === 0 ? (
-            <Alert severity="info">No standings computed yet. Click &quot;{t("admin.compute_standings")}&quot; to generate.</Alert>
-          ) : (
-            groupLetters.map((group) => (
-              <Box key={group} sx={{ mb: 3 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>Group {group}</Typography>
-                <TableContainer>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>#</TableCell>
-                        <TableCell>Team</TableCell>
-                        <TableCell align="center">P</TableCell>
-                        <TableCell align="center">W</TableCell>
-                        <TableCell align="center">D</TableCell>
-                        <TableCell align="center">L</TableCell>
-                        <TableCell align="center">GF</TableCell>
-                        <TableCell align="center">GA</TableCell>
-                        <TableCell align="center">GD</TableCell>
-                        <TableCell align="center">Pts</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {standings.filter((s) => s.group === group).sort((a, b) => (a.position ?? 99) - (b.position ?? 99)).map((s) => (
-                        <TableRow key={s.team_id}>
-                          <TableCell>{s.position ?? "-"}</TableCell>
-                          <TableCell>{s.team_code} {s.team_name}</TableCell>
-                          <TableCell align="center">{s.played}</TableCell>
-                          <TableCell align="center">{s.won}</TableCell>
-                          <TableCell align="center">{s.drawn}</TableCell>
-                          <TableCell align="center">{s.lost}</TableCell>
-                          <TableCell align="center">{s.goals_for}</TableCell>
-                          <TableCell align="center">{s.goals_against}</TableCell>
-                          <TableCell align="center">{s.goal_difference}</TableCell>
-                          <TableCell align="center" sx={{ fontWeight: 700 }}>{s.points}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Box>
-            ))
-          )}
-        </Paper>
-      )}
-
       {/* ═══ TAB 4: KNOCKOUT ADVANCEMENTS ═══ */}
       {tab === 4 && (
         <Paper elevation={2} sx={{ p: 3 }}>
-          <Typography variant="h6" gutterBottom>{t("admin.knockout_advancements")}</Typography>
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 3, mb: 3 }}>
-            <Autocomplete options={teams} getOptionLabel={(o) => `${o.flag_emoji ?? ""} ${o.name}`}
-              value={selectedAdvTeam} onChange={(_, v) => setAdvForm((f) => ({ ...f, team_id: v?.id || null }))}
-              renderInput={(params) => <TextField {...params} label="Team" />} />
-            <FormControl fullWidth>
-              <InputLabel>Round</InputLabel>
-              <Select value={advForm.round} label="Round" onChange={(e) => setAdvForm((f) => ({ ...f, round: e.target.value }))}>
-                <MenuItem value="round_of_32">Round of 32</MenuItem>
-                <MenuItem value="round_of_16">Round of 16</MenuItem>
-                <MenuItem value="quarter_final">Quarter-final</MenuItem>
-                <MenuItem value="semi_final">Semi-final</MenuItem>
-                <MenuItem value="final">Final</MenuItem>
-                <MenuItem value="match_for_third_place">3rd Place</MenuItem>
-                <MenuItem value="world_champion">World Champion</MenuItem>
-              </Select>
-            </FormControl>
-            <TextField label="Match number (optional)" type="text" value={advForm.match_number}
-              onChange={(e) => setAdvForm((f) => ({ ...f, match_number: e.target.value }))} />
-            <Box sx={{ display: "flex", gap: 2 }}>
-              <Button variant="contained" onClick={handleSetAdvancement} disabled={!advForm.team_id || advancementLoading}>
-                {advancementLoading ? <CircularProgress size={20} /> : t("admin.set_advancement")}
-              </Button>
-              <Button variant="outlined" onClick={handleResolveKnockout} disabled={loading}>
-                {loading ? <CircularProgress size={20} /> : t("admin.resolve_knockout")}
-              </Button>
-            </Box>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, mb: 2 }}>
+            <Typography variant="h6">{t("admin.knockout_advancements")}</Typography>
+            <Button variant="outlined" onClick={handleResolveKnockout} disabled={loading}>
+              {loading ? <CircularProgress size={20} /> : t("admin.resolve_knockout")}
+            </Button>
           </Box>
-          {advancements.length > 0 && (
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Team</TableCell>
-                    <TableCell>Round</TableCell>
-                    <TableCell>Match #</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {advancements.map((a) => (
-                    <TableRow key={a.id}>
-                      <TableCell>{a.team_code} {a.team_name}</TableCell>
-                      <TableCell>{a.round}</TableCell>
-                      <TableCell>{a.match_number ?? "-"}</TableCell>
+          <TableContainer sx={{ mb: 3 }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>#</TableCell>
+                  <TableCell>{t("matches.round")}</TableCell>
+                  <TableCell>{t("matches.home")}</TableCell>
+                  <TableCell>{t("matches.away")}</TableCell>
+                  <TableCell sx={{ minWidth: 220 }}>Advanced team</TableCell>
+                  <TableCell sx={{ minWidth: 180 }}>Advances to</TableCell>
+                  <TableCell align="right">{t("common.actions")}</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {knockoutMatches.map((match) => {
+                  const homeName = match.home_team?.name ?? match.home_team_placeholder ?? "?";
+                  const awayName = match.away_team?.name ?? match.away_team_placeholder ?? "?";
+                  const teamOptions = [match.home_team, match.away_team].filter((team): team is Team => Boolean(team));
+                  const defaultRound = nextAdvancementRound(match.round);
+                  const draft = advancementDrafts[match.id] ?? { team_id: null, round: defaultRound };
+                  const selectedTeam = teamOptions.find((team) => team.id === draft.team_id) ?? null;
+
+                  return (
+                    <TableRow key={match.id} hover>
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>{match.match_number}</TableCell>
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>{t(`matches.${match.round}`)}</TableCell>
+                      <TableCell>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                          <Typography component="span">{match.home_team?.flag_emoji ?? ""}</Typography>
+                          <Typography variant="body2">{homeName}</Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                          <Typography component="span">{match.away_team?.flag_emoji ?? ""}</Typography>
+                          <Typography variant="body2">{awayName}</Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Autocomplete
+                          size="small"
+                          options={teamOptions}
+                          getOptionLabel={(o) => `${o.flag_emoji ?? ""} ${o.name}`}
+                          value={selectedTeam}
+                          onChange={(_, value) => handleAdvancementDraftChange(match.id, value?.id ?? null, draft.round)}
+                          renderInput={(params) => <TextField {...params} placeholder="Select team" />}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <FormControl size="small" fullWidth>
+                          <Select
+                            value={draft.round}
+                            onChange={(e) => handleAdvancementDraftChange(match.id, draft.team_id, e.target.value)}
+                          >
+                            <MenuItem value="round_of_16">Round of 16</MenuItem>
+                            <MenuItem value="quarter_final">Quarter-final</MenuItem>
+                            <MenuItem value="semi_final">Semi-final</MenuItem>
+                            <MenuItem value="final">Final</MenuItem>
+                            <MenuItem value="match_for_third_place">3rd Place</MenuItem>
+                            <MenuItem value="world_champion">World Champion</MenuItem>
+                          </Select>
+                        </FormControl>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Button
+                          size="small"
+                          variant="contained"
+                          onClick={() => handleSetAdvancement(match)}
+                          disabled={!draft.team_id || advancementLoading}
+                        >
+                          {advancementLoading ? <CircularProgress size={18} /> : t("admin.set_advancement")}
+                        </Button>
+                      </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          {advancements.length > 0 && (
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>Saved advancements</Typography>
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Team</TableCell>
+                      <TableCell>Round</TableCell>
+                      <TableCell>Match #</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {advancements.map((a) => (
+                      <TableRow key={a.id}>
+                        <TableCell>{a.team_code} {a.team_name}</TableCell>
+                        <TableCell>{a.round}</TableCell>
+                        <TableCell>{a.match_number ?? "-"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
           )}
         </Paper>
       )}
@@ -676,6 +872,7 @@ export default function AdminPage() {
                 if (!user) return null;
                 const groupMatches = user.match_predictions.filter((m) => m.round === "group");
                 const knockoutMatches = user.match_predictions.filter((m) => m.round !== "group");
+                const bonuses = user.tournament_bonuses;
                 return (
                   <Box>
                     {/* ── Group predictions ── */}
@@ -770,13 +967,13 @@ export default function AdminPage() {
                     {/* ── Tournament bonuses ── */}
                     <Typography variant="subtitle1" sx={{ fontWeight: 700, mt: 3, mb: 1 }}>{t("admin.tournament_bonuses")}</Typography>
                     <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1 }}>
-                      <Typography variant="body2"><strong>{t("admin.winner")}:</strong> {user.tournament_bonuses.winner_team_flag ?? ""} {user.tournament_bonuses.winner_team_name || t("admin.none")}</Typography>
-                      <Typography variant="body2"><strong>{t("admin.top_scorer")}:</strong> {user.tournament_bonuses.top_scorer_name || t("admin.none")}</Typography>
-                      <Typography variant="body2"><strong>{t("admin.bronze_winner")}:</strong> {user.tournament_bonuses.bronze_winner_team_id ? user.tournament_bonuses.bronze_winner_team_name : t("admin.none")}</Typography>
-                      <Typography variant="body2"><strong>{t("admin.most_goals_team")}:</strong> {user.tournament_bonuses.most_goals_team_id ? user.tournament_bonuses.most_goals_team_name : t("admin.none")}</Typography>
-                      <Typography variant="body2"><strong>{t("admin.most_conceded_team")}:</strong> {user.tournament_bonuses.most_conceded_team_id ? user.tournament_bonuses.most_conceded_team_name : t("admin.none")}</Typography>
-                      {user.tournament_bonuses.custom_bonus_1 && <Typography variant="body2"><strong>{t("admin.custom_bonus_1")}:</strong> {user.tournament_bonuses.custom_bonus_1}</Typography>}
-                      {user.tournament_bonuses.custom_bonus_2 && <Typography variant="body2"><strong>{t("admin.custom_bonus_2")}:</strong> {user.tournament_bonuses.custom_bonus_2}</Typography>}
+                      <Typography variant="body2"><strong>{t("admin.winner")}:</strong> {bonuses?.winner_team_flag ?? ""} {bonuses?.winner_team_name || t("admin.none")}</Typography>
+                      <Typography variant="body2"><strong>{t("admin.top_scorer")}:</strong> {bonuses?.top_scorer_name || t("admin.none")}</Typography>
+                      <Typography variant="body2"><strong>{t("admin.bronze_winner")}:</strong> {bonuses?.bronze_winner_team_id ? bonuses.bronze_winner_team_name : t("admin.none")}</Typography>
+                      <Typography variant="body2"><strong>{t("admin.most_goals_team")}:</strong> {bonuses?.most_goals_team_id ? bonuses.most_goals_team_name : t("admin.none")}</Typography>
+                      <Typography variant="body2"><strong>{t("admin.most_conceded_team")}:</strong> {bonuses?.most_conceded_team_id ? bonuses.most_conceded_team_name : t("admin.none")}</Typography>
+                      {bonuses?.custom_bonus_1 && <Typography variant="body2"><strong>{t("admin.custom_bonus_1")}:</strong> {bonuses.custom_bonus_1}</Typography>}
+                      {bonuses?.custom_bonus_2 && <Typography variant="body2"><strong>{t("admin.custom_bonus_2")}:</strong> {bonuses.custom_bonus_2}</Typography>}
                     </Box>
                   </Box>
                 );

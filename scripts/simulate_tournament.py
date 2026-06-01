@@ -217,6 +217,56 @@ def score_for_prediction(match_number: int, salt: int = 0) -> tuple[int, int]:
     return home, away
 
 
+def _outcome(home: int, away: int) -> int:
+    return (home > away) - (home < away)
+
+
+def _match_points(pred_home: int, pred_away: int, actual_home: int, actual_away: int) -> int:
+    points = 0
+    if _outcome(pred_home, pred_away) == _outcome(actual_home, actual_away):
+        points += 3
+    if pred_home == actual_home:
+        points += 2
+    if pred_away == actual_away:
+        points += 2
+    return points
+
+
+def _find_prediction_with_points(
+    actual_home: int,
+    actual_away: int,
+    target_points: int,
+    *,
+    change_both_scores: bool = False,
+) -> tuple[int, int]:
+    for home in range(0, 8):
+        for away in range(0, 8):
+            if change_both_scores and (home == actual_home or away == actual_away):
+                continue
+            if _match_points(home, away, actual_home, actual_away) == target_points:
+                return home, away
+    raise RuntimeError("Could not generate requested prediction score")
+
+
+def group_prediction_for_match(match_number: int) -> tuple[int, int]:
+    """Create predictable test coverage for all match scoring variants."""
+    actual_home, actual_away = score_for_prediction(match_number, salt=3)
+
+    variant = match_number % 5
+    if variant == 0:
+        # Perfect: outcome + both team scores = 7p.
+        return actual_home, actual_away
+    if variant == 1:
+        # Correct outcome only = 3p.
+        return _find_prediction_with_points(actual_home, actual_away, 3, change_both_scores=True)
+    if variant in {2, 3}:
+        # One team score correct only = 2p.
+        return _find_prediction_with_points(actual_home, actual_away, 2)
+
+    # No scoring component correct = 0p.
+    return _find_prediction_with_points(actual_home, actual_away, 0)
+
+
 def knockout_score(match_number: int, salt: int = 0) -> tuple[int, int]:
     """Deterministic non-draw knockout scores."""
     if (match_number + salt) % 2 == 0:
@@ -258,7 +308,7 @@ def tip_matches(db, user, league, round_name: str) -> None:
     )
     for match in matches:
         if round_name == "group":
-            home, away = score_for_prediction(match.match_number, salt=0)
+            home, away = group_prediction_for_match(match.match_number)
         else:
             home, away = knockout_score(match.match_number, salt=2)
         upsert_prediction(db, user.id, league.id, match, home, away)

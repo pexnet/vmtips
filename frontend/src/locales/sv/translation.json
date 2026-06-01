@@ -51,6 +51,7 @@
     "goal_diff": "Målskillnad",
     "standing_points": "P",
     "points": "Poäng",
+    "points_earned": "{{points}}p",
     "played_short": "S",
     "goal_diff_short": "MS",
     "points_short": "P",
@@ -106,7 +107,9 @@
     "custom_bonus_2": "Egen bonusfråga 2",
     "no_predictions": "Inga tips sparade ännu. Gå till Matcher för att tippa!",
     "no_league_selected": "Ingen liga vald.",
-    "tournament_bonus_points": "Bonuspoäng"
+    "tournament_bonus_points": "Bonuspoäng",
+    "scoring_help_title": "Så räknas poängen",
+    "scoring_help_text": "Gruppspel och slutspelsmatcher ger upp till 7 poäng per match: 3p för rätt utfall, 2p för rätt hemmamål och 2p för rätt bortamål. I slutspelet får du dessutom poäng för lag som du tippat till rätt omgång, från 1p i sextondelsfinal till 20p för världsmästaren. Bonusfrågorna kan ge upp till 100p."
   },
   "phase": {
     "group_open": "Gruppspel öppet",
@@ -171,7 +174,9 @@
     "team_id": "Lag",
     "match_breakdown": "Matchför-match-genomgång",
     "no_breakdown": "Inga matcher har poängsatts ännu.",
-    "tournament_bonus_points": "Bonuspoäng"
+    "tournament_bonus_points": "Bonuspoäng",
+    "upload_avatar": "Ladda upp avatar",
+    "remove_avatar": "Ta bort avatar"
   },
   "admin": {
     "title": "Adminpanel",

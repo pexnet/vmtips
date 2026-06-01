@@ -8,6 +8,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useAppTheme } from "../contexts/ThemeContext";
 import { useLeague } from "../contexts/LeagueContext";
 import { useLeagues } from "../hooks/useLeagues";
+import UserAvatar from "./UserAvatar";
 
 export default function Navbar() {
   const { t, i18n } = useTranslation();
@@ -90,8 +91,14 @@ export default function Navbar() {
           </IconButton>
 
           {isLoggedIn ? (
-            <Button color="inherit" onClick={logout}>
-              {t("nav.logout")} ({user?.display_name || user?.email})
+            <Button color="inherit" onClick={logout} sx={{ gap: 1 }}>
+              <UserAvatar
+                displayName={user?.display_name}
+                email={user?.email}
+                avatarUrl={user?.avatar_url}
+                sx={{ width: 28, height: 28, fontSize: "0.75rem" }}
+              />
+              {t("nav.logout")}
             </Button>
           ) : (
             <Button color="inherit" onClick={() => navigate("/login")}>

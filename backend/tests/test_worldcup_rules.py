@@ -116,6 +116,32 @@ def test_bracket_view_uses_predictions_until_all_group_matches_finished(seeded_d
     assert group_a[0]["team_id"] == match.away_team_id
 
 
+def test_bracket_view_keeps_predicted_group_standings_after_group_stage_complete(seeded_db):
+    user = seeded_db.query(User).filter(User.email == "admin@vmtips.se").one()
+    league = seeded_db.query(League).filter(League.name == "VM2026").one()
+    target_match = seeded_db.query(Match).filter(Match.match_number == 1).one()
+
+    group_matches = seeded_db.query(Match).filter(Match.round == "group").all()
+    for match in group_matches:
+        match.home_goals = 1
+        match.away_goals = 0
+        match.status = "finished"
+
+    seeded_db.add(Prediction(
+        user_id=user.id,
+        league_id=league.id,
+        match_id=target_match.id,
+        home_goals=0,
+        away_goals=1,
+    ))
+    seeded_db.commit()
+
+    view = get_bracket_view(seeded_db, user.id, league.id)
+    group_a = view["group_standings"]["A"]
+
+    assert group_a[0]["team_id"] == target_match.away_team_id
+
+
 def test_knockout_draw_predictions_require_winner_marker(client, set_phase):
     set_phase("knockout_open")
     client.post("/auth/register", json={

@@ -7,6 +7,7 @@ from sqlalchemy import (
     Column,
     Integer,
     String,
+    Text,
     Boolean,
     DateTime,
     ForeignKey,
@@ -31,6 +32,7 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     display_name = Column(String, nullable=False)
+    avatar_url = Column(Text, nullable=True)
     is_admin = Column(Boolean, default=False)
     created_at = Column(DateTime, default=_utcnow)
 

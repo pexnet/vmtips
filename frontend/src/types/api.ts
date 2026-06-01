@@ -8,6 +8,7 @@ export interface User {
   id: number;
   email: string;
   display_name: string | null;
+  avatar_url: string | null;
   is_admin?: boolean;
 }
 
@@ -71,6 +72,7 @@ export interface TournamentBonus {
 export interface LeagueMember {
   id: number;
   display_name: string | null;
+  avatar_url: string | null;
 }
 
 export interface League {
@@ -93,6 +95,7 @@ export interface LeagueDetail extends League {
 export interface LeaderboardEntry {
   user_id: number;
   display_name: string;
+  avatar_url: string | null;
   total_points: number;
   predictions_made: number;
   perfect_predictions: number;
@@ -120,6 +123,7 @@ export interface BracketDetail {
 export interface PersonalScore {
   user_id: number;
   display_name: string;
+  avatar_url: string | null;
   total_points: number;
   match_points: number;
   bracket_points: number;

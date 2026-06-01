@@ -1,13 +1,15 @@
 """
 Authentication router: register, login, and current-user endpoints.
 """
-from fastapi import APIRouter, Depends, Request, status
+import base64
+
+from fastapi import APIRouter, Depends, File, Request, UploadFile, status
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from database import get_db
-from errors import ConflictError, UnauthorizedError
+from errors import ConflictError, UnauthorizedError, ValidationError
 from models import User
 from schemas import UserCreate, UserLogin, Token, UserOut
 from security import get_password_hash, verify_password, create_access_token, fetch_current_user
@@ -17,6 +19,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 # Pre-computed bcrypt hash of "dummy" for constant-time login failure
 _DUMMY_HASH = "$2b$12$EIx9hO4im1St7uFtCC0zYe4M05Ao6CRKu0VJgPnlLz9xqf4N0AG2S"
+_ALLOWED_AVATAR_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+_MAX_AVATAR_BYTES = 1_000_000
 
 def _fetch_current_user(
     user: User = Depends(fetch_current_user),
@@ -91,4 +95,37 @@ def login(request: Request, payload: UserLogin, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserOut)
 def me(current_user: User = Depends(_fetch_current_user)):
     """Return the currently authenticated user."""
+    return current_user
+
+
+@router.post("/me/avatar", response_model=UserOut)
+async def upload_avatar(
+    file: UploadFile = File(...),
+    current_user: User = Depends(_fetch_current_user),
+    db: Session = Depends(get_db),
+):
+    """Store a small user-uploaded avatar as a data URL."""
+    if file.content_type not in _ALLOWED_AVATAR_TYPES:
+        raise ValidationError(detail="avatar_file_type_not_supported", error_code="avatar_file_type_not_supported")
+
+    content = await file.read(_MAX_AVATAR_BYTES + 1)
+    if len(content) > _MAX_AVATAR_BYTES:
+        raise ValidationError(detail="avatar_file_too_large", error_code="avatar_file_too_large")
+
+    encoded = base64.b64encode(content).decode("ascii")
+    current_user.avatar_url = f"data:{file.content_type};base64,{encoded}"
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@router.delete("/me/avatar", response_model=UserOut)
+def delete_avatar(
+    current_user: User = Depends(_fetch_current_user),
+    db: Session = Depends(get_db),
+):
+    """Remove the current user's uploaded avatar."""
+    current_user.avatar_url = None
+    db.commit()
+    db.refresh(current_user)
     return current_user
