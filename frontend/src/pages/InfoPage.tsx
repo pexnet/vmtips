@@ -45,7 +45,7 @@ export default function InfoPage() {
   };
   const totalBracketPts = Object.entries(bracketSlots)
     .reduce((sum, [key, slots]) => sum + slots * BRACKET_ROUND_POINTS[key as keyof typeof BRACKET_ROUND_POINTS], 0);
-  const totalBonusPts = 20 + 20 + 20 + 10 + 10 + 10 + 10; // = 100
+  const totalBonusPts = bonusRows.reduce((sum, row) => sum + row.points, 0);
   const totalMatchPts = 104 * 7; // 72 group + 32 knockout
   const grandTotal = totalMatchPts + totalBracketPts + totalBonusPts;
 

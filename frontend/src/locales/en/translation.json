@@ -15,7 +15,7 @@
   "auth": {
     "email": "Email",
     "identifier": "Username or email",
-    "identifier_placeholder": "e.g. janne",
+    "identifier_placeholder": "e.g. nickname",
     "password": "Password",
     "display_name": "Display Name",
     "login": "Login",
@@ -119,7 +119,7 @@
     "no_league_selected": "No league selected.",
     "tournament_bonus_points": "Bonus Points",
     "scoring_help_title": "How scoring works",
-    "scoring_help_text": "Group-stage and knockout match scores can earn up to 7 points per match: 3 pts for the correct outcome, 2 pts for the correct home goals, and 2 pts for the correct away goals. In the knockout stage you also earn team advancement points for teams predicted in the correct round: 1 pt for the Round of 32, then +2 pts per additional step, up to 11 pts for the world champion. Bonus questions can add up to 100 pts."
+    "scoring_help_text": "Group-stage and knockout match scores can earn up to 7 points per match: 3 pts for the correct outcome, 2 pts for the correct home goals, and 2 pts for the correct away goals. In the knockout stage you also earn team advancement points for teams predicted in the correct round: 1 pt for the Round of 32, then +2 pts per additional step, up to 11 pts for the world champion. Bonus questions can add up to 80 pts."
   },
   "phase": {
     "group_open": "Group Stage Open",

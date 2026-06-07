@@ -15,7 +15,7 @@
   "auth": {
     "email": "E-post",
     "identifier": "Användarnamn eller e-post",
-    "identifier_placeholder": "t.ex. janne",
+    "identifier_placeholder": "t.ex. nickname",
     "password": "Lösenord",
     "display_name": "Visningsnamn",
     "login": "Logga in",
@@ -50,7 +50,7 @@
     "outcome": "Utfall",
     "home_goals": "Hemmamål",
     "away_goals": "Bortamål",
-    "predicted_standings": "Tipsad ställning",
+    "predicted_standings": "Tippad ställning",
     "actual_standings": "Aktuell ställning",
     "team": "Lag",
     "played": "Spelade",
@@ -119,7 +119,7 @@
     "no_league_selected": "Ingen liga vald.",
     "tournament_bonus_points": "Bonuspoäng",
     "scoring_help_title": "Så räknas poängen",
-    "scoring_help_text": "Gruppspel och slutspelsmatcher ger upp till 7 poäng per match: 3p för rätt utfall, 2p för rätt hemmamål och 2p för rätt bortamål. I slutspelet får du dessutom poäng för lag som du tippat till rätt omgång: 1p för sextondelsfinal och därefter +2p per ytterligare steg, upp till 11p för världsmästaren. Bonusfrågorna kan ge upp till 100p."
+    "scoring_help_text": "Gruppspel och slutspelsmatcher ger upp till 7 poäng per match: 3p för rätt utfall, 2p för rätt hemmamål och 2p för rätt bortamål. I slutspelet får du dessutom poäng för lag som du tippat till rätt omgång: 1p för sextondelsfinal och därefter +2p per ytterligare steg, upp till 11p för världsmästaren. Bonusfrågorna kan ge upp till 80p."
   },
   "phase": {
     "group_open": "Gruppspel öppet",
