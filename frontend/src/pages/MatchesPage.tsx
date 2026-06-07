@@ -27,7 +27,7 @@ import { usePhase, isGroupOpen } from "../hooks/usePhase";
 import { useLeague } from "../contexts/LeagueContext";
 import BracketViewTab from "../components/BracketViewTab";
 import PredictionStatusBanner from "../components/PredictionStatusBanner";
-import { computePredictedStandings, computeThirdPlaceRanking } from "../utils/standings";
+import { computePredictedStandings } from "../utils/standings";
 
 import type { Match, Team } from "../types/api";
 import type { StandingTeam } from "../utils/standings";
@@ -259,11 +259,9 @@ function TwoColumnGrid({ children }: { children: React.ReactNode }) {
 function QualificationStandings({
   group,
   teams,
-  thirdPlaceQualified,
 }: {
   group: string;
   teams: StandingTeam[];
-  thirdPlaceQualified: Set<number>;
 }) {
   const { t } = useTranslation();
 
@@ -294,8 +292,6 @@ function QualificationStandings({
         <TableBody>
           {teams.map((team, index) => {
             const direct = index < 2;
-            const thirdQualified = index === 2 && thirdPlaceQualified.has(team.team_id);
-            const thirdPending = index === 2 && !thirdQualified;
             return (
               <TableRow
                 key={team.team_id}
@@ -307,16 +303,12 @@ function QualificationStandings({
                   },
                   "& td:first-of-type": {
                     borderLeft: 3,
-                    borderLeftColor: direct || thirdQualified
+                    borderLeftColor: direct
                       ? "primary.main"
-                      : thirdPending
-                        ? "warning.main"
-                        : "transparent",
-                    bgcolor: direct || thirdQualified
+                      : "transparent",
+                    bgcolor: direct
                       ? "rgba(25, 118, 210, 0.08)"
-                      : thirdPending
-                        ? "rgba(237, 108, 2, 0.06)"
-                        : "background.paper",
+                      : "background.paper",
                   },
                 }}
               >
@@ -335,27 +327,6 @@ function QualificationStandings({
           })}
         </TableBody>
       </Table>
-    </Paper>
-  );
-}
-
-function BestThirdPlaceStrip({ teams }: { teams: StandingTeam[] }) {
-  return (
-    <Paper elevation={1} sx={{ p: 1.5, mb: 2 }}>
-      <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
-        Best third-place teams
-      </Typography>
-      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
-        {teams.map((team, index) => (
-          <Chip
-            key={`${team.group}-${team.team_id}`}
-            size="small"
-            color={index < 8 ? "success" : "default"}
-            variant={index < 8 ? "filled" : "outlined"}
-            label={`${index + 1}. ${team.flag_emoji ?? ""} ${team.code || team.name} (${team.points}p, ${team.gd})`}
-          />
-        ))}
-      </Box>
     </Paper>
   );
 }
@@ -513,14 +484,6 @@ export default function MatchesPage() {
     () => computePredictedStandings(matches, predictions),
     [matches, predictions],
   );
-  const thirdPlaceRanking = useMemo(
-    () => computeThirdPlaceRanking(predictedStandings),
-    [predictedStandings],
-  );
-  const qualifiedThirdTeamIds = useMemo(
-    () => new Set(thirdPlaceRanking.slice(0, 8).map((team) => team.team_id)),
-    [thirdPlaceRanking],
-  );
 
   const isLoading = matchesLoading || predictionsLoading;
 
@@ -575,7 +538,6 @@ export default function MatchesPage() {
       {/* GROUP STAGE TAB */}
       {tab === 0 && (
         <Box>
-          <BestThirdPlaceStrip teams={thirdPlaceRanking} />
           {groups.map((group) => {
             const grpMatches = groupMatches.filter((m) => m.group === group);
             return (
@@ -612,7 +574,6 @@ export default function MatchesPage() {
                 <QualificationStandings
                   group={group}
                   teams={predictedStandings[group] ?? []}
-                  thirdPlaceQualified={qualifiedThirdTeamIds}
                 />
               </Paper>
             );
