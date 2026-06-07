@@ -357,11 +357,13 @@ def seed_default_league(db, default_user_emails: list[str] | None = None):
         default_league = League(
             name="VM2026",
             invite_code="VM2026",
-            is_public=False,
+            is_public=True,
             admin_user_id=admin.id,
         )
         db.add(default_league)
         db.flush()
+    elif not default_league.is_public:
+        default_league.is_public = True
 
     db.query(LeagueMember).filter(
         LeagueMember.league_id == default_league.id,

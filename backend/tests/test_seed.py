@@ -80,6 +80,7 @@ def test_seed_creates_release_users_league_and_lock(seeded_db):
     assert len(users) == 7
     assert len(set(configured_passwords)) == len(configured_passwords)
     assert all(not user.is_admin and user.is_active for user in users)
+    assert league.is_public is True
     assert {user.id for user in users} == member_ids
     assert admin.id not in member_ids
     assert phase.extra_questions_lock_at == first_match_at

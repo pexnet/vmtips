@@ -16,9 +16,19 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
 
   const { data: leagues = [] } = useLeagues();
 
-  // Auto-select first league if none selected and leagues loaded
+  // Auto-select the first available league when none is selected, and clear
+  // stale selections left in localStorage when switching between accounts.
   useEffect(() => {
-    if (!selectedLeagueId && leagues.length > 0) {
+    if (leagues.length === 0) {
+      if (selectedLeagueId) {
+        setSelectedLeagueId(null);
+        localStorage.removeItem("selected_league_id");
+      }
+      return;
+    }
+
+    const selectedIsAvailable = leagues.some((league) => league.id === selectedLeagueId);
+    if (!selectedLeagueId || !selectedIsAvailable) {
       const first = leagues[0].id;
       setSelectedLeagueId(first);
       localStorage.setItem("selected_league_id", String(first));
