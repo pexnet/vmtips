@@ -3,7 +3,7 @@ services:
     image: ghcr.io/pexnet/vmtips:latest
     container_name: vmtips
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     # The non-root appuser (uid 1000) inside the container needs to own
     # the host bind-mount directory, otherwise SQLite cannot open the file.
     # Run `mkdir -p ./data` on the host before `docker compose up -d`

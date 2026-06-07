@@ -87,6 +87,47 @@ def upgrade() -> None:
             "VALUES ('worldcupjson', 0, 5)"
         )
 
+    if 'bracket_predictions' not in existing:
+        op.create_table(
+            'bracket_predictions',
+            sa.Column('id', sa.Integer(), nullable=False),
+            sa.Column('user_id', sa.Integer(), nullable=False),
+            sa.Column('team_id', sa.Integer(), nullable=False),
+            sa.Column('round', sa.String(), nullable=False),
+            sa.Column('source', sa.String(), nullable=True),
+            sa.Column('created_at', sa.DateTime(), nullable=True),
+            sa.Column('updated_at', sa.DateTime(), nullable=True),
+            sa.ForeignKeyConstraint(['team_id'], ['teams.id']),
+            sa.ForeignKeyConstraint(['user_id'], ['users.id']),
+            sa.PrimaryKeyConstraint('id'),
+            sa.UniqueConstraint('user_id', 'team_id', 'round', name='uq_user_team_round'),
+        )
+        with op.batch_alter_table('bracket_predictions', schema=None) as batch_op:
+            batch_op.create_index(batch_op.f('ix_bracket_predictions_id'), ['id'], unique=False)
+        existing.add('bracket_predictions')
+
+    if 'tournament_results' not in existing:
+        op.create_table(
+            'tournament_results',
+            sa.Column('id', sa.Integer(), nullable=False),
+            sa.Column('winner_team_id', sa.Integer(), nullable=True),
+            sa.Column('top_scorer_name', sa.String(), nullable=True),
+            sa.Column('bronze_winner_team_id', sa.Integer(), nullable=True),
+            sa.Column('most_goals_team_id', sa.Integer(), nullable=True),
+            sa.Column('most_conceded_team_id', sa.Integer(), nullable=True),
+            sa.Column('custom_bonus_1_answer', sa.String(), nullable=True),
+            sa.Column('custom_bonus_2_answer', sa.String(), nullable=True),
+            sa.Column('updated_at', sa.DateTime(), nullable=True),
+            sa.ForeignKeyConstraint(['bronze_winner_team_id'], ['teams.id']),
+            sa.ForeignKeyConstraint(['most_conceded_team_id'], ['teams.id']),
+            sa.ForeignKeyConstraint(['most_goals_team_id'], ['teams.id']),
+            sa.ForeignKeyConstraint(['winner_team_id'], ['teams.id']),
+            sa.PrimaryKeyConstraint('id'),
+        )
+        with op.batch_alter_table('tournament_results', schema=None) as batch_op:
+            batch_op.create_index(batch_op.f('ix_tournament_results_id'), ['id'], unique=False)
+        existing.add('tournament_results')
+
     # ── Alter existing tables ───────────────────────────────────────
     # bracket_predictions: add source column
     bp_cols = {row[1] for row in conn.execute(sa.text(
