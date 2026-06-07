@@ -260,7 +260,14 @@ def sync_match_results(db, source: str | None = None) -> dict:
     """
     from models import Match, Team
 
-    raw_matches = _fetch_matches(source, db=db)
+    # B-16: resolve the source we are about to use so both the fetch
+    # and the log line below agree on it. Previously the log printed
+    # `settings.sync_source` (the raw config value, which may be None
+    # or empty), and a per-call `source` override was silently
+    # invisible in the logs.
+    resolved_source = source or settings.sync_source or "worldcupjson"
+
+    raw_matches = _fetch_matches(resolved_source, db=db)
 
     local_matches = {m.match_number: m for m in db.query(Match).all()}
     team_by_code = {t.code: t for t in db.query(Team).all()}
@@ -319,15 +326,15 @@ def sync_match_results(db, source: str | None = None) -> dict:
 
     logger.info(
         "Sync complete (%s): %d matches updated, %d finished from API",
-        settings.sync_source,
+        resolved_source,
         updated,
         total_finished,
     )
 
     return {
         "synced": True,
+        "source": resolved_source,
         "updated": updated,
         "total_finished": total_finished,
         "errors": errors,
-        "source": settings.sync_source,
     }

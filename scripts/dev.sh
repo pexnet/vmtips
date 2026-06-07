@@ -11,6 +11,10 @@ COMPOSE_FILE="$PROJECT_ROOT/docker-compose.yml"
 
 cd "$PROJECT_ROOT"
 
+# Pre-create the host bind-mount directory so the non-root appuser inside
+# the container can write to it. mkdir -p is a no-op if it already exists.
+mkdir -p "$PROJECT_ROOT/data"
+
 case "${1:-up}" in
   up)
     echo "🚀 Starting VMTips..."

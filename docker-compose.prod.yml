@@ -4,6 +4,10 @@ services:
     container_name: vmtips
     ports:
       - "8000:8000"
+    # The non-root appuser (uid 1000) inside the container needs to own
+    # the host bind-mount directory, otherwise SQLite cannot open the file.
+    # Run `mkdir -p ./data` on the host before `docker compose up -d`
+    # the first time, or use scripts/dev.sh up which does it for you.
     volumes:
       - ./data:/data
     environment:

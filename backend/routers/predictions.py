@@ -4,8 +4,8 @@ Phase-gated: group stage predictions locked after group deadline, knockout predi
 only allowed during knockout phase.
 All predictions are scoped per league (league_id required on save, optional on list).
 """
-import math
 import logging
+import math
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -16,7 +16,7 @@ from database import get_db
 from errors import ForbiddenError, ValidationError
 from models import Prediction, Match, Team, TournamentBonus, BracketPrediction, TournamentPhase, LeagueMember
 from schemas import PredictionBatchCreate, TournamentBonusCreate, BracketPredictionBatch
-from routers.auth import fetch_current_user
+from security import fetch_current_user
 from bracket_engine import save_generated_bracket
 
 router = APIRouter(prefix="/predictions", tags=["predictions"])

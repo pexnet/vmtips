@@ -30,8 +30,9 @@ from scoring import (
     BRACKET_ROUND_POINTS, BONUS_POINTS,
 )
 from fifa_standings import sort_group_teams as _sort_group_teams
-from bracket_engine import compute_third_place_rankings
+from bracket_engine import compute_third_place_rankings, build_actual_advancements, save_generated_bracket
 from third_place_table import get_annex_c_match_mapping
+from sync_service import sync_match_results, SyncError
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -46,7 +47,12 @@ def _get_sync_config_row(db: Session) -> SyncConfig:
         auto_sync_interval_minutes=settings.auto_sync_interval_minutes,
     )
     db.add(row)
-    db.flush()
+    # B-6: commit the bootstrap row. Without this the first request that
+    # touches the sync config left a pending INSERT in the session and a
+    # subsequent rollback (e.g. on a downstream error) would have left the
+    # DB in an inconsistent state. Committing here makes the row durable
+    # and idempotent (the next call returns it from the SELECT).
+    db.commit()
     return row
 
 
@@ -155,7 +161,6 @@ def sync_results(
     db: Session = Depends(get_db),
 ):
     """Trigger a sync of match results from external API."""
-    from sync_service import sync_match_results, SyncError
 
     try:
         result = sync_match_results(db)
@@ -242,8 +247,6 @@ def recalculate_scores(
 
     Then sets total_points = match_points + bracket_points + tournament_bonus_points + league_bonus_points
     """
-    from scoring import calculate_tournament_bonus_points
-
     # ── 1. Match-result points ──────────────────────────────────────
     finished_matches = db.query(Match).filter(Match.status == "finished").all()
 
@@ -263,7 +266,9 @@ def recalculate_scores(
             user_match_points[key] = user_match_points.get(key, 0) + pts
 
     # ── 2. Bracket points ───────────────────────────────────────────
-    actual_advancements = _build_actual_advancements(db)
+    actual_advancements = set(
+        (a["team_id"], a["round"]) for a in build_actual_advancements(db)
+    )
 
     bracket_preds = db.query(BracketPrediction).all()
     user_bracket_points = {}
@@ -383,39 +388,7 @@ def recalculate_scores(
     }
 
 
-def _build_actual_advancements(db) -> set[tuple[int, str]]:
-    """
-    Determine which teams actually advanced to each knockout round.
-
-    Uses KnockoutAdvancement table if populated, otherwise falls back
-    to inspecting finished knockout matches.
-    """
-    # Prefer explicit advancements from admin
-    advancements = db.query(KnockoutAdvancement).all()
-    if advancements:
-        return {(a.team_id, a.round) for a in advancements}
-
-    # Fallback: derive from finished knockout matches
-    finished_knockout = (
-        db.query(Match)
-        .filter(
-            Match.status == "finished",
-            Match.round != "group",
-        )
-        .all()
-    )
-
-    result = set()
-    for match in finished_knockout:
-        if match.home_team_id is not None:
-            result.add((match.home_team_id, match.round))
-        if match.away_team_id is not None:
-            result.add((match.away_team_id, match.round))
-
-    return result
-
-
-# ═══════════════════════════════════════════════════════════════
+# Group standings computation
 # Group standings computation
 # ═══════════════════════════════════════════════════════════════
 
@@ -687,6 +660,55 @@ def resolve_knockout_teams(
         )
     third_match_mapping = get_annex_c_match_mapping(list(third_by_group.keys()))
 
+    # B-8: the R32 has exactly 8 placeholders of the "3X" form (one per
+    # qualifying third-place team). If any of them collide — either a
+    # group letter appears twice in the placeholders, or a group letter
+    # expected by Annex C is missing — bail out before we silently
+    # produce a wrong bracket. (We previously relied on Annex C's
+    # mapping being a dict and just looked up matches by letter, which
+    # meant a duplicate placeholder would skip the second occurrence
+    # without complaint.)
+    r32_placeholders = []
+    for m in db.query(Match).filter(Match.round == "round_of_32").all():
+        for ph in (m.home_team_placeholder, m.away_team_placeholder):
+            if ph and ph.startswith("3"):
+                r32_placeholders.append(ph)
+    seen_groups: set[str] = set()
+    for ph in r32_placeholders:
+        # third-place placeholders are comma-separated group letters
+        # ("3A/B/C/D/F"), but for safety accept a single letter too.
+        letters = ph[1:].split("/") if "/" in ph else [ph[1:]]
+        for letter in letters:
+            if not letter:
+                continue
+            if letter in seen_groups:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Duplicate third-place placeholder for group '{letter}' "
+                        f"in Round of 32 matches. Each advancing third-place "
+                        f"team must appear in exactly one R32 match."
+                    ),
+                )
+            seen_groups.add(letter)
+    expected_groups = set(third_by_group.keys())
+    if seen_groups != expected_groups:
+        missing = expected_groups - seen_groups
+        extra = seen_groups - expected_groups
+        problems: list[str] = []
+        if missing:
+            problems.append(f"missing {sorted(missing)}")
+        if extra:
+            problems.append(f"unexpected {sorted(extra)}")
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Third-place placeholder coverage mismatch: "
+                f"{', '.join(problems)}. Annex C expects exactly one R32 "
+                f"match per advancing third-place team."
+            ),
+        )
+
     # Get Round of 32 matches that have placeholders
     r32_matches = db.query(Match).filter(
         Match.round == "round_of_32",
@@ -773,12 +795,34 @@ def update_phase(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    """Update the current tournament phase. Admin only."""
+    """Update the current tournament phase. Admin only.
+
+    When the phase transitions into ``knockout_open``, every (user, league)
+    pair that has at least one group-stage prediction gets their bracket
+    auto-generated from those predictions, mirroring what the per-user
+    ``POST /bracket/generate`` endpoint does. A single bad row will not
+    abort the phase transition; per-user errors are logged and counted in
+    the response.
+    """
+    # B-9: reject no-op payloads so a UI double-click cannot silently
+    # "succeed" without changing anything (and we cannot tell whether
+    # bracket auto-gen should fire).
+    no_op = (
+        payload.phase is None
+        and payload.group_deadline is None
+        and payload.knockout_opens_at is None
+        and payload.knockout_deadline is None
+    )
+    if no_op:
+        raise HTTPException(422, "at least one of phase, group_deadline, knockout_opens_at, knockout_deadline must be provided")
+
     phase_row = db.query(TournamentPhase).first()
     if not phase_row:
         phase_row = TournamentPhase(phase="group_open")
         db.add(phase_row)
         db.flush()
+
+    previous_phase = phase_row.phase
 
     if payload.phase is not None:
         valid_phases = ("group_open", "group_closed", "knockout_open", "knockout_closed")
@@ -795,11 +839,41 @@ def update_phase(
 
     db.commit()
 
+    # B-5: when entering knockout_open, auto-generate brackets for every
+    # (user, league) that has group predictions. We only fire on a real
+    # transition (previous_phase != knockout_open) to avoid clobbering
+    # user-edited brackets on no-op re-saves of the same phase.
+    auto_generated_brackets = 0
+    auto_generate_errors: list[dict] = []
+    if phase_row.phase == "knockout_open" and previous_phase != "knockout_open":
+        pairs = (
+            db.query(Prediction.user_id, Prediction.league_id)
+            .join(Match, Match.id == Prediction.match_id)
+            .filter(Match.round == "group")
+            .filter(Prediction.league_id.isnot(None))
+            .distinct()
+            .all()
+        )
+        for user_id, league_id in pairs:
+            try:
+                # save_generated_bracket commits internally, so each
+                # user is a self-contained unit.
+                save_generated_bracket(db, int(user_id), int(league_id))
+                auto_generated_brackets += 1
+            except Exception as exc:
+                auto_generate_errors.append({
+                    "user_id": int(user_id),
+                    "league_id": int(league_id),
+                    "error": str(exc),
+                })
+
     return {
         "phase": phase_row.phase,
         "group_deadline": phase_row.group_deadline.isoformat() if phase_row.group_deadline else None,
         "knockout_opens_at": phase_row.knockout_opens_at.isoformat() if phase_row.knockout_opens_at else None,
         "knockout_deadline": phase_row.knockout_deadline.isoformat() if phase_row.knockout_deadline else None,
+        "auto_generated_brackets": auto_generated_brackets,
+        "auto_generate_errors": auto_generate_errors,
     }
 
 

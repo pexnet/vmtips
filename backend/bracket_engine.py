@@ -11,7 +11,7 @@ kickoff times are seeded from worldcup2026_fixtures.json.
 from collections import defaultdict
 from typing import Optional
 from sqlalchemy.orm import Session, joinedload
-from models import Prediction, Match, Team, BracketPrediction
+from models import Prediction, Match, Team, BracketPrediction, KnockoutAdvancement
 from fifa_standings import sort_group_teams as _sort_group_teams
 from match_table import (
     get_group_slot_mapping as _get_group_slot_mapping,
@@ -28,6 +28,44 @@ def _lazy_load_slot_data():
 
 
 _lazy_load_slot_data()  # warm up on import
+
+
+def build_actual_advancements(db: Session) -> list[dict]:
+    """Return the set of teams that actually advanced to each knockout round.
+
+    Prefers explicit `KnockoutAdvancement` rows (set by the admin or by
+    `resolve_knockout_teams`). Falls back to deriving from finished
+    knockout matches if no explicit rows exist. Duplicates are
+    deduplicated by `(team_id, round)` pair.
+
+    Returns a list of `{"team_id": int, "round": str}` dicts. Callers
+    that need O(1) lookup can convert to a set:
+        set((a["team_id"], a["round"]) for a in build_actual_advancements(db))
+    """
+    advancements = db.query(KnockoutAdvancement).all()
+    if advancements:
+        return [{"team_id": a.team_id, "round": a.round} for a in advancements]
+
+    finished_knockout = (
+        db.query(Match)
+        .filter(
+            Match.status == "finished",
+            Match.round != "group",
+        )
+        .all()
+    )
+
+    result: list = []
+    seen: set = set()
+    for match in finished_knockout:
+        if match.home_team_id is not None and (match.home_team_id, match.round) not in seen:
+            result.append({"team_id": match.home_team_id, "round": match.round})
+            seen.add((match.home_team_id, match.round))
+        if match.away_team_id is not None and (match.away_team_id, match.round) not in seen:
+            result.append({"team_id": match.away_team_id, "round": match.round})
+            seen.add((match.away_team_id, match.round))
+    return result
+
 
 def _determine_outcome(home_goals: int, away_goals: int) -> str:
     if home_goals > away_goals:

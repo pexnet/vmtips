@@ -49,6 +49,12 @@ interface PredictionWithMatch {
 
 // ── MatchCard ─────────────────────────────────────────────
 
+// IMPORTANT: This function MUST stay in sync with
+// backend/scoring.py:calculate_match_points. The backend is the source
+// of truth and is exercised by tests/test_scoring.py; this copy exists
+// so the UI can show predicted/earned points instantly without a
+// roundtrip. If the rules change (e.g. +1 for correct goal difference),
+// update both files in the same commit.
 function calculateMatchPoints(
   predHome: string,
   predAway: string,

@@ -14,10 +14,11 @@ from errors import NotFoundError, ForbiddenError
 from models import (
     User, Prediction, Match, League, LeagueMember, Score,
     BracketPrediction, TournamentResult, TournamentBonus,
-    KnockoutAdvancement, LeagueBonusAnswer, LeagueBonusQuestion, TournamentPhase,
+    LeagueBonusAnswer, LeagueBonusQuestion, TournamentPhase,
 )
 from security import fetch_current_user
 from scoring import calculate_match_points, calculate_bracket_points, calculate_tournament_bonus_points, BRACKET_ROUND_POINTS
+from bracket_engine import build_actual_advancements
 
 router = APIRouter(prefix="/leaderboard", tags=["leaderboard"])
 
@@ -119,7 +120,7 @@ def _batch_calculate_scores(
         scores[row.user_id]["predictions_made"] = int(row.predictions_made or 0)
         scores[row.user_id]["perfect_predictions"] = int(row.perfect_predictions or 0)
 
-    actual_advancements = _build_actual_advancements(db)
+    actual_advancements = build_actual_advancements(db)
     if actual_advancements:
         bracket_filters = [
             BracketPrediction.user_id.in_(user_ids),
@@ -269,7 +270,7 @@ def _calculate_user_score(user_id: int, db: Session, league_id: int | None = Non
         })
 
     # ── Bracket points ──
-    actual_advancements = _build_actual_advancements(db)
+    actual_advancements = build_actual_advancements(db)
     bracket_query = db.query(BracketPrediction).filter(
         BracketPrediction.user_id == user_id,
         BracketPrediction.league_id == league_id,
@@ -366,41 +367,6 @@ def _calculate_user_score(user_id: int, db: Session, league_id: int | None = Non
         "bracket_details": bracket_result["details"],
         "breakdown": match_points,
     }
-
-
-def _build_actual_advancements(db) -> list[dict]:
-    """
-    Build a list of actual team advancements from the database.
-
-    Prefers explicit KnockoutAdvancement entries, falls back to
-    deriving from finished knockout matches.
-    """
-    # Check explicit advancements first
-    advancements_db = db.query(KnockoutAdvancement).all()
-    if advancements_db:
-        return [{"team_id": a.team_id, "round": a.round} for a in advancements_db]
-
-    # Fallback: derive from finished knockout matches
-    finished_knockout = (
-        db.query(Match)
-        .filter(
-            Match.status == "finished",
-            Match.round != "group",
-        )
-        .all()
-    )
-
-    advancements = []
-    seen = set()
-    for match in finished_knockout:
-        if match.home_team_id is not None and (match.home_team_id, match.round) not in seen:
-            advancements.append({"team_id": match.home_team_id, "round": match.round})
-            seen.add((match.home_team_id, match.round))
-        if match.away_team_id is not None and (match.away_team_id, match.round) not in seen:
-            advancements.append({"team_id": match.away_team_id, "round": match.round})
-            seen.add((match.away_team_id, match.round))
-
-    return advancements
 
 
 @router.get("/global")

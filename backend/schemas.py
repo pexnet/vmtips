@@ -1,29 +1,10 @@
 """
 Pydantic schemas for request/response validation.
 """
-import math
 from datetime import datetime
-from typing import Generic, Literal, TypeVar
+from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field
-
-T = TypeVar("T")
-
-# ── Pagination ─────────────────────────────────────────────
-
-class PaginationParams(BaseModel):
-    """Query parameters for paginated list endpoints."""
-    page: int = Field(default=1, ge=1, description="Page number (1-indexed)")
-    per_page: int = Field(default=50, ge=1, le=200, description="Items per page")
-
-class PaginatedResponse(BaseModel, Generic[T]):
-    """Wrapper for paginated list responses."""
-    items: list[T]
-    total: int
-    page: int
-    per_page: int
-    total_pages: int
-
 
 # ── Auth ────────────────────────────────────────────────────
 

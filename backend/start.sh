@@ -1,8 +1,36 @@
 #!/bin/bash
 set -e
 
-# Create data directory if missing
-mkdir -p /app/data
+# ── Ensure the SQLite data directory exists with the right ownership ──
+# The DATABASE_URL is normally sqlite:///app/data/vmtips.db (Docker) or
+# sqlite:///./vmtips.db (local dev). We parse the URL to discover the
+# actual directory and mkdir -p it. This works for absolute paths,
+# relative paths, and the /data bind-mount used by docker-compose.prod.yml.
+#
+# Fix: start.sh used to hardcode `/app/data` which is wrong for the
+# production compose file (it uses `/data`). Derive the dir from the URL
+# so any of the three layouts "just work".
+ensure_data_dir() {
+  local db_url="${DATABASE_URL:-sqlite:///./vmtips.db}"
+  # Strip the sqlite:/// or sqlite:// prefix
+  local db_path="${db_url#sqlite:///}"
+  db_path="${db_path#sqlite://}"
+  # Drop any ?drivername query string
+  db_path="${db_path%%\?*}"
+  # Take the dirname
+  local db_dir
+  db_dir="$(dirname "$db_path")"
+  # In the container, sqlite:///app/data/vmtips.db has no leading slash
+  # (sqlite:// is scheme+//; path is /app/data/...).  dirname on "/app/data/vmtips.db" → "/app/data".
+  # For relative paths like "./vmtips.db" dirname is "." which mkdir handles fine.
+  if [ -z "$db_dir" ] || [ "$db_dir" = "/" ]; then
+    return 0
+  fi
+  mkdir -p "$db_dir"
+  echo "[startup] Ensured data directory: $db_dir"
+}
+
+ensure_data_dir
 
 if [ "${ENVIRONMENT:-${APP_ENV:-development}}" = "production" ]; then
   if [ -z "${ADMIN_EMAIL:-}" ] || [ -z "${ADMIN_PASSWORD:-}" ]; then

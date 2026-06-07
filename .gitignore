@@ -227,3 +227,5 @@ __marimo__/
 
 # PDFs not belonging in repo
 *.pdf
+# Host bind-mount for production SQLite (do not commit)
+/data/
