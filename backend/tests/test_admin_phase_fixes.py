@@ -8,7 +8,7 @@ Tests for the admin /phase endpoint fixes:
 
 The seed script creates an admin user (admin@vmtips.se / admin), 104
 matches, 12 groups, 8 third-place R32 placeholders, and the default
-"VM2026" league with the admin as a member.
+"VM2026" league.
 """
 import pytest
 from unittest.mock import patch

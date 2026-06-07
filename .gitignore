@@ -229,3 +229,6 @@ __marimo__/
 *.pdf
 # Host bind-mount for production SQLite (do not commit)
 /data/
+
+# Private initial-user credentials
+/backend/data/start_users.json

@@ -18,11 +18,26 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Chip,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import { useLeagueDetail, useLeagueBonusQuestions, useCreateBonusQuestion, useUpdateBonusQuestion, useDeleteBonusQuestion, useMyBonusAnswer, useSaveBonusAnswer } from "../hooks/useLeagues";
 import { isGroupOpen, usePhase } from "../hooks/usePhase";
+
+function toUtcIso(value: string): string | undefined {
+  if (!value) return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
+function toLocalInput(value: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
 
 function BonusAnswerForm({ leagueId, questionId, locked }: { leagueId: number; questionId: number; locked: boolean }) {
   const { t } = useTranslation();
@@ -69,11 +84,19 @@ export default function LeagueBonusQuestionsPage() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const [newQuestion, setNewQuestion] = useState({ question_text: "", points_value: "", answer: "" });
-  const [editQuestion, setEditQuestion] = useState<{ id: number; question_text: string; points_value: string; answer: string } | null>(null);
+  const [newQuestion, setNewQuestion] = useState({ question_text: "", points_value: "", answer: "", closed_at: "" });
+  const [editQuestion, setEditQuestion] = useState<{ id: number; question_text: string; points_value: string; answer: string; closed_at: string } | null>(null);
 
   const isAdmin = league?.is_admin ?? false;
   const answersLocked = !isGroupOpen(phaseData);
+  const tournamentLockAt = phaseData?.extra_questions_lock_at
+    ? new Date(phaseData.extra_questions_lock_at)
+    : null;
+  const tournamentLocked = Boolean(
+    tournamentLockAt &&
+    !Number.isNaN(tournamentLockAt.getTime()) &&
+    tournamentLockAt <= new Date(),
+  );
 
   const handleCreate = () => {
     if (!id || !newQuestion.question_text.trim() || !newQuestion.points_value) return;
@@ -84,12 +107,13 @@ export default function LeagueBonusQuestionsPage() {
           question_text: newQuestion.question_text.trim(),
           points_value: Number(newQuestion.points_value),
           answer: newQuestion.answer.trim() || undefined,
+          closed_at: toUtcIso(newQuestion.closed_at),
         },
       },
       {
         onSuccess: () => {
           setCreateOpen(false);
-          setNewQuestion({ question_text: "", points_value: "", answer: "" });
+          setNewQuestion({ question_text: "", points_value: "", answer: "", closed_at: "" });
         },
       }
     );
@@ -105,6 +129,7 @@ export default function LeagueBonusQuestionsPage() {
           question_text: editQuestion.question_text.trim() || undefined,
           points_value: editQuestion.points_value ? Number(editQuestion.points_value) : undefined,
           answer: editQuestion.answer.trim() || undefined,
+          closed_at: editQuestion.closed_at ? toUtcIso(editQuestion.closed_at) : null,
         },
       },
       {
@@ -140,13 +165,16 @@ export default function LeagueBonusQuestionsPage() {
         </Typography>
       )}
       {error && <Alert severity="error" sx={{ mb: 2 }}>{t("common.error")}</Alert>}
+      {tournamentLocked && (
+        <Alert severity="warning" sx={{ mb: 2 }}>{t("leagues.bonus_questions_locked")}</Alert>
+      )}
       {!isAdmin && answersLocked && (
         <Alert severity="info" sx={{ mb: 2 }}>{t("phase.group_closed_msg")}</Alert>
       )}
 
       {isAdmin && (
         <Box sx={{ mb: 3 }}>
-          <Button variant="contained" onClick={() => setCreateOpen(true)}>
+          <Button variant="contained" onClick={() => setCreateOpen(true)} disabled={tournamentLocked}>
             {t("leagues.add_question")}
           </Button>
         </Box>
@@ -170,6 +198,7 @@ export default function LeagueBonusQuestionsPage() {
                             question_text: q.question_text,
                             points_value: String(q.points_value),
                             answer: q.answer || "",
+                            closed_at: toLocalInput(q.closed_at),
                           });
                           setEditOpen(true);
                         }}
@@ -183,13 +212,18 @@ export default function LeagueBonusQuestionsPage() {
                   ) : null
                 }
               >
-                <ListItemText
+              <ListItemText
                   primary={q.question_text}
-                  secondary={`${t("leagues.points")}: ${q.points_value}${q.answer ? ` | ${t("leagues.answer")}: ${q.answer}` : ""}`}
+                  secondary={
+                    <Box component="span" sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+                      <span>{`${t("leagues.points")}: ${q.points_value}${q.answer ? ` | ${t("leagues.answer")}: ${q.answer}` : ""}`}</span>
+                      {q.is_closed && <Chip size="small" color="warning" label={t("leagues.closed")} />}
+                    </Box>
+                  }
                 />
               </ListItem>
               {!isAdmin && id && (
-                <BonusAnswerForm leagueId={id} questionId={q.id} locked={answersLocked} />
+                <BonusAnswerForm leagueId={id} questionId={q.id} locked={answersLocked || q.is_closed} />
               )}
             </Paper>
           ))}
@@ -225,6 +259,15 @@ export default function LeagueBonusQuestionsPage() {
             fullWidth
             value={newQuestion.answer}
             onChange={(e) => setNewQuestion((p) => ({ ...p, answer: e.target.value }))}
+          />
+          <TextField
+            margin="dense"
+            label={t("leagues.closed_at")}
+            type="datetime-local"
+            fullWidth
+            value={newQuestion.closed_at}
+            onChange={(e) => setNewQuestion((p) => ({ ...p, closed_at: e.target.value }))}
+            slotProps={{ inputLabel: { shrink: true } }}
           />
         </DialogContent>
         <DialogActions>
@@ -264,6 +307,15 @@ export default function LeagueBonusQuestionsPage() {
             fullWidth
             value={editQuestion?.answer || ""}
             onChange={(e) => setEditQuestion((p) => p ? { ...p, answer: e.target.value } : null)}
+          />
+          <TextField
+            margin="dense"
+            label={t("leagues.closed_at")}
+            type="datetime-local"
+            fullWidth
+            value={editQuestion?.closed_at || ""}
+            onChange={(e) => setEditQuestion((p) => p ? { ...p, closed_at: e.target.value } : null)}
+            slotProps={{ inputLabel: { shrink: true } }}
           />
         </DialogContent>
         <DialogActions>

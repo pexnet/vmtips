@@ -14,6 +14,7 @@ import ScoringOverviewTab from "./admin/ScoringOverviewTab";
 import ScoreManagementTab from "./admin/ScoreManagementTab";
 import AllPredictionsTab from "./admin/AllPredictionsTab";
 import LeagueManagementTab from "./admin/LeagueManagementTab";
+import UsersTab from "./admin/UsersTab";
 
 export default function AdminPage() {
   const { t } = useTranslation();
@@ -84,6 +85,7 @@ export default function AdminPage() {
         <Tab label={t("admin.score_management")} />
         <Tab label={t("admin.all_predictions")} />
         <Tab label={t("admin.league_management")} />
+        <Tab label={t("admin.user_management")} />
       </Tabs>
 
       <Box>
@@ -100,6 +102,7 @@ export default function AdminPage() {
         {tab === 6 && <ScoreManagementTab notify={notify} queryClient={queryClient} />}
         {tab === 7 && <AllPredictionsTab />}
         {tab === 8 && <LeagueManagementTab notify={notify} />}
+        {tab === 9 && <UsersTab notify={notify} />}
       </Box>
     </Container>
   );

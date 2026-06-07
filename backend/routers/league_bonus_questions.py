@@ -46,7 +46,47 @@ def _verify_member(league_id: int, user: User, db: Session):
         raise ForbiddenError(detail="not_a_member", error_code="not_a_member")
 
 
-def _question_to_dict(q: LeagueBonusQuestion, include_answer: bool = True) -> dict:
+def _as_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _is_locked(
+    phase: TournamentPhase | None,
+    question: LeagueBonusQuestion | None = None,
+) -> bool:
+    """Return whether the tournament or per-question deadline has passed."""
+    now = datetime.now(timezone.utc)
+    tournament_lock = _as_utc(
+        phase.extra_questions_lock_at if phase else None
+    )
+    question_lock = _as_utc(question.closed_at if question else None)
+    return bool(
+        (tournament_lock is not None and now >= tournament_lock)
+        or (question_lock is not None and now >= question_lock)
+    )
+
+
+def _ensure_unlocked(
+    db: Session,
+    question: LeagueBonusQuestion | None = None,
+) -> None:
+    phase = db.query(TournamentPhase).first()
+    if _is_locked(phase, question):
+        raise ForbiddenError(
+            detail="extra_questions_locked",
+            error_code="extra_questions_locked",
+        )
+
+
+def _question_to_dict(
+    q: LeagueBonusQuestion,
+    phase: TournamentPhase | None,
+    include_answer: bool = True,
+) -> dict:
     """Serialize a LeagueBonusQuestion row."""
     return {
         "id": q.id,
@@ -54,6 +94,8 @@ def _question_to_dict(q: LeagueBonusQuestion, include_answer: bool = True) -> di
         "question_text": q.question_text,
         "points_value": q.points_value,
         "answer": q.answer if include_answer else None,
+        "closed_at": q.closed_at.isoformat() if q.closed_at else None,
+        "is_closed": _is_locked(phase, q),
         "created_at": q.created_at.isoformat() if q.created_at else None,
     }
 
@@ -98,18 +140,20 @@ def create_bonus_question(
         raise NotFoundError(detail="league_not_found", error_code="league_not_found")
 
     _verify_admin(league, current_user)
+    _ensure_unlocked(db)
 
     question = LeagueBonusQuestion(
         league_id=league_id,
         question_text=payload.question_text,
         points_value=payload.points_value,
         answer=payload.answer,
+        closed_at=payload.closed_at,
     )
     db.add(question)
     db.commit()
     db.refresh(question)
 
-    return _question_to_dict(question)
+    return _question_to_dict(question, db.query(TournamentPhase).first())
 
 
 @router.get(
@@ -135,7 +179,11 @@ def list_bonus_questions(
         .all()
     )
     include_answer = league.admin_user_id == current_user.id
-    return [_question_to_dict(q, include_answer=include_answer) for q in questions]
+    phase = db.query(TournamentPhase).first()
+    return [
+        _question_to_dict(q, phase, include_answer=include_answer)
+        for q in questions
+    ]
 
 
 @router.get(
@@ -170,7 +218,11 @@ def get_bonus_question(
         )
 
     include_answer = league.admin_user_id == current_user.id
-    return _question_to_dict(question, include_answer=include_answer)
+    return _question_to_dict(
+        question,
+        db.query(TournamentPhase).first(),
+        include_answer=include_answer,
+    )
 
 
 @router.patch(
@@ -224,7 +276,7 @@ def update_bonus_question(
     db.commit()
     db.refresh(question)
 
-    return _question_to_dict(question)
+    return _question_to_dict(question, db.query(TournamentPhase).first())
 
 
 @router.delete(
@@ -295,6 +347,8 @@ def save_bonus_answer(
             detail="bonus_question_not_found",
             error_code="bonus_question_not_found",
         )
+
+    _ensure_unlocked(db, question)
 
     if not _answers_are_open(db):
         raise ForbiddenError(

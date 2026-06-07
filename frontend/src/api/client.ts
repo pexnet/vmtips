@@ -38,7 +38,7 @@ api.interceptors.response.use(
 export const authApi = {
   register: (data: { email: string; password: string; display_name?: string }) =>
     api.post("/auth/register", data),
-  login: (data: { email: string; password: string }) =>
+  login: (data: { identifier: string; password: string }) =>
     api.post("/auth/login", data),
   me: () => api.get("/auth/me"),
   updateMe: (data: {
@@ -110,9 +110,9 @@ export const leaguesApi = {
   public: () => api.get("/leagues/public"),
   listBonusQuestions: (league_id: number) =>
     api.get(`/leagues/${league_id}/bonus-questions`),
-  createBonusQuestion: (league_id: number, payload: { question_text: string; points_value: number; answer?: string }) =>
+  createBonusQuestion: (league_id: number, payload: { question_text: string; points_value: number; answer?: string; closed_at?: string }) =>
     api.post(`/leagues/${league_id}/bonus-questions`, payload),
-  updateBonusQuestion: (league_id: number, question_id: number, payload: { question_text?: string; points_value?: number; answer?: string }) =>
+  updateBonusQuestion: (league_id: number, question_id: number, payload: { question_text?: string; points_value?: number; answer?: string; closed_at?: string | null }) =>
     api.patch(`/leagues/${league_id}/bonus-questions/${question_id}`, payload),
   deleteBonusQuestion: (league_id: number, question_id: number) =>
     api.delete(`/leagues/${league_id}/bonus-questions/${question_id}`),
@@ -162,7 +162,10 @@ export const adminApi = {
     group_deadline?: string;
     knockout_opens_at?: string;
     knockout_deadline?: string;
+    extra_questions_lock_at?: string;
   }) => api.post("/admin/phase", data),
+  resetExtraQuestionsLock: () =>
+    api.post("/admin/phase/reset-extra-questions-lock"),
   // Group standings
   computeStandings: () => api.post("/admin/compute-standings"),
   getStandings: () => api.get("/admin/group-standings"),
@@ -179,6 +182,27 @@ export const adminApi = {
   listLeagues: () => api.get("/admin/leagues"),
   updateLeague: (id: number, data: { name?: string; is_public?: boolean }) => api.patch(`/admin/leagues/${id}`, data),
   deleteLeague: (id: number) => api.delete(`/admin/leagues/${id}`),
+  listUsers: () => api.get("/admin/users"),
+  createUser: (data: {
+    email: string;
+    password: string;
+    display_name: string;
+    first_name?: string;
+    last_name?: string;
+    is_admin: boolean;
+    is_active: boolean;
+    league_ids: number[];
+  }) => api.post("/admin/users", data),
+  updateUser: (id: number, data: {
+    email?: string;
+    password?: string;
+    display_name?: string;
+    first_name?: string;
+    last_name?: string;
+    is_admin?: boolean;
+    is_active?: boolean;
+    league_ids?: number[];
+  }) => api.patch(`/admin/users/${id}`, data),
 };
 
 // Bracket

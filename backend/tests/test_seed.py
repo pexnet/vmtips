@@ -1,10 +1,16 @@
 """
 Tests verifying the seed script inserts the expected WC 2026 data.
 """
-import pytest
-from sqlalchemy import inspect
+import json
+from pathlib import Path
 
-from models import Team, Match
+from models import Team, Match, League, LeagueMember, TournamentPhase, User
+from security import verify_password
+from seed import load_start_users, main as seed_main, seed_default_users
+
+TEST_START_USERS_FILE = (
+    Path(__file__).resolve().parents[1] / "data" / "start_users.example.json"
+)
 
 
 def test_seed_creates_48_teams(seeded_db):
@@ -50,3 +56,92 @@ def test_knockout_matches_use_placeholders(seeded_db):
     assert ko.home_team_id is None
     assert ko.away_team_id is None
     assert ko.home_team_placeholder.startswith("1") or ko.home_team_placeholder.startswith("2") or ko.home_team_placeholder.startswith("3")
+
+
+def test_seed_creates_release_users_league_and_lock(seeded_db):
+    admin = seeded_db.query(User).filter(User.is_admin.is_(True)).one()
+    expected_emails = {
+        user["email"] for user in load_start_users(TEST_START_USERS_FILE)
+    }
+    users = seeded_db.query(User).filter(User.email.in_(expected_emails)).all()
+    league = seeded_db.query(League).filter(League.name == "VM2026").one()
+    member_ids = {
+        user_id
+        for (user_id,) in seeded_db.query(LeagueMember.user_id)
+        .filter(LeagueMember.league_id == league.id)
+        .all()
+    }
+    phase = seeded_db.query(TournamentPhase).one()
+    first_match_at = seeded_db.query(Match.match_date).order_by(Match.match_date).first()[0]
+
+    assert len(users) == 7
+    assert all(not user.is_admin and user.is_active for user in users)
+    assert {user.id for user in users} == member_ids
+    assert admin.id not in member_ids
+    assert phase.extra_questions_lock_at == first_match_at
+
+
+def test_seed_is_idempotent(seeded_db):
+    seed_main(
+        session=seeded_db,
+        start_users_file=TEST_START_USERS_FILE,
+    )
+    user_count = seeded_db.query(User).count()
+    membership_count = seeded_db.query(LeagueMember).count()
+
+    seed_main(
+        session=seeded_db,
+        start_users_file=TEST_START_USERS_FILE,
+    )
+
+    assert seeded_db.query(User).count() == user_count
+    assert seeded_db.query(LeagueMember).count() == membership_count
+
+
+def test_default_users_are_read_from_private_file(db, tmp_path):
+    start_users_file = tmp_path / "start_users.json"
+    start_users_file.write_text(
+        json.dumps(
+            [
+                {
+                    "username": "private-user",
+                    "password": "private-password",
+                    "display_name": "Private-User",
+                    "email": "private@example.com",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    configured = seed_default_users(db, start_users_file=start_users_file)
+    user = db.query(User).filter(User.email == "private@example.com").one()
+
+    assert len(configured) == 1
+    assert user.display_name == "Private-User"
+    assert verify_password("private-password", user.password_hash)
+
+
+def test_missing_start_users_file_skips_default_users(db, tmp_path):
+    configured = seed_default_users(
+        db,
+        start_users_file=tmp_path / "missing.json",
+    )
+
+    assert configured == []
+    assert db.query(User).count() == 0
+
+
+def test_start_users_file_rejects_short_password(db, tmp_path):
+    start_users_file = tmp_path / "start_users.json"
+    start_users_file.write_text(
+        json.dumps([{"username": "bad", "password": "123"}]),
+        encoding="utf-8",
+    )
+
+    try:
+        seed_default_users(db, start_users_file=start_users_file)
+    except ValueError as exc:
+        assert "at least 6 characters" in str(exc)
+    else:
+        raise AssertionError("short start-user password was accepted")

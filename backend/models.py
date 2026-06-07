@@ -14,6 +14,7 @@ from sqlalchemy import (
     UniqueConstraint,
     CheckConstraint,
     Float,
+    event,
 )
 from sqlalchemy.orm import relationship
 
@@ -27,15 +28,21 @@ def _utcnow():
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        UniqueConstraint("display_name_lower", name="uq_users_display_name_lower"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     display_name = Column(String, nullable=False)
+    display_name_lower = Column(String, nullable=False)
     first_name = Column(String, nullable=True)
     last_name = Column(String, nullable=True)
     avatar_url = Column(Text, nullable=True)
     is_admin = Column(Boolean, default=False)
+    is_active = Column(Boolean, default=True, server_default="1", nullable=False)
+    last_login_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=_utcnow)
 
     predictions = relationship("Prediction", back_populates="user", cascade="all, delete-orphan")
@@ -43,6 +50,15 @@ class User(Base):
     league_memberships = relationship("LeagueMember", back_populates="user", cascade="all, delete-orphan")
     scores = relationship("Score", back_populates="user", cascade="all, delete-orphan")
     bracket_predictions = relationship("BracketPrediction", back_populates="user", cascade="all, delete-orphan")
+
+
+@event.listens_for(User, "before_insert")
+@event.listens_for(User, "before_update")
+def _normalise_user_identity(mapper, connection, user):
+    """Keep case-insensitive identity fields consistent for every write path."""
+    user.email = user.email.strip().lower()
+    user.display_name = user.display_name.strip()
+    user.display_name_lower = user.display_name.lower()
 
 
 class Team(Base):
@@ -168,6 +184,7 @@ class LeagueBonusQuestion(Base):
     question_text = Column(String, nullable=False)
     points_value = Column(Integer, nullable=False)
     answer = Column(String)
+    closed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=_utcnow)
 
     league = relationship("League", back_populates="bonus_questions")
@@ -251,6 +268,7 @@ class TournamentPhase(Base):
     group_deadline = Column(DateTime, nullable=True)  # When group predictions close
     knockout_opens_at = Column(DateTime, nullable=True)  # When knockout predictions open
     knockout_deadline = Column(DateTime, nullable=True)  # When knockout predictions close
+    extra_questions_lock_at = Column(DateTime, nullable=True)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
 

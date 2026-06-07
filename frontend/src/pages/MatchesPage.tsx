@@ -26,6 +26,7 @@ import { usePredictions, useTournamentBonuses, useTeamsFromMatches } from "../ho
 import { usePhase, isGroupOpen } from "../hooks/usePhase";
 import { useLeague } from "../contexts/LeagueContext";
 import BracketViewTab from "../components/BracketViewTab";
+import PredictionStatusBanner from "../components/PredictionStatusBanner";
 import { computePredictedStandings, computeThirdPlaceRanking } from "../utils/standings";
 
 import type { Match, Team } from "../types/api";
@@ -561,6 +562,7 @@ export default function MatchesPage() {
           {phaseData.knockout_deadline && ` — ${t("phase.knockout_deadline")}: ${new Date(phaseData.knockout_deadline).toLocaleString()}`}
         </Alert>
       )}
+      <PredictionStatusBanner leagueId={selectedLeagueId} />
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {saveMsg && <Alert severity="success" sx={{ mb: 2 }}>{saveMsg}</Alert>}

@@ -17,17 +17,19 @@ export default function LoginPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { login } = useAuth();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const publicRegistrationEnabled =
+    import.meta.env.VITE_ALLOW_PUBLIC_REGISTRATION === "true";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      const res = await authApi.login({ email, password });
+      const res = await authApi.login({ identifier, password });
       login(res.data.access_token);
       navigate("/leaderboard");
     } catch (err: unknown) {
@@ -51,10 +53,10 @@ export default function LoginPage() {
 
         <Box component="form" onSubmit={handleSubmit} sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <TextField
-            label={t("auth.email")}
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            label={t("auth.identifier")}
+            placeholder={t("auth.identifier_placeholder")}
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
             required
             fullWidth
           />
@@ -71,9 +73,11 @@ export default function LoginPage() {
           </Button>
         </Box>
 
-        <Typography variant="body2" align="center" sx={{ mt: 2 }}>
-          <Link to="/register">{t("auth.no_account")}</Link>
-        </Typography>
+        {publicRegistrationEnabled && (
+          <Typography variant="body2" align="center" sx={{ mt: 2 }}>
+            <Link to="/register">{t("auth.no_account")}</Link>
+          </Typography>
+        )}
       </Paper>
     </Container>
   );

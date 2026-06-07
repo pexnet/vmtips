@@ -6,6 +6,11 @@ Source: https://github.com/openfootball/worldcup.json
 Run: cd backend && uv run python seed.py
 """
 import datetime
+import json
+import os
+from pathlib import Path
+from sqlalchemy import func
+
 from database import SessionLocal, engine, Base
 from models import Team, Match, User, TournamentPhase, TournamentResult, League, LeagueMember
 from security import get_password_hash
@@ -67,6 +72,13 @@ TEAM_DATA = [
 ADMIN_EMAIL = "admin@vmtips.se"
 ADMIN_PASSWORD = "admin"
 ADMIN_DISPLAY_NAME = "Admin"
+
+START_USERS_FILE = Path(
+    os.environ.get(
+        "START_USERS_FILE",
+        Path(__file__).resolve().parent.parent / "data" / "start_users.json",
+    )
+)
 
 # Custom bonus question labels (displayed in frontend)
 CUSTOM_BONUS_1 = "Vilken målvakt gör flest räddningar?"
@@ -187,6 +199,90 @@ def seed_admin(db):
     print(f"[seed] Created admin user: {ADMIN_EMAIL} / {ADMIN_PASSWORD}")
 
 
+def load_start_users(start_users_file: Path = START_USERS_FILE) -> list[dict]:
+    """Load and validate private initial-user credentials from JSON."""
+    if not start_users_file.exists():
+        print(f"[seed] Start users file not found: {start_users_file}")
+        return []
+
+    raw_users = json.loads(start_users_file.read_text(encoding="utf-8"))
+    if not isinstance(raw_users, list):
+        raise ValueError("start_users.json must contain a JSON array")
+
+    users = []
+    seen_usernames = set()
+    seen_emails = set()
+    for index, raw_user in enumerate(raw_users):
+        if not isinstance(raw_user, dict):
+            raise ValueError(f"start_users.json entry {index} must be an object")
+        username = str(raw_user.get("username", "")).strip().lower()
+        password = str(raw_user.get("password", ""))
+        display_name = str(raw_user.get("display_name") or username).strip()
+        email = str(raw_user.get("email") or f"{username}@vmtips.se").strip().lower()
+        if not username:
+            raise ValueError(f"start_users.json entry {index} is missing username")
+        if len(password) < 6:
+            raise ValueError(
+                f"start_users.json user '{username}' must have a password of at least 6 characters"
+            )
+        if not display_name:
+            raise ValueError(
+                f"start_users.json user '{username}' is missing display_name"
+            )
+        if display_name.lower() != username:
+            raise ValueError(
+                f"start_users.json user '{username}' must use a matching display_name"
+            )
+        if "@" not in email:
+            raise ValueError(
+                f"start_users.json user '{username}' has an invalid email"
+            )
+        if username in seen_usernames:
+            raise ValueError(f"duplicate username in start_users.json: {username}")
+        if email in seen_emails:
+            raise ValueError(f"duplicate email in start_users.json: {email}")
+        seen_usernames.add(username)
+        seen_emails.add(email)
+        users.append(
+            {
+                "username": username,
+                "password": password,
+                "display_name": display_name,
+                "email": email,
+            }
+        )
+    return users
+
+
+def seed_default_users(db, start_users_file: Path = START_USERS_FILE):
+    """Create initial participants from the private start-users file."""
+    configured_users = load_start_users(start_users_file)
+    created_users = []
+    for configured_user in configured_users:
+        email = configured_user["email"]
+        existing = db.query(User).filter(func.lower(User.email) == email).first()
+        if existing:
+            continue
+        user = User(
+            email=email,
+            password_hash=get_password_hash(configured_user["password"]),
+            display_name=configured_user["display_name"],
+            is_admin=False,
+            is_active=True,
+        )
+        db.add(user)
+        created_users.append(configured_user)
+    db.commit()
+
+    if created_users:
+        print(f"[seed] Created {len(created_users)} default users:")
+        for user in created_users:
+            print(f"[seed]   {user['email']}")
+    else:
+        print("[seed] No new default users created")
+    return configured_users
+
+
 def seed_tournament_phase(db):
     """Create the default tournament phase row (group_open) if not present."""
     existing = db.query(TournamentPhase).first()
@@ -198,6 +294,33 @@ def seed_tournament_phase(db):
     db.add(phase)
     db.commit()
     print("[seed] Created tournament phase: group_open")
+
+
+def compute_lock_at(db):
+    """Return the first match kickoff, or None when fixtures are absent."""
+    return db.query(func.min(Match.match_date)).scalar()
+
+
+def seed_tournament_phase_lock(db):
+    """Set the extra-question lock from match 1 unless an override exists."""
+    phase = db.query(TournamentPhase).first()
+    if phase is None:
+        seed_tournament_phase(db)
+        phase = db.query(TournamentPhase).first()
+    if phase.extra_questions_lock_at is not None:
+        print(
+            "[seed] Preserving extra_questions_lock_at override: "
+            f"{phase.extra_questions_lock_at}"
+        )
+        return phase.extra_questions_lock_at
+    lock_at = compute_lock_at(db)
+    if lock_at is None:
+        print("[seed] WARNING: no matches found; extra questions remain unlocked")
+        return None
+    phase.extra_questions_lock_at = lock_at
+    db.commit()
+    print(f"[seed] Computed extra_questions_lock_at: {lock_at}")
+    return lock_at
 
 
 def seed_tournament_result(db):
@@ -216,53 +339,70 @@ def seed_tournament_result(db):
     print(f"[seed] Created tournament result with custom bonus labels")
 
 
-def seed_default_league(db):
-    """Ensure a private VM2026 default league exists and admin is member."""
-    existing = db.query(League).filter(League.name == "VM2026").first()
-    if existing:
-        print("[seed] Default VM2026 league already exists")
-        return
-
-    # Clean up any stray leagues created before this fix
-    db.query(League).filter(League.name != "VM2026").delete(synchronize_session=False)
-    db.commit()
-
+def seed_default_league(db, default_user_emails: list[str] | None = None):
+    """Ensure VM2026 exists and contains the seven default participants."""
     admin = db.query(User).filter(User.email == ADMIN_EMAIL).first()
+    if not admin:
+        admin = db.query(User).filter(User.is_admin.is_(True)).order_by(User.id).first()
     if not admin:
         print("[seed] Admin user not found, skipping default league creation")
         return
 
-    default_league = League(
-        name="VM2026",
-        invite_code="VM2026",
-        is_public=False,
-        admin_user_id=admin.id,
-    )
-    db.add(default_league)
+    default_league = db.query(League).filter(League.name == "VM2026").first()
+    if not default_league:
+        default_league = League(
+            name="VM2026",
+            invite_code="VM2026",
+            is_public=False,
+            admin_user_id=admin.id,
+        )
+        db.add(default_league)
+        db.flush()
+
+    db.query(LeagueMember).filter(
+        LeagueMember.league_id == default_league.id,
+        LeagueMember.user_id == admin.id,
+    ).delete(synchronize_session=False)
+
+    default_emails = default_user_emails or []
+    default_users = db.query(User).filter(User.email.in_(default_emails)).all()
+    existing_member_ids = {
+        user_id
+        for (user_id,) in db.query(LeagueMember.user_id)
+        .filter(LeagueMember.league_id == default_league.id)
+        .all()
+    }
+    for user in default_users:
+        if user.id not in existing_member_ids:
+            db.add(LeagueMember(league_id=default_league.id, user_id=user.id))
     db.commit()
-    db.refresh(default_league)
-
-    member = LeagueMember(league_id=default_league.id, user_id=admin.id)
-    db.add(member)
-    db.commit()
-    print(f"[seed] Created default VM2026 league (private) and joined admin")
+    print(f"[seed] Added {len(default_users)} default users to VM2026 league")
+    print("[seed] Admin is NOT a member of VM2026 (administrator only)")
+    return default_league
 
 
-def main(session=None):
+def main(session=None, start_users_file=None):
     """Seed the database. If a session is provided, use it (for testing)."""
     if session is None:
         Base.metadata.create_all(bind=engine)
         db = SessionLocal()
     else:
         db = session
+    if start_users_file is None:
+        start_users_file = START_USERS_FILE
     try:
         seed_teams(db)
         seed_group_matches(db)
         seed_knockout_matches(db)
         seed_admin(db)
+        configured_users = seed_default_users(db, start_users_file=start_users_file)
         seed_tournament_phase(db)
+        seed_tournament_phase_lock(db)
         seed_tournament_result(db)
-        seed_default_league(db)
+        seed_default_league(
+            db,
+            default_user_emails=[user["email"] for user in configured_users],
+        )
         print("[seed] Database seeded successfully")
     finally:
         if session is None:

@@ -18,6 +18,8 @@ const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const LeagueBonusQuestionsPage = lazy(() => import("./pages/LeagueBonusQuestionsPage"));
 const InfoPage = lazy(() => import("./pages/InfoPage"));
 const AdminPage = lazy(() => import("./pages/AdminPage"));
+const publicRegistrationEnabled =
+  import.meta.env.VITE_ALLOW_PUBLIC_REGISTRATION === "true";
 
 import "./i18n";
 
@@ -33,7 +35,10 @@ export default function App() {
                 <Routes>
                   <Route path="/" element={<HomePage />} />
                   <Route path="/login" element={<LoginPage />} />
-                  <Route path="/register" element={<RegisterPage />} />
+                  <Route
+                    path="/register"
+                    element={publicRegistrationEnabled ? <RegisterPage /> : <Navigate to="/login" replace />}
+                  />
                   <Route path="/leaderboard" element={<LeaderboardPage />} />
                   <Route path="/info" element={<InfoPage />} />
                   <Route

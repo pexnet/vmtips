@@ -18,6 +18,7 @@ services:
       - JWT_EXPIRATION_HOURS=168
       - ADMIN_EMAIL=${ADMIN_EMAIL:?ADMIN_EMAIL must be set}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set}
+      - START_USERS_FILE=/data/start_users.json
       - WORLD_CUP_JSON_URL=https://worldcupjson.net/matches
       - CORS_ORIGINS=${CORS_ORIGINS:-}
       - STATIC_DIR=/app/static

@@ -49,6 +49,8 @@ export function useLeagueBonusQuestions(leagueId: number | null) {
         question_text: string;
         points_value: number;
         answer: string | null;
+        closed_at: string | null;
+        is_closed: boolean;
         created_at: string | null;
       }>;
     },
@@ -59,7 +61,7 @@ export function useLeagueBonusQuestions(leagueId: number | null) {
 export function useCreateBonusQuestion() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ leagueId, payload }: { leagueId: number; payload: { question_text: string; points_value: number; answer?: string } }) => {
+    mutationFn: async ({ leagueId, payload }: { leagueId: number; payload: { question_text: string; points_value: number; answer?: string; closed_at?: string } }) => {
       const res = await leaguesApi.createBonusQuestion(leagueId, payload);
       return res.data;
     },
@@ -72,7 +74,7 @@ export function useCreateBonusQuestion() {
 export function useUpdateBonusQuestion() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ leagueId, questionId, payload }: { leagueId: number; questionId: number; payload: { question_text?: string; points_value?: number; answer?: string } }) => {
+    mutationFn: async ({ leagueId, questionId, payload }: { leagueId: number; questionId: number; payload: { question_text?: string; points_value?: number; answer?: string; closed_at?: string | null } }) => {
       const res = await leaguesApi.updateBonusQuestion(leagueId, questionId, payload);
       return res.data;
     },

@@ -12,6 +12,8 @@ export interface User {
   last_name: string | null;
   avatar_url: string | null;
   is_admin?: boolean;
+  is_active?: boolean;
+  last_login_at?: string | null;
 }
 
 export interface Token {
@@ -182,6 +184,15 @@ export interface PhaseInfo {
   group_deadline: string | null;
   knockout_opens_at: string | null;
   knockout_deadline: string | null;
+  extra_questions_lock_at: string | null;
+  computed_extra_questions_lock_at: string | null;
+  extra_questions_lock_is_override: boolean;
+}
+
+export interface AdminUser extends User {
+  is_admin: boolean;
+  is_active: boolean;
+  league_ids: number[];
 }
 
 // ── Group Standings ───────────────────────────────────────────

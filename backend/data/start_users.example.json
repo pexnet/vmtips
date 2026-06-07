@@ -1,0 +1,44 @@
+[
+  {
+    "username": "jack",
+    "password": "replace-with-a-strong-password",
+    "display_name": "Jack",
+    "email": "jack@vmtips.se"
+  },
+  {
+    "username": "janne",
+    "password": "replace-with-a-strong-password",
+    "display_name": "Janne",
+    "email": "janne@vmtips.se"
+  },
+  {
+    "username": "acke",
+    "password": "replace-with-a-strong-password",
+    "display_name": "Acke",
+    "email": "acke@vmtips.se"
+  },
+  {
+    "username": "sean",
+    "password": "replace-with-a-strong-password",
+    "display_name": "Sean",
+    "email": "sean@vmtips.se"
+  },
+  {
+    "username": "bill",
+    "password": "replace-with-a-strong-password",
+    "display_name": "Bill",
+    "email": "bill@vmtips.se"
+  },
+  {
+    "username": "edith",
+    "password": "replace-with-a-strong-password",
+    "display_name": "Edith",
+    "email": "edith@vmtips.se"
+  },
+  {
+    "username": "mats",
+    "password": "replace-with-a-strong-password",
+    "display_name": "Mats",
+    "email": "mats@vmtips.se"
+  }
+]

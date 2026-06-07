@@ -4,7 +4,7 @@ Pydantic schemas for request/response validation.
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import AliasChoices, BaseModel, EmailStr, Field
 
 # ── Auth ────────────────────────────────────────────────────
 
@@ -22,7 +22,13 @@ class UserProfileUpdate(BaseModel):
     display_name: str = Field(..., min_length=1, max_length=50)
 
 class UserLogin(BaseModel):
-    email: EmailStr
+    """Username (display_name) or email, matched case-insensitively."""
+    identifier: str = Field(
+        ...,
+        min_length=1,
+        max_length=254,
+        validation_alias=AliasChoices("identifier", "email"),
+    )
     password: str
 
 class Token(BaseModel):
@@ -37,6 +43,8 @@ class UserOut(BaseModel):
     last_name: str | None = None
     avatar_url: str | None = None
     is_admin: bool = False
+    is_active: bool = True
+    last_login_at: datetime | None = None
 
     class Config:
         from_attributes = True
@@ -137,11 +145,13 @@ class LeagueBonusQuestionCreate(BaseModel):
     question_text: str = Field(..., min_length=1, max_length=500)
     points_value: int = Field(..., ge=1)
     answer: str | None = None
+    closed_at: datetime | None = None
 
 class LeagueBonusQuestionUpdate(BaseModel):
     question_text: str | None = Field(None, min_length=1, max_length=500)
     points_value: int | None = Field(None, ge=1)
     answer: str | None = None
+    closed_at: datetime | None = None
 
 class LeagueBonusAnswerCreate(BaseModel):
     answer_text: str = Field(..., min_length=1, max_length=500)
@@ -152,6 +162,8 @@ class LeagueBonusQuestionOut(BaseModel):
     question_text: str
     points_value: int
     answer: str | None = None
+    closed_at: datetime | None = None
+    is_closed: bool = False
     created_at: datetime | None = None
 
     class Config:
@@ -224,6 +236,32 @@ class TournamentResultUpdate(BaseModel):
     custom_bonus_2_answer: str | None = None
 
 
+class AdminCreateUser(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=6, max_length=72)
+    display_name: str = Field(..., min_length=1, max_length=50)
+    first_name: str | None = Field(None, max_length=50)
+    last_name: str | None = Field(None, max_length=50)
+    is_admin: bool = False
+    is_active: bool = True
+    league_ids: list[int] = Field(default_factory=list)
+
+
+class AdminUpdateUser(BaseModel):
+    email: EmailStr | None = None
+    password: str | None = Field(None, min_length=6, max_length=72)
+    display_name: str | None = Field(None, min_length=1, max_length=50)
+    first_name: str | None = Field(None, max_length=50)
+    last_name: str | None = Field(None, max_length=50)
+    is_admin: bool | None = None
+    is_active: bool | None = None
+    league_ids: list[int] | None = None
+
+
+class AdminUserOut(UserOut):
+    league_ids: list[int] = Field(default_factory=list)
+
+
 # ── Phase ─────────────────────────────────────────────────────
 
 class PhaseOut(BaseModel):
@@ -232,6 +270,9 @@ class PhaseOut(BaseModel):
     group_deadline: datetime | None = None
     knockout_opens_at: datetime | None = None
     knockout_deadline: datetime | None = None
+    extra_questions_lock_at: datetime | None = None
+    computed_extra_questions_lock_at: datetime | None = None
+    extra_questions_lock_is_override: bool = False
 
     class Config:
         from_attributes = True
@@ -241,6 +282,7 @@ class PhaseUpdate(BaseModel):
     group_deadline: str | None = None  # ISO datetime
     knockout_opens_at: str | None = None  # ISO datetime
     knockout_deadline: str | None = None  # ISO datetime
+    extra_questions_lock_at: str | None = None  # ISO datetime
 
 
 # ── Group Standings ───────────────────────────────────────────

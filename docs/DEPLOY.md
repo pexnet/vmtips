@@ -26,6 +26,8 @@ Copy `docker-compose.prod.yml` to the server:
 
 ```bash
 scp docker-compose.prod.yml user@your-server:/opt/vmtips/
+ssh user@your-server mkdir -p /opt/vmtips/data
+scp backend/data/start_users.example.json user@your-server:/opt/vmtips/data/start_users.json
 ```
 
 Set required production secrets:
@@ -37,6 +39,16 @@ export ADMIN_EMAIL="admin@yourdomain.example"
 export ADMIN_PASSWORD="replace-this-admin-password"
 export CORS_ORIGINS="https://vmtips.yourdomain.example"
 ```
+
+Create the private initial-user file before first startup:
+
+```bash
+chmod 600 data/start_users.json
+```
+
+Replace every example password. The file is gitignored and appears inside the
+production container as `/data/start_users.json`. It is only used to create
+missing accounts; editing it later does not reset existing passwords.
 
 Start the app:
 

@@ -18,6 +18,7 @@ export function usePhase() {
         phase?.group_deadline,
         phase?.knockout_opens_at,
         phase?.knockout_deadline,
+        phase?.extra_questions_lock_at,
       ]
         .filter((value): value is string => Boolean(value))
         .map((value) => new Date(value).getTime())

@@ -27,7 +27,7 @@ def test_create_league(client):
     data = response.json()
     assert data["name"] == "Alice's League"
     assert len(data["invite_code"]) == 6
-    assert data["admin_user_id"] == 2  # Seeded admin is id=1; Alice is id=2
+    assert data["admin_user_id"] > 0
 
 
 def test_list_my_leagues(client):
@@ -51,7 +51,7 @@ def test_list_my_leagues(client):
 
 def test_join_league(client):
     """A user can join a league with the correct invite code."""
-    admin_token = _register_and_login(client, "admin@example.com", "secret123", "Admin")
+    admin_token = _register_and_login(client, "admin@example.com", "secret123", "League Admin")
     create_r = client.post(
         "/leagues",
         json={"name": "Fun League"},
@@ -72,7 +72,7 @@ def test_join_league(client):
 
 def test_join_wrong_code(client):
     """Joining with wrong invite code returns 403."""
-    admin_token = _register_and_login(client, "admin2@example.com", "secret123", "Admin")
+    admin_token = _register_and_login(client, "admin2@example.com", "secret123", "League Admin 2")
     create_r = client.post(
         "/leagues",
         json={"name": "Secret League"},
@@ -134,7 +134,7 @@ def test_get_league_detail(client):
 
 def test_get_league_not_member(client):
     """Non-member cannot view league details."""
-    admin_token = _register_and_login(client, "admin3@example.com", "secret123", "Admin")
+    admin_token = _register_and_login(client, "admin3@example.com", "secret123", "League Admin 3")
     create_r = client.post(
         "/leagues",
         json={"name": "Private League"},

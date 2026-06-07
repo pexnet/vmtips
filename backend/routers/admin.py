@@ -9,11 +9,13 @@ from typing import Optional
 
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from config import settings
 from database import get_db
-from errors import NotFoundError, ForbiddenError
+from errors import ConflictError, NotFoundError, ForbiddenError, ValidationError
 from models import (
     Match, User, Prediction, Score, BracketPrediction, TournamentResult,
     TournamentBonus, TournamentPhase, GroupStanding, KnockoutAdvancement, Team,
@@ -23,8 +25,9 @@ from schemas import (
     MatchResultUpdate, TournamentResultUpdate, PhaseUpdate,
     KnockoutAdvancementCreate, GroupStandingOut, PhaseOut,
     KnockoutAdvancementOut, ScoreDetailOut,
+    AdminCreateUser, AdminUpdateUser, AdminUserOut,
 )
-from security import fetch_current_user
+from security import fetch_current_user, get_password_hash
 from scoring import (
     calculate_match_points, calculate_bracket_points, calculate_tournament_bonus_points,
     BRACKET_ROUND_POINTS, BONUS_POINTS,
@@ -35,6 +38,14 @@ from third_place_table import get_annex_c_match_mapping
 from sync_service import sync_match_results, SyncError
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+def _with_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 
 def _get_sync_config_row(db: Session) -> SyncConfig:
@@ -71,6 +82,169 @@ def require_admin(current_user: User = Depends(fetch_current_user)) -> User:
     if not _is_admin(current_user):
         raise ForbiddenError(detail="admin_only", error_code="admin_only")
     return current_user
+
+
+# ═══════════════════════════════════════════════════════════════
+# User management
+# ═══════════════════════════════════════════════════════════════
+
+def _admin_user_out(user: User) -> dict:
+    last_login_at = user.last_login_at
+    if last_login_at is not None and last_login_at.tzinfo is None:
+        last_login_at = _with_utc(last_login_at)
+    return {
+        "id": user.id,
+        "email": user.email,
+        "display_name": user.display_name,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "avatar_url": user.avatar_url,
+        "is_admin": user.is_admin,
+        "is_active": user.is_active,
+        "last_login_at": last_login_at,
+        "league_ids": sorted(
+            membership.league_id for membership in user.league_memberships
+        ),
+    }
+
+
+def _validate_league_ids(db: Session, league_ids: list[int]) -> list[int]:
+    unique_ids = sorted(set(league_ids))
+    if not unique_ids:
+        return []
+    existing = {
+        league_id
+        for (league_id,) in db.query(League.id)
+        .filter(League.id.in_(unique_ids))
+        .all()
+    }
+    missing = [league_id for league_id in unique_ids if league_id not in existing]
+    if missing:
+        raise ValidationError(
+            detail=f"league_not_found:{missing[0]}",
+            error_code="league_not_found",
+        )
+    return unique_ids
+
+
+def _ensure_user_identity_available(
+    db: Session,
+    email: str,
+    display_name: str,
+    exclude_user_id: int | None = None,
+) -> None:
+    email_query = db.query(User).filter(func.lower(User.email) == email.lower())
+    nickname_query = db.query(User).filter(
+        User.display_name_lower == display_name.strip().lower()
+    )
+    if exclude_user_id is not None:
+        email_query = email_query.filter(User.id != exclude_user_id)
+        nickname_query = nickname_query.filter(User.id != exclude_user_id)
+    if email_query.first():
+        raise ConflictError(
+            detail="email_already_registered",
+            error_code="email_already_registered",
+        )
+    if nickname_query.first():
+        raise ConflictError(detail="nickname_taken", error_code="nickname_taken")
+
+
+@router.get("/users", response_model=list[AdminUserOut])
+def list_users(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    users = db.query(User).order_by(User.display_name_lower).all()
+    return [_admin_user_out(user) for user in users]
+
+
+@router.post("/users", response_model=AdminUserOut, status_code=status.HTTP_201_CREATED)
+def create_user(
+    payload: AdminCreateUser,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    email = payload.email.lower()
+    display_name = payload.display_name.strip()
+    _ensure_user_identity_available(db, email, display_name)
+    league_ids = _validate_league_ids(db, payload.league_ids)
+
+    user = User(
+        email=email,
+        password_hash=get_password_hash(payload.password),
+        display_name=display_name,
+        first_name=payload.first_name.strip() if payload.first_name else None,
+        last_name=payload.last_name.strip() if payload.last_name else None,
+        is_admin=payload.is_admin,
+        is_active=payload.is_active,
+    )
+    db.add(user)
+    try:
+        db.flush()
+        for league_id in league_ids:
+            db.add(LeagueMember(league_id=league_id, user_id=user.id))
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise ConflictError(detail="user_conflict", error_code="user_conflict")
+    db.refresh(user)
+    return _admin_user_out(user)
+
+
+@router.patch("/users/{user_id}", response_model=AdminUserOut)
+def update_user(
+    user_id: int,
+    payload: AdminUpdateUser,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise NotFoundError(detail="user_not_found", error_code="user_not_found")
+    changes = payload.model_dump(exclude_unset=True)
+    if not changes:
+        raise ValidationError(
+            detail="no_fields_to_update",
+            error_code="no_fields_to_update",
+        )
+
+    email = str(changes.get("email", user.email)).lower()
+    display_name = str(changes.get("display_name", user.display_name)).strip()
+    _ensure_user_identity_available(
+        db,
+        email,
+        display_name,
+        exclude_user_id=user.id,
+    )
+
+    if "email" in changes:
+        user.email = email
+    if "display_name" in changes:
+        user.display_name = display_name
+    for field in ("first_name", "last_name"):
+        if field in changes:
+            value = changes[field]
+            setattr(user, field, value.strip() if value else None)
+    for field in ("is_admin", "is_active"):
+        if field in changes:
+            setattr(user, field, changes[field])
+    if changes.get("password"):
+        user.password_hash = get_password_hash(changes["password"])
+    if "league_ids" in changes:
+        league_ids = _validate_league_ids(db, changes["league_ids"])
+        db.query(LeagueMember).filter(LeagueMember.user_id == user.id).delete(
+            synchronize_session=False
+        )
+        for league_id in league_ids:
+            db.add(LeagueMember(league_id=league_id, user_id=user.id))
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise ConflictError(detail="user_conflict", error_code="user_conflict")
+    db.refresh(user)
+    return _admin_user_out(user)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -781,11 +955,19 @@ def get_phase(
     if not phase_row:
         return PhaseOut(phase="group_open")
 
+    computed_lock = db.query(func.min(Match.match_date)).scalar()
     return PhaseOut(
         phase=phase_row.phase,
         group_deadline=phase_row.group_deadline.isoformat() if phase_row.group_deadline else None,
         knockout_opens_at=phase_row.knockout_opens_at.isoformat() if phase_row.knockout_opens_at else None,
         knockout_deadline=phase_row.knockout_deadline.isoformat() if phase_row.knockout_deadline else None,
+        extra_questions_lock_at=_with_utc(phase_row.extra_questions_lock_at),
+        computed_extra_questions_lock_at=_with_utc(computed_lock),
+        extra_questions_lock_is_override=bool(
+            phase_row.extra_questions_lock_at
+            and computed_lock
+            and phase_row.extra_questions_lock_at != computed_lock
+        ),
     )
 
 
@@ -812,9 +994,14 @@ def update_phase(
         and payload.group_deadline is None
         and payload.knockout_opens_at is None
         and payload.knockout_deadline is None
+        and payload.extra_questions_lock_at is None
     )
     if no_op:
-        raise HTTPException(422, "at least one of phase, group_deadline, knockout_opens_at, knockout_deadline must be provided")
+        raise HTTPException(
+            422,
+            "at least one of phase, group_deadline, knockout_opens_at, "
+            "knockout_deadline, extra_questions_lock_at must be provided",
+        )
 
     phase_row = db.query(TournamentPhase).first()
     if not phase_row:
@@ -836,6 +1023,8 @@ def update_phase(
         phase_row.knockout_opens_at = datetime.fromisoformat(payload.knockout_opens_at)
     if payload.knockout_deadline is not None:
         phase_row.knockout_deadline = datetime.fromisoformat(payload.knockout_deadline)
+    if payload.extra_questions_lock_at is not None:
+        phase_row.extra_questions_lock_at = datetime.fromisoformat(payload.extra_questions_lock_at)
 
     db.commit()
 
@@ -872,9 +1061,40 @@ def update_phase(
         "group_deadline": phase_row.group_deadline.isoformat() if phase_row.group_deadline else None,
         "knockout_opens_at": phase_row.knockout_opens_at.isoformat() if phase_row.knockout_opens_at else None,
         "knockout_deadline": phase_row.knockout_deadline.isoformat() if phase_row.knockout_deadline else None,
+        "extra_questions_lock_at": phase_row.extra_questions_lock_at.isoformat() if phase_row.extra_questions_lock_at else None,
         "auto_generated_brackets": auto_generated_brackets,
         "auto_generate_errors": auto_generate_errors,
     }
+
+
+@router.post("/phase/reset-extra-questions-lock", response_model=PhaseOut)
+def reset_extra_questions_lock(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Restore the extra-question deadline to the first match kickoff."""
+    computed_lock = db.query(func.min(Match.match_date)).scalar()
+    if computed_lock is None:
+        raise ValidationError(
+            detail="no_matches_for_extra_questions_lock",
+            error_code="no_matches_for_extra_questions_lock",
+        )
+    phase_row = db.query(TournamentPhase).first()
+    if not phase_row:
+        phase_row = TournamentPhase(phase="group_open")
+        db.add(phase_row)
+    phase_row.extra_questions_lock_at = computed_lock
+    db.commit()
+    db.refresh(phase_row)
+    return PhaseOut(
+        phase=phase_row.phase,
+        group_deadline=phase_row.group_deadline,
+        knockout_opens_at=phase_row.knockout_opens_at,
+        knockout_deadline=phase_row.knockout_deadline,
+        extra_questions_lock_at=_with_utc(phase_row.extra_questions_lock_at),
+        computed_extra_questions_lock_at=_with_utc(computed_lock),
+        extra_questions_lock_is_override=False,
+    )
 
 
 # ═══════════════════════════════════════════════════════════════

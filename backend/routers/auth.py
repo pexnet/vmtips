@@ -2,14 +2,16 @@
 Authentication router: register, login, and current-user endpoints.
 """
 import base64
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, Request, UploadFile, status
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from config import settings
 from database import get_db
-from errors import ConflictError, UnauthorizedError, ValidationError
+from errors import ConflictError, ForbiddenError, UnauthorizedError, ValidationError
 from models import User
 from schemas import UserCreate, UserLogin, UserProfileUpdate, Token, UserOut
 from security import get_password_hash, verify_password, create_access_token, fetch_current_user
@@ -33,10 +35,24 @@ def _fetch_current_user(
 @limiter.limit("5/minute")
 def register(request: Request, payload: UserCreate, db: Session = Depends(get_db)):
     """Create a new user account."""
+    if not settings.allow_public_registration:
+        raise ForbiddenError(
+            detail="registration_disabled",
+            error_code="registration_disabled",
+        )
+
     email = payload.email.lower()
+    display_name = payload.display_name.strip()
     existing = db.query(User).filter(func.lower(User.email) == email).first()
     if existing:
         raise ConflictError(detail="email_already_registered", error_code="email_already_registered")
+    nickname_owner = (
+        db.query(User)
+        .filter(User.display_name_lower == display_name.lower())
+        .first()
+    )
+    if nickname_owner:
+        raise ConflictError(detail="nickname_taken", error_code="nickname_taken")
 
     from models import League, LeagueMember
 
@@ -44,7 +60,7 @@ def register(request: Request, payload: UserCreate, db: Session = Depends(get_db
         user = User(
             email=email,
             password_hash=get_password_hash(payload.password),
-            display_name=payload.display_name,
+            display_name=display_name,
             first_name=payload.first_name,
             last_name=payload.last_name,
         )
@@ -64,8 +80,10 @@ def register(request: Request, payload: UserCreate, db: Session = Depends(get_db
         member = LeagueMember(league_id=default_league.id, user_id=user.id)
         db.add(member)
         db.commit()
-    except IntegrityError:
+    except IntegrityError as exc:
         db.rollback()
+        if "display_name_lower" in str(exc.orig):
+            raise ConflictError(detail="nickname_taken", error_code="nickname_taken")
         raise ConflictError(detail="email_already_registered", error_code="email_already_registered")
     db.refresh(user)
 
@@ -76,20 +94,28 @@ def register(request: Request, payload: UserCreate, db: Session = Depends(get_db
 @limiter.limit("10/minute")
 def login(request: Request, payload: UserLogin, db: Session = Depends(get_db)):
     """Authenticate a user and return a JWT access token."""
-    email = payload.email.lower()
-    user = db.query(User).filter(func.lower(User.email) == email).first()
+    identifier = payload.identifier.strip().lower()
+    user = (
+        db.query(User)
+        .filter(
+            (func.lower(User.email) == identifier)
+            | (User.display_name_lower == identifier)
+        )
+        .first()
+    )
     if not user:
-        # Always run bcrypt to prevent timing-based email enumeration
+        # Always run bcrypt to prevent timing-based account enumeration.
         verify_password("dummy", _DUMMY_HASH)
         raise UnauthorizedError(detail="invalid_credentials", error_code="invalid_credentials")
 
     if not verify_password(payload.password, user.password_hash):
         raise UnauthorizedError(detail="invalid_credentials", error_code="invalid_credentials")
 
-    if user.email != email:
-        user.email = email
-        db.commit()
+    if not user.is_active:
+        raise ForbiddenError(detail="user_disabled", error_code="user_disabled")
 
+    user.last_login_at = datetime.now(timezone.utc)
+    db.commit()
     token = create_access_token(data={"sub": str(user.id)})
     return {"access_token": token, "token_type": "bearer"}
 
@@ -119,6 +145,16 @@ def update_me(
     )
     if existing:
         raise ConflictError(detail="email_already_registered", error_code="email_already_registered")
+    nickname_owner = (
+        db.query(User)
+        .filter(
+            User.display_name_lower == display_name.lower(),
+            User.id != current_user.id,
+        )
+        .first()
+    )
+    if nickname_owner:
+        raise ConflictError(detail="nickname_taken", error_code="nickname_taken")
 
     current_user.email = email
     current_user.first_name = payload.first_name.strip() or None

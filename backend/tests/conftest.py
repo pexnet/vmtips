@@ -4,11 +4,13 @@ Uses an in-memory SQLite database so tests never touch production data.
 Rate limiting is bypassed by patching the shared limiter instance.
 """
 import pytest
+from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import sessionmaker
 
 from database import Base, get_db
+from config import settings
 from rate_limit import limiter
 
 # In-memory SQLite with StaticPool so all connections share the same DB.
@@ -23,6 +25,9 @@ test_engine = create_engine(
     echo=False,
 )
 TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+TEST_START_USERS_FILE = (
+    Path(__file__).resolve().parents[1] / "data" / "start_users.example.json"
+)
 
 
 def _override_get_db():
@@ -51,6 +56,17 @@ def _bypass_rate_limit():
     limiter.enabled = False
     yield
     limiter.enabled = True
+
+
+@pytest.fixture(scope="function", autouse=True)
+def _enable_public_registration_for_existing_tests():
+    """Keep existing endpoint tests working while production defaults to closed."""
+    previous = settings.allow_public_registration
+    settings.allow_public_registration = True
+    try:
+        yield
+    finally:
+        settings.allow_public_registration = previous
 
 
 # Import app AFTER fixtures are defined so that the dependency override
@@ -93,7 +109,10 @@ def client():
     # Seed using the test session so data lands in the in-memory DB
     test_session = TestSessionLocal()
     try:
-        seed_main(session=test_session)
+        seed_main(
+            session=test_session,
+            start_users_file=TEST_START_USERS_FILE,
+        )
     finally:
         test_session.close()
 
@@ -114,7 +133,10 @@ def seeded_db():
 
     test_session = TestSessionLocal()
     try:
-        seed_main(session=test_session)
+        seed_main(
+            session=test_session,
+            start_users_file=TEST_START_USERS_FILE,
+        )
     finally:
         test_session.close()
 

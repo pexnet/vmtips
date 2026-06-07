@@ -102,5 +102,32 @@ finally:
     db.close()
 "
 
+# Seed release defaults after the configured admin exists. Existing users,
+# memberships, and an administrator-overridden lock timestamp are preserved.
+python -c "
+from database import SessionLocal
+from seed import (
+    START_USERS_FILE,
+    seed_default_users,
+    seed_tournament_phase,
+    seed_tournament_phase_lock,
+    seed_tournament_result,
+    seed_default_league,
+)
+
+db = SessionLocal()
+try:
+    configured_users = seed_default_users(db, start_users_file=START_USERS_FILE)
+    seed_tournament_phase(db)
+    seed_tournament_phase_lock(db)
+    seed_tournament_result(db)
+    seed_default_league(
+        db,
+        default_user_emails=[user['email'] for user in configured_users],
+    )
+finally:
+    db.close()
+"
+
 # Start the application
 exec uvicorn main:app --host 0.0.0.0 --port 8000
