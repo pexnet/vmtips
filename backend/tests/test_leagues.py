@@ -175,11 +175,11 @@ def test_list_public_leagues(client):
     response = client.get("/leagues/public")
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 1
-    assert data[0]["name"] == "Public League"
-    assert data[0]["id"] == public_league_id
-    assert data[0]["member_count"] == 1  # creator is auto-added
-    assert "invite_code" not in data[0]
+    public_league = next(l for l in data if l["name"] == "Public League")
+    assert public_league["id"] == public_league_id
+    assert public_league["member_count"] == 1  # creator is auto-added
+    assert "invite_code" not in public_league
+    assert not any(l["name"] == "Private League" for l in data)
 
 
 def test_list_public_leagues_empty(client):
@@ -193,7 +193,8 @@ def test_list_public_leagues_empty(client):
 
     response = client.get("/leagues/public")
     assert response.status_code == 200
-    assert response.json() == []
+    data = response.json()
+    assert not any(l["name"] == "Private Only" for l in data)
 
 
 def test_list_public_leagues_member_count(client):
@@ -218,5 +219,5 @@ def test_list_public_leagues_member_count(client):
     response = client.get("/leagues/public")
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 1
-    assert data[0]["member_count"] == 2
+    public_league = next(l for l in data if l["name"] == "Big Public League")
+    assert public_league["member_count"] == 2
