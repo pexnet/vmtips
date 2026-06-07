@@ -167,12 +167,9 @@ def _batch_calculate_scores(
 
         bonus_points = (
             case((and_(TournamentBonus.winner_team_id.isnot(None), TournamentBonus.winner_team_id == actual_result.winner_team_id), 20), else_=0)
-            + case((_text_matches(TournamentBonus.top_scorer_name, actual_result.top_scorer_name), 20), else_=0)
+            + case((and_(TournamentBonus.runner_up_team_id.isnot(None), TournamentBonus.runner_up_team_id == actual_result.runner_up_team_id), 20), else_=0)
             + case((and_(TournamentBonus.bronze_winner_team_id.isnot(None), TournamentBonus.bronze_winner_team_id == actual_result.bronze_winner_team_id), 20), else_=0)
-            + case((and_(TournamentBonus.most_goals_team_id.isnot(None), TournamentBonus.most_goals_team_id == actual_result.most_goals_team_id), 10), else_=0)
-            + case((and_(TournamentBonus.most_conceded_team_id.isnot(None), TournamentBonus.most_conceded_team_id == actual_result.most_conceded_team_id), 10), else_=0)
-            + case((_text_matches(TournamentBonus.custom_bonus_1, actual_result.custom_bonus_1_answer), 10), else_=0)
-            + case((_text_matches(TournamentBonus.custom_bonus_2, actual_result.custom_bonus_2_answer), 10), else_=0)
+            + case((_text_matches(TournamentBonus.top_scorer_name, actual_result.top_scorer_name), 20), else_=0)
         )
         bonus_rows = (
             db.query(
@@ -291,6 +288,7 @@ def _calculate_user_score(user_id: int, db: Session, league_id: int | None = Non
     tb = bonus_query.first()
 
     actual_winner_id = actual_result.winner_team_id if actual_result else None
+    actual_runner_up_id = actual_result.runner_up_team_id if actual_result else None
     actual_top_scorer = actual_result.top_scorer_name if actual_result else None
     actual_bronze_winner_id = actual_result.bronze_winner_team_id if actual_result else None
     actual_most_goals_team_id = actual_result.most_goals_team_id if actual_result else None
@@ -301,6 +299,7 @@ def _calculate_user_score(user_id: int, db: Session, league_id: int | None = Non
     tournament_bonus_points = 0
     tournament_bonus_details = {
         "winner_correct": False,
+        "runner_up_correct": False,
         "top_scorer_correct": False,
         "bronze_winner_correct": False,
         "most_goals_team_correct": False,
@@ -313,6 +312,8 @@ def _calculate_user_score(user_id: int, db: Session, league_id: int | None = Non
         tb_result = calculate_tournament_bonus_points(
             pred_winner_id=tb.winner_team_id,
             actual_winner_id=actual_winner_id,
+            pred_runner_up_id=tb.runner_up_team_id,
+            actual_runner_up_id=actual_runner_up_id,
             pred_top_scorer=tb.top_scorer_name,
             actual_top_scorer=actual_top_scorer,
             pred_bronze_winner_id=tb.bronze_winner_team_id,
@@ -329,6 +330,7 @@ def _calculate_user_score(user_id: int, db: Session, league_id: int | None = Non
         tournament_bonus_points = tb_result["points"]
         tournament_bonus_details = {
             "winner_correct": tb_result.get("winner_correct", False),
+            "runner_up_correct": tb_result.get("runner_up_correct", False),
             "top_scorer_correct": tb_result.get("top_scorer_correct", False),
             "bronze_winner_correct": tb_result.get("bronze_winner_correct", False),
             "most_goals_team_correct": tb_result.get("most_goals_team_correct", False),

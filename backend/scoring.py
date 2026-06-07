@@ -30,12 +30,9 @@ BRACKET_ROUND_POINTS = {
 # ── Tournament bonus point values ─────────────────────────────────
 BONUS_POINTS = {
     "world_champion": 20,
+    "runner_up": 20,
+    "third_place": 20,
     "top_scorer": 20,
-    "bronze_match_winner": 20,
-    "most_goals_team": 10,
-    "most_conceded_team": 10,
-    "custom_bonus_1": 10,
-    "custom_bonus_2": 10,
 }
 
 
@@ -145,33 +142,34 @@ def calculate_tournament_bonus_points(
     actual_top_scorer: Optional[str],
     pred_bronze_winner_id: Optional[int],
     actual_bronze_winner_id: Optional[int],
-    pred_most_goals_team_id: Optional[int],
-    actual_most_goals_team_id: Optional[int],
-    pred_most_conceded_team_id: Optional[int],
-    actual_most_conceded_team_id: Optional[int],
-    pred_custom_bonus_1: Optional[str],
-    actual_custom_bonus_1: Optional[str],
-    pred_custom_bonus_2: Optional[str],
-    actual_custom_bonus_2: Optional[str],
+    pred_most_goals_team_id: Optional[int] = None,
+    actual_most_goals_team_id: Optional[int] = None,
+    pred_most_conceded_team_id: Optional[int] = None,
+    actual_most_conceded_team_id: Optional[int] = None,
+    pred_custom_bonus_1: Optional[str] = None,
+    actual_custom_bonus_1: Optional[str] = None,
+    pred_custom_bonus_2: Optional[str] = None,
+    actual_custom_bonus_2: Optional[str] = None,
+    pred_runner_up_id: Optional[int] = None,
+    actual_runner_up_id: Optional[int] = None,
 ) -> dict:
     """
     Calculate points for tournament bonus predictions.
 
-    Scoring (matches Excel template):
-        - Correct world champion:        20 points
-        - Correct top scorer:            20 points
-        - Correct bronze match winner:   20 points
-        - Correct most goals team:       10 points
-        - Correct most conceded team:     10 points
-        - Correct custom bonus 1:        10 points
-        - Correct custom bonus 2:        10 points
-        - Maximum total bonus:         100 points
+    Current tournament bonus questions:
+        - Correct World Cup winner: 20 points
+        - Correct runner-up:        20 points
+        - Correct third place:      20 points
+        - Correct top scorer:       20 points
+        - Maximum total bonus:      80 points
 
-    Note: Top scorer name must be spelled exactly the same as the admin answer.
+    Legacy fields for most goals/conceded/custom bonuses are accepted for
+    backwards-compatible callers but are no longer scored.
     """
     points = 0
     result = {
         "winner_correct": False,
+        "runner_up_correct": False,
         "top_scorer_correct": False,
         "bronze_winner_correct": False,
         "most_goals_team_correct": False,
@@ -185,32 +183,18 @@ def calculate_tournament_bonus_points(
         points += BONUS_POINTS["world_champion"]
         result["winner_correct"] = True
 
+    if pred_runner_up_id is not None and actual_runner_up_id is not None and pred_runner_up_id == actual_runner_up_id:
+        points += BONUS_POINTS["runner_up"]
+        result["runner_up_correct"] = True
+
+    if pred_bronze_winner_id is not None and actual_bronze_winner_id is not None and pred_bronze_winner_id == actual_bronze_winner_id:
+        points += BONUS_POINTS["third_place"]
+        result["bronze_winner_correct"] = True
+
     if pred_top_scorer is not None and actual_top_scorer is not None:
         if pred_top_scorer.strip().lower() == actual_top_scorer.strip().lower():
             points += BONUS_POINTS["top_scorer"]
             result["top_scorer_correct"] = True
-
-    if pred_bronze_winner_id is not None and actual_bronze_winner_id is not None and pred_bronze_winner_id == actual_bronze_winner_id:
-        points += BONUS_POINTS["bronze_match_winner"]
-        result["bronze_winner_correct"] = True
-
-    if pred_most_goals_team_id is not None and actual_most_goals_team_id is not None and pred_most_goals_team_id == actual_most_goals_team_id:
-        points += BONUS_POINTS["most_goals_team"]
-        result["most_goals_team_correct"] = True
-
-    if pred_most_conceded_team_id is not None and actual_most_conceded_team_id is not None and pred_most_conceded_team_id == actual_most_conceded_team_id:
-        points += BONUS_POINTS["most_conceded_team"]
-        result["most_conceded_team_correct"] = True
-
-    if pred_custom_bonus_1 is not None and actual_custom_bonus_1 is not None:
-        if pred_custom_bonus_1.strip().lower() == actual_custom_bonus_1.strip().lower():
-            points += BONUS_POINTS["custom_bonus_1"]
-            result["custom_bonus_1_correct"] = True
-
-    if pred_custom_bonus_2 is not None and actual_custom_bonus_2 is not None:
-        if pred_custom_bonus_2.strip().lower() == actual_custom_bonus_2.strip().lower():
-            points += BONUS_POINTS["custom_bonus_2"]
-            result["custom_bonus_2_correct"] = True
 
     result["points"] = points
     return result

@@ -16,11 +16,9 @@ type AllPredictionsResponse = {
     }[];
     tournament_bonuses: {
       winner_team_id: number | null; winner_team_name: string | null; winner_team_flag: string | null;
+      runner_up_team_id: number | null; runner_up_team_name: string | null; runner_up_team_flag: string | null;
       top_scorer_name: string | null;
-      bronze_winner_team_id: number | null; bronze_winner_team_name: string | null;
-      most_goals_team_id: number | null; most_goals_team_name: string | null;
-      most_conceded_team_id: number | null; most_conceded_team_name: string | null;
-      custom_bonus_1: string | null; custom_bonus_2: string | null;
+      bronze_winner_team_id: number | null; bronze_winner_team_name: string | null; bronze_winner_team_flag: string | null;
     } | null;
   }[];
 };
@@ -163,12 +161,9 @@ export default function AllPredictionsTab() {
                 <Typography variant="subtitle1" sx={{ fontWeight: 700, mt: 3, mb: 1 }}>{t("admin.tournament_bonuses")}</Typography>
                 <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1 }}>
                   <Typography variant="body2"><strong>{t("admin.winner")}:</strong> {bonuses?.winner_team_flag ?? ""} {bonuses?.winner_team_name || t("admin.none")}</Typography>
+                  <Typography variant="body2"><strong>{t("admin.runner_up")}:</strong> {bonuses?.runner_up_team_flag ?? ""} {bonuses?.runner_up_team_name || t("admin.none")}</Typography>
+                  <Typography variant="body2"><strong>{t("admin.third_place")}:</strong> {bonuses?.bronze_winner_team_flag ?? ""} {bonuses?.bronze_winner_team_name || t("admin.none")}</Typography>
                   <Typography variant="body2"><strong>{t("admin.top_scorer")}:</strong> {bonuses?.top_scorer_name || t("admin.none")}</Typography>
-                  <Typography variant="body2"><strong>{t("admin.bronze_winner")}:</strong> {bonuses?.bronze_winner_team_id ? bonuses.bronze_winner_team_name : t("admin.none")}</Typography>
-                  <Typography variant="body2"><strong>{t("admin.most_goals_team")}:</strong> {bonuses?.most_goals_team_id ? bonuses.most_goals_team_name : t("admin.none")}</Typography>
-                  <Typography variant="body2"><strong>{t("admin.most_conceded_team")}:</strong> {bonuses?.most_conceded_team_id ? bonuses.most_conceded_team_name : t("admin.none")}</Typography>
-                  {bonuses?.custom_bonus_1 && <Typography variant="body2"><strong>{t("admin.custom_bonus_1")}:</strong> {bonuses.custom_bonus_1}</Typography>}
-                  {bonuses?.custom_bonus_2 && <Typography variant="body2"><strong>{t("admin.custom_bonus_2")}:</strong> {bonuses.custom_bonus_2}</Typography>}
                 </Box>
               </Box>
             );

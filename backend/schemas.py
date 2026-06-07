@@ -107,6 +107,7 @@ class PredictionBatchCreate(BaseModel):
 class TournamentBonusCreate(BaseModel):
     league_id: int | None = None
     winner_team_id: int | None = None
+    runner_up_team_id: int | None = None
     top_scorer_name: str | None = None
     bronze_winner_team_id: int | None = None
     most_goals_team_id: int | None = None
@@ -228,6 +229,7 @@ class MatchResultUpdate(BaseModel):
 
 class TournamentResultUpdate(BaseModel):
     winner_team_id: int | None = None
+    runner_up_team_id: int | None = None
     top_scorer_name: str | None = None
     bronze_winner_team_id: int | None = None
     most_goals_team_id: int | None = None

@@ -87,6 +87,7 @@ export const predictionsApi = {
     api.get(`/predictions/tournament${leagueId !== undefined ? `?league_id=${leagueId}` : ""}`),
   saveTournament: (leagueId: number, data: {
     winner_team_id?: number;
+    runner_up_team_id?: number;
     top_scorer_name?: string;
     bronze_winner_team_id?: number;
     most_goals_team_id?: number;
@@ -143,6 +144,7 @@ export const adminApi = {
   tournamentResult: () => api.get("/admin/tournament-result"),
   setTournamentResult: (data: {
     winner_team_id?: number;
+    runner_up_team_id?: number;
     top_scorer_name?: string;
     bronze_winner_team_id?: number;
     most_goals_team_id?: number;

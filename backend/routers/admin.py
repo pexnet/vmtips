@@ -261,6 +261,7 @@ def get_tournament_result(
     if not result:
         return {
             "winner_team_id": None,
+            "runner_up_team_id": None,
             "top_scorer_name": None,
             "bronze_winner_team_id": None,
             "most_goals_team_id": None,
@@ -271,6 +272,7 @@ def get_tournament_result(
         }
     return {
         "winner_team_id": result.winner_team_id,
+        "runner_up_team_id": result.runner_up_team_id,
         "top_scorer_name": result.top_scorer_name,
         "bronze_winner_team_id": result.bronze_winner_team_id,
         "most_goals_team_id": result.most_goals_team_id,
@@ -457,6 +459,7 @@ def recalculate_scores(
     bonuses = db.query(TournamentBonus).all()
     actual_result = db.query(TournamentResult).first()
     actual_winner_id = actual_result.winner_team_id if actual_result else None
+    actual_runner_up_id = actual_result.runner_up_team_id if actual_result else None
     actual_top_scorer = actual_result.top_scorer_name if actual_result else None
     actual_bronze_winner_id = actual_result.bronze_winner_team_id if actual_result else None
     actual_most_goals_team_id = actual_result.most_goals_team_id if actual_result else None
@@ -469,6 +472,8 @@ def recalculate_scores(
         result = calculate_tournament_bonus_points(
             pred_winner_id=bonus.winner_team_id,
             actual_winner_id=actual_winner_id,
+            pred_runner_up_id=bonus.runner_up_team_id,
+            actual_runner_up_id=actual_runner_up_id,
             pred_top_scorer=bonus.top_scorer_name,
             actual_top_scorer=actual_top_scorer,
             pred_bronze_winner_id=bonus.bronze_winner_team_id,
@@ -1223,22 +1228,19 @@ def all_predictions(
         tournament_bonuses = None
         if user_bonus:
             _wt = team_map.get(user_bonus.winner_team_id) if user_bonus.winner_team_id else None
+            _rt = team_map.get(user_bonus.runner_up_team_id) if user_bonus.runner_up_team_id else None
             _bt = team_map.get(user_bonus.bronze_winner_team_id) if user_bonus.bronze_winner_team_id else None
-            _mg = team_map.get(user_bonus.most_goals_team_id) if user_bonus.most_goals_team_id else None
-            _mc = team_map.get(user_bonus.most_conceded_team_id) if user_bonus.most_conceded_team_id else None
             tournament_bonuses = {
                 "winner_team_id": user_bonus.winner_team_id,
                 "winner_team_name": _wt.name if _wt else None,
                 "winner_team_flag": _wt.flag_emoji if _wt else None,
+                "runner_up_team_id": user_bonus.runner_up_team_id,
+                "runner_up_team_name": _rt.name if _rt else None,
+                "runner_up_team_flag": _rt.flag_emoji if _rt else None,
                 "top_scorer_name": user_bonus.top_scorer_name,
                 "bronze_winner_team_id": user_bonus.bronze_winner_team_id,
                 "bronze_winner_team_name": _bt.name if _bt else None,
-                "most_goals_team_id": user_bonus.most_goals_team_id,
-                "most_goals_team_name": _mg.name if _mg else None,
-                "most_conceded_team_id": user_bonus.most_conceded_team_id,
-                "most_conceded_team_name": _mc.name if _mc else None,
-                "custom_bonus_1": user_bonus.custom_bonus_1,
-                "custom_bonus_2": user_bonus.custom_bonus_2,
+                "bronze_winner_team_flag": _bt.flag_emoji if _bt else None,
             }
 
         result.append({

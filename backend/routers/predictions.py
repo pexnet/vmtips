@@ -359,6 +359,7 @@ def get_tournament_bonuses(
         return None
     return {
         "winner_team_id": bonus.winner_team_id,
+        "runner_up_team_id": bonus.runner_up_team_id,
         "top_scorer_name": bonus.top_scorer_name,
         "bronze_winner_team_id": bonus.bronze_winner_team_id,
         "most_goals_team_id": bonus.most_goals_team_id,
@@ -408,6 +409,7 @@ def save_tournament_bonuses(
             user_id=current_user.id,
             league_id=league_id,
             winner_team_id=payload.winner_team_id,
+            runner_up_team_id=payload.runner_up_team_id,
             top_scorer_name=payload.top_scorer_name,
             bronze_winner_team_id=payload.bronze_winner_team_id,
             most_goals_team_id=payload.most_goals_team_id,

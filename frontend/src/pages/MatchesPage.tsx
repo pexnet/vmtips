@@ -380,11 +380,10 @@ export default function MatchesPage() {
 
   // Tournament bonuses state
   const [bonuses, setBonuses] = useState({
+    winner_team_id: null as number | null,
+    runner_up_team_id: null as number | null,
+    bronze_winner_team_id: null as number | null,
     top_scorer_name: "",
-    most_goals_team_id: null as number | null,
-    most_conceded_team_id: null as number | null,
-    custom_bonus_1: "",
-    custom_bonus_2: "",
   });
 
   const { data: matches = [], isLoading: matchesLoading } = useMatches();
@@ -404,11 +403,10 @@ export default function MatchesPage() {
       const b = bonusesData as unknown as Record<string, unknown>;
       setBonuses((prev) => ({
         ...prev,
+        winner_team_id: (b.winner_team_id as number) || null,
+        runner_up_team_id: (b.runner_up_team_id as number) || null,
+        bronze_winner_team_id: (b.bronze_winner_team_id as number) || null,
         top_scorer_name: (b.top_scorer_name as string) || "",
-        most_goals_team_id: (b.most_goals_team_id as number) || null,
-        most_conceded_team_id: (b.most_conceded_team_id as number) || null,
-        custom_bonus_1: (b.custom_bonus_1 as string) || "",
-        custom_bonus_2: (b.custom_bonus_2 as string) || "",
       }));
     }
   }, [bonusesData]);
@@ -496,18 +494,18 @@ export default function MatchesPage() {
     }
     predictionsApi
       .saveTournament(selectedLeagueId, {
+        winner_team_id: bonuses.winner_team_id || undefined,
+        runner_up_team_id: bonuses.runner_up_team_id || undefined,
+        bronze_winner_team_id: bonuses.bronze_winner_team_id || undefined,
         top_scorer_name: bonuses.top_scorer_name || undefined,
-        most_goals_team_id: bonuses.most_goals_team_id || undefined,
-        most_conceded_team_id: bonuses.most_conceded_team_id || undefined,
-        custom_bonus_1: bonuses.custom_bonus_1 || undefined,
-        custom_bonus_2: bonuses.custom_bonus_2 || undefined,
       })
       .then(() => setSaveMsg(t("predictions.save_success")))
       .catch(() => setError(t("common.error")));
   };
 
-  const selectedMostGoals = teams.find((tm: Team) => tm.id === bonuses.most_goals_team_id) || null;
-  const selectedMostConceded = teams.find((tm: Team) => tm.id === bonuses.most_conceded_team_id) || null;
+  const selectedWinnerTeam = teams.find((tm: Team) => tm.id === bonuses.winner_team_id) || null;
+  const selectedRunnerUpTeam = teams.find((tm: Team) => tm.id === bonuses.runner_up_team_id) || null;
+  const selectedThirdPlaceTeam = teams.find((tm: Team) => tm.id === bonuses.bronze_winner_team_id) || null;
 
   const groupMatches = matches.filter((m) => m.round === "group");
   const groups = [...new Set(groupMatches.map((m) => m.group).filter((group): group is string => Boolean(group)))].sort();
@@ -567,14 +565,6 @@ export default function MatchesPage() {
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       {saveMsg && <Alert severity="success" sx={{ mb: 2 }}>{saveMsg}</Alert>}
 
-      <Alert severity="info" sx={{ mb: 2 }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-          {t("predictions.scoring_help_title")}
-        </Typography>
-        <Typography variant="body2">
-          {t("predictions.scoring_help_text")}
-        </Typography>
-      </Alert>
 
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
         {tabs.map((label, idx) => (
@@ -645,48 +635,43 @@ export default function MatchesPage() {
           )}
 
           <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            <Autocomplete
+              options={teams}
+              getOptionLabel={(o) => `${o.flag_emoji ?? ""} ${o.name}`}
+              value={selectedWinnerTeam}
+              onChange={(_, v) => setBonuses((b) => ({ ...b, winner_team_id: v?.id || null }))}
+              disabled={groupLocked}
+              renderInput={(params) => (
+                <TextField {...params} label={`${t("predictions.winner")} (20p)`} />
+              )}
+            />
+
+            <Autocomplete
+              options={teams}
+              getOptionLabel={(o) => `${o.flag_emoji ?? ""} ${o.name}`}
+              value={selectedRunnerUpTeam}
+              onChange={(_, v) => setBonuses((b) => ({ ...b, runner_up_team_id: v?.id || null }))}
+              disabled={groupLocked}
+              renderInput={(params) => (
+                <TextField {...params} label={`${t("predictions.runner_up")} (20p)`} />
+              )}
+            />
+
+            <Autocomplete
+              options={teams}
+              getOptionLabel={(o) => `${o.flag_emoji ?? ""} ${o.name}`}
+              value={selectedThirdPlaceTeam}
+              onChange={(_, v) => setBonuses((b) => ({ ...b, bronze_winner_team_id: v?.id || null }))}
+              disabled={groupLocked}
+              renderInput={(params) => (
+                <TextField {...params} label={`${t("predictions.third_place")} (20p)`} />
+              )}
+            />
+
             <TextField
               label={`${t("predictions.top_scorer")} (20p)`}
               value={bonuses.top_scorer_name}
               onChange={(e) => setBonuses((b) => ({ ...b, top_scorer_name: e.target.value }))}
-              disabled={groupLocked}
-              fullWidth
-            />
-
-            <Autocomplete
-              options={teams}
-              getOptionLabel={(o) => `${o.flag_emoji ?? ""} ${o.name}`}
-              value={selectedMostGoals}
-              onChange={(_, v) => setBonuses((b) => ({ ...b, most_goals_team_id: v?.id || null }))}
-              disabled={groupLocked}
-              renderInput={(params) => (
-                <TextField {...params} label={`${t("predictions.most_goals_team")} (10p)`} />
-              )}
-            />
-
-            <Autocomplete
-              options={teams}
-              getOptionLabel={(o) => `${o.flag_emoji ?? ""} ${o.name}`}
-              value={selectedMostConceded}
-              onChange={(_, v) => setBonuses((b) => ({ ...b, most_conceded_team_id: v?.id || null }))}
-              disabled={groupLocked}
-              renderInput={(params) => (
-                <TextField {...params} label={`${t("predictions.most_conceded_team")} (10p)`} />
-              )}
-            />
-
-            <TextField
-              label={`${t("predictions.custom_bonus_1")} (10p)`}
-              value={bonuses.custom_bonus_1}
-              onChange={(e) => setBonuses((b) => ({ ...b, custom_bonus_1: e.target.value }))}
-              disabled={groupLocked}
-              fullWidth
-            />
-
-            <TextField
-              label={`${t("predictions.custom_bonus_2")} (10p)`}
-              value={bonuses.custom_bonus_2}
-              onChange={(e) => setBonuses((b) => ({ ...b, custom_bonus_2: e.target.value }))}
               disabled={groupLocked}
               fullWidth
             />

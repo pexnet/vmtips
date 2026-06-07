@@ -28,12 +28,9 @@ export default function InfoPage() {
 
   const bonusRows = [
     { label: t("info.bonus.champion"), points: 20 },
-    { label: t("info.bonus.top_scorer"), points: 20 },
+    { label: t("info.bonus.runner_up"), points: 20 },
     { label: t("info.bonus.bronze_winner"), points: 20 },
-    { label: t("info.bonus.most_goals"), points: 10 },
-    { label: t("info.bonus.most_conceded"), points: 10 },
-    { label: t("info.bonus.custom1"), points: 10 },
-    { label: t("info.bonus.custom2"), points: 10 },
+    { label: t("info.bonus.top_scorer"), points: 20 },
   ];
 
   const bracketPointValues = { r32: 1, r16: 2, qf: 4, sf: 6, third: 8, final: 8, champion: 20 };

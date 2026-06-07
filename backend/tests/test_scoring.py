@@ -149,6 +149,16 @@ class TestTournamentBonusScoring:
         assert result["points"] == 20
         assert result["bronze_winner_correct"] is True
 
+    def test_runner_up_correct(self):
+        result = calculate_tournament_bonus_points(
+            pred_winner_id=None, actual_winner_id=None,
+            pred_runner_up_id=2, actual_runner_up_id=2,
+            pred_top_scorer=None, actual_top_scorer=None,
+            pred_bronze_winner_id=None, actual_bronze_winner_id=None,
+        )
+        assert result["points"] == 20
+        assert result["runner_up_correct"] is True
+
     def test_most_goals_correct(self):
         result = calculate_tournament_bonus_points(
             pred_winner_id=None, actual_winner_id=None,
@@ -159,8 +169,8 @@ class TestTournamentBonusScoring:
             pred_custom_bonus_1=None, actual_custom_bonus_1=None,
             pred_custom_bonus_2=None, actual_custom_bonus_2=None,
         )
-        assert result["points"] == 10
-        assert result["most_goals_team_correct"] is True
+        assert result["points"] == 0
+        assert result["most_goals_team_correct"] is False
 
     def test_most_conceded_correct(self):
         result = calculate_tournament_bonus_points(
@@ -172,12 +182,13 @@ class TestTournamentBonusScoring:
             pred_custom_bonus_1=None, actual_custom_bonus_1=None,
             pred_custom_bonus_2=None, actual_custom_bonus_2=None,
         )
-        assert result["points"] == 10
-        assert result["most_conceded_team_correct"] is True
+        assert result["points"] == 0
+        assert result["most_conceded_team_correct"] is False
 
     def test_all_correct(self):
         result = calculate_tournament_bonus_points(
             pred_winner_id=1, actual_winner_id=1,
+            pred_runner_up_id=2, actual_runner_up_id=2,
             pred_top_scorer="Mbappe", actual_top_scorer="mbappe",
             pred_bronze_winner_id=3, actual_bronze_winner_id=3,
             pred_most_goals_team_id=5, actual_most_goals_team_id=5,
@@ -185,15 +196,16 @@ class TestTournamentBonusScoring:
             pred_custom_bonus_1="Sweden", actual_custom_bonus_1="Sweden",
             pred_custom_bonus_2="Brazil", actual_custom_bonus_2="Brazil",
         )
-        # 20 + 20 + 20 + 10 + 10 + 10 + 10 = 100
-        assert result["points"] == 100
+        # Winner + runner-up + third place + top scorer = 80
+        assert result["points"] == 80
         assert result["winner_correct"] is True
+        assert result["runner_up_correct"] is True
         assert result["top_scorer_correct"] is True
         assert result["bronze_winner_correct"] is True
-        assert result["most_goals_team_correct"] is True
-        assert result["most_conceded_team_correct"] is True
-        assert result["custom_bonus_1_correct"] is True
-        assert result["custom_bonus_2_correct"] is True
+        assert result["most_goals_team_correct"] is False
+        assert result["most_conceded_team_correct"] is False
+        assert result["custom_bonus_1_correct"] is False
+        assert result["custom_bonus_2_correct"] is False
 
     def test_none_correct(self):
         result = calculate_tournament_bonus_points(

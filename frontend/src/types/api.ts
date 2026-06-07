@@ -63,6 +63,7 @@ export interface Prediction {
 
 export interface TournamentBonus {
   winner_team_id: number | null;
+  runner_up_team_id: number | null;
   top_scorer_name: string | null;
   bronze_winner_team_id: number | null;
   most_goals_team_id: number | null;
@@ -144,6 +145,7 @@ export interface PersonalScore {
   tournament_bonus_points: number;
   tournament_bonus_details?: {
     winner_correct: boolean;
+    runner_up_correct: boolean;
     top_scorer_correct: boolean;
     bronze_winner_correct: boolean;
     most_goals_team_correct: boolean;

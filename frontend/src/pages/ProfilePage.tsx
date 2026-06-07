@@ -325,38 +325,20 @@ export default function ProfilePage() {
               />
               <Chip
                 size="small"
-                label={`${t("predictions.top_scorer")} (20p): ${personal.tournament_bonus_details.top_scorer_correct ? "✅" : "❌"}`}
-                color={personal.tournament_bonus_details.top_scorer_correct ? "success" : "default"}
+                label={`${t("predictions.runner_up")} (20p): ${personal.tournament_bonus_details.runner_up_correct ? "✅" : "❌"}`}
+                color={personal.tournament_bonus_details.runner_up_correct ? "success" : "default"}
                 variant="outlined"
               />
               <Chip
                 size="small"
-                label={`${t("predictions.bronze_winner")} (20p): ${personal.tournament_bonus_details.bronze_winner_correct ? "✅" : "❌"}`}
+                label={`${t("predictions.third_place")} (20p): ${personal.tournament_bonus_details.bronze_winner_correct ? "✅" : "❌"}`}
                 color={personal.tournament_bonus_details.bronze_winner_correct ? "success" : "default"}
                 variant="outlined"
               />
               <Chip
                 size="small"
-                label={`${t("predictions.most_goals_team")} (10p): ${personal.tournament_bonus_details.most_goals_team_correct ? "✅" : "❌"}`}
-                color={personal.tournament_bonus_details.most_goals_team_correct ? "success" : "default"}
-                variant="outlined"
-              />
-              <Chip
-                size="small"
-                label={`${t("predictions.most_conceded_team")}: ${personal.tournament_bonus_details.most_conceded_team_correct ? "✅" : "❌"}`}
-                color={personal.tournament_bonus_details.most_conceded_team_correct ? "success" : "default"}
-                variant="outlined"
-              />
-              <Chip
-                size="small"
-                label={`${t("predictions.custom_bonus_1")}: ${personal.tournament_bonus_details.custom_bonus_1_correct ? "✅" : "❌"}`}
-                color={personal.tournament_bonus_details.custom_bonus_1_correct ? "success" : "default"}
-                variant="outlined"
-              />
-              <Chip
-                size="small"
-                label={`${t("predictions.custom_bonus_2")}: ${personal.tournament_bonus_details.custom_bonus_2_correct ? "✅" : "❌"}`}
-                color={personal.tournament_bonus_details.custom_bonus_2_correct ? "success" : "default"}
+                label={`${t("predictions.top_scorer")} (20p): ${personal.tournament_bonus_details.top_scorer_correct ? "✅" : "❌"}`}
+                color={personal.tournament_bonus_details.top_scorer_correct ? "success" : "default"}
                 variant="outlined"
               />
             </>

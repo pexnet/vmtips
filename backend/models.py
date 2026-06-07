@@ -159,6 +159,7 @@ class TournamentBonus(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     league_id = Column(Integer, ForeignKey("leagues.id"), nullable=False)
     winner_team_id = Column(Integer, ForeignKey("teams.id"))
+    runner_up_team_id = Column(Integer, ForeignKey("teams.id"))
     top_scorer_name = Column(String)
     bronze_winner_team_id = Column(Integer, ForeignKey("teams.id"))
     most_goals_team_id = Column(Integer, ForeignKey("teams.id"))
@@ -171,6 +172,7 @@ class TournamentBonus(Base):
     user = relationship("User", back_populates="tournament_bonuses")
     league = relationship("League")
     winner_team = relationship("Team", foreign_keys=[winner_team_id])
+    runner_up_team = relationship("Team", foreign_keys=[runner_up_team_id])
     bronze_winner_team = relationship("Team", foreign_keys=[bronze_winner_team_id])
     most_goals_team = relationship("Team", foreign_keys=[most_goals_team_id])
     most_conceded_team = relationship("Team", foreign_keys=[most_conceded_team_id])
@@ -229,6 +231,7 @@ class TournamentResult(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     winner_team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
+    runner_up_team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
     top_scorer_name = Column(String)
     bronze_winner_team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
     most_goals_team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
@@ -238,6 +241,7 @@ class TournamentResult(Base):
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     winner_team = relationship("Team", foreign_keys=[winner_team_id])
+    runner_up_team = relationship("Team", foreign_keys=[runner_up_team_id])
     bronze_winner_team = relationship("Team", foreign_keys=[bronze_winner_team_id])
     most_goals_team = relationship("Team", foreign_keys=[most_goals_team_id])
     most_conceded_team = relationship("Team", foreign_keys=[most_conceded_team_id])
