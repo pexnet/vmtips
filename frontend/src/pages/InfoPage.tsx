@@ -5,6 +5,7 @@ import SportsSoccerIcon from "@mui/icons-material/SportsSoccer";
 import MilitaryTechIcon from "@mui/icons-material/MilitaryTech";
 import CalculateIcon from "@mui/icons-material/Calculate";
 import BarChartIcon from "@mui/icons-material/BarChart";
+import { BRACKET_ROUND_POINTS } from "../hooks/useBracket";
 
 export default function InfoPage() {
   const { t } = useTranslation();
@@ -17,13 +18,13 @@ export default function InfoPage() {
   ];
 
   const bracketRows = [
-    { round: t("info.bracket.r32"), points: 1 },
-    { round: t("info.bracket.r16"), points: 2 },
-    { round: t("info.bracket.qf"), points: 4 },
-    { round: t("info.bracket.sf"), points: 6 },
-    { round: t("info.bracket.third"), points: 8 },
-    { round: t("info.bracket.final"), points: 8 },
-    { round: t("info.bracket.champion"), points: 20, bold: true },
+    { round: t("info.bracket.r32"), points: BRACKET_ROUND_POINTS.round_of_32 },
+    { round: t("info.bracket.r16"), points: BRACKET_ROUND_POINTS.round_of_16 },
+    { round: t("info.bracket.qf"), points: BRACKET_ROUND_POINTS.quarter_final },
+    { round: t("info.bracket.sf"), points: BRACKET_ROUND_POINTS.semi_final },
+    { round: t("info.bracket.third"), points: BRACKET_ROUND_POINTS.match_for_third_place },
+    { round: t("info.bracket.final"), points: BRACKET_ROUND_POINTS.final },
+    { round: t("info.bracket.champion"), points: BRACKET_ROUND_POINTS.world_champion, bold: true },
   ];
 
   const bonusRows = [
@@ -33,10 +34,17 @@ export default function InfoPage() {
     { label: t("info.bonus.top_scorer"), points: 20 },
   ];
 
-  const bracketPointValues = { r32: 1, r16: 2, qf: 4, sf: 6, third: 8, final: 8, champion: 20 };
-  const bracketSlots = { r32: 32, r16: 16, qf: 8, sf: 4, third: 2, final: 2, champion: 1 };
-  const totalBracketPts = Object.entries(bracketSlots as Record<string, number>)
-    .reduce((sum, [key, slots]) => sum + slots * (bracketPointValues as Record<string, number>)[key], 0);
+  const bracketSlots = {
+    round_of_32: 32,
+    round_of_16: 16,
+    quarter_final: 8,
+    semi_final: 4,
+    match_for_third_place: 2,
+    final: 2,
+    world_champion: 1,
+  };
+  const totalBracketPts = Object.entries(bracketSlots)
+    .reduce((sum, [key, slots]) => sum + slots * BRACKET_ROUND_POINTS[key as keyof typeof BRACKET_ROUND_POINTS], 0);
   const totalBonusPts = 20 + 20 + 20 + 10 + 10 + 10 + 10; // = 100
   const totalMatchPts = 104 * 7; // 72 group + 32 knockout
   const grandTotal = totalMatchPts + totalBracketPts + totalBonusPts;
