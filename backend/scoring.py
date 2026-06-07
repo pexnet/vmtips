@@ -2,29 +2,30 @@
 Scoring engine for the VMTips application.
 Calculates points for match predictions, bracket predictions, and tournament bonuses.
 
-Scoring rules match the VM-tips-2026 Excel template (7p per match variant).
+Scoring rules match the current VMTips rules (9p per match variant).
 """
 from typing import Optional
 
 
 # ── Match points (group + knockout) ──────────────────────────────
-# Correct outcome (1X2): 3 points
+# Correct outcome (1X2): 5 points
 # Correct home goals:     2 points
 # Correct away goals:     2 points
-# Maximum per match:      7 points
+# Maximum per match:      9 points
 
 # ── Bracket round point values ────────────────────────────────────
 # Points per correctly predicted team in each knockout round.
-# A team reaching the Round of 32 earns 1 point. Each further correct
-# knockout step is worth +2 points, separate from tournament bonuses.
+# A team reaching the Round of 32 earns 1 point. Round of 16 and every later
+# correct knockout placement is capped at 3 points, separate from tournament
+# bonuses.
 BRACKET_ROUND_POINTS = {
     "round_of_32": 1,
     "round_of_16": 3,
-    "quarter_final": 5,
-    "semi_final": 7,
-    "match_for_third_place": 9,
-    "final": 9,
-    "world_champion": 11,
+    "quarter_final": 3,
+    "semi_final": 3,
+    "match_for_third_place": 3,
+    "final": 3,
+    "world_champion": 3,
 }
 
 # ── Tournament bonus point values ─────────────────────────────────
@@ -54,11 +55,11 @@ def calculate_match_points(
     """
     Calculate points for a single match prediction.
 
-    Scoring (matches Excel template):
-        - Correct outcome (1X2):       3 points
+    Scoring:
+        - Correct outcome (1X2):       5 points
         - Correct home team goals:      2 points
         - Correct away team goals:      2 points
-        - Maximum per match:            7 points
+        - Maximum per match:            9 points
 
     Returns a dict with:
         - points: total points earned
@@ -77,7 +78,7 @@ def calculate_match_points(
 
     points = 0
     if outcome_correct:
-        points += 3
+        points += 5
     if home_score_correct:
         points += 2
     if away_score_correct:

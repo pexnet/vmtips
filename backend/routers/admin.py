@@ -416,7 +416,7 @@ def recalculate_scores(
     Recalculate and update cached total scores for all users.
 
     Computes:
-      - match_points: from match prediction scoring (outcome 3p + correct home/away 2p each, max 7p)
+      - match_points: from match prediction scoring (outcome 5p + correct home/away 2p each, max 9p)
       - bracket_points: from knockout bracket team placement scoring
       - tournament_bonus_points: from tournament bonus predictions (Excel scoring)
       - league_bonus_points: from league bonus answers

@@ -22,7 +22,7 @@ Points for a single match prediction are calculated by checking three independen
 
 | Criterion | Points | Description |
 |---|---|---|
-| **Correct outcome (1X2)** | 3 p | You correctly picked the winner (home win, away win, or draw) |
+| **Correct outcome (1X2)** | 5 p | You correctly picked the winner (home win, away win, or draw) |
 | **Correct home score** | 2 p | You predicted the exact number of goals scored by the home team |
 | **Correct away score** | 2 p | You predicted the exact number of goals scored by the away team |
 
@@ -30,19 +30,19 @@ Points for a single match prediction are calculated by checking three independen
 
 A **perfect prediction** (exact scoreline) automatically satisfies all three criteria:
 
-3 (outcome) + 2 (home score) + 2 (away score) = **7 points**
+5 (outcome) + 2 (home score) + 2 (away score) = **9 points**
 
 ### Examples
 
-| # | Your Prediction | Actual Result | Outcome (3p) | Home Score (2p) | Away Score (2p) | **Total** |
+| # | Your Prediction | Actual Result | Outcome (5p) | Home Score (2p) | Away Score (2p) | **Total** |
 |---|---|---|---|---|---|---|
-| 1 | 2-1 | **2-1** | ✅ 3 | ✅ 2 | ✅ 2 | **7 p** |
-| 2 | 1-1 | **1-1** | ✅ 3 | ✅ 2 | ✅ 2 | **7 p** |
-| 3 | 3-1 | **2-0** | ✅ 3 | ❌ | ❌ | **3 p** |
-| 4 | 2-1 | **3-1** | ✅ 3 | ❌ | ✅ 2 | **5 p** |
+| 1 | 2-1 | **2-1** | ✅ 5 | ✅ 2 | ✅ 2 | **9 p** |
+| 2 | 1-1 | **1-1** | ✅ 5 | ✅ 2 | ✅ 2 | **9 p** |
+| 3 | 3-1 | **2-0** | ✅ 5 | ❌ | ❌ | **5 p** |
+| 4 | 2-1 | **3-1** | ✅ 5 | ❌ | ✅ 2 | **7 p** |
 | 5 | 2-0 | **2-3** | ❌ | ✅ 2 | ❌ | **2 p** |
-| 6 | 1-1 | **0-0** | ✅ 3 | ❌ | ❌ | **3 p** |
-| 7 | 3-2 | **2-0** | ✅ 3 | ❌ | ❌ | **3 p** |
+| 6 | 1-1 | **0-0** | ✅ 5 | ❌ | ❌ | **5 p** |
+| 7 | 3-2 | **2-0** | ✅ 5 | ❌ | ❌ | **5 p** |
 | 8 | 2-0 | **0-1** | ❌ | ❌ | ❌ | **0 p** |
 
 ---
@@ -54,19 +54,19 @@ A **perfect prediction** (exact scoreline) automatically satisfies all three cri
 | Round | Points per team |
 |---|---|
 | Round of 32 | 1 p |
-| Round of 16 | 2 p |
-| Quarterfinal | 4 p |
-| Semifinal | 6 p |
-| Match for Third Place | 8 p |
-| Final | 8 p |
-| **World Champion** | **20 p** |
-| **Max total bracket** | **172 p** |
+| Round of 16 | 3 p |
+| Quarterfinal | 3 p |
+| Semifinal | 3 p |
+| Match for Third Place | 3 p |
+| Final | 3 p |
+| **World Champion** | **3 p** |
+| **Max total bracket** | **131 p** |
 
 ### Note: Dual match result points in knockout stage
 
 For knockout matches, points are calculated in two parallel tracks:
 
-1. **Match result points** — You get points for correct outcome/goals on each match slot (regardless of which teams actually play). For example, if you predicted Germany–South Korea 3-1 in Round of 32 match #73, and the real match becomes Brazil–Scotland 3-1, you still get 7p for your result prediction (if the scores match).
+1. **Match result points** — You get points for correct outcome/goals on each match slot (regardless of which teams actually play). For example, if you predicted Germany–South Korea 3-1 in Round of 32 match #73, and the real match becomes Brazil–Scotland 3-1, you still get 9p for your result prediction (if the scores match).
 
 2. **Team bonus** — Extra points for each team you correctly placed in the right round.
 
@@ -74,19 +74,15 @@ For knockout matches, points are calculated in two parallel tracks:
 
 ## 4. Tournament Bonus Predictions
 
-Before the tournament begins, you can make seven long-term predictions. Each correct prediction awards the points shown below.
+Before the tournament begins, you can make four long-term predictions. Each correct prediction awards the points shown below.
 
 | Bonus | Points | Description | Matching Rule |
 |---|---|---|---|
 | **World Champion** | 20 p | Predict which team wins the World Cup | Must match the team by ID (exact team) |
-| **Top Scorer** | 20 p | Predict the player who scores the most goals | Matched case-insensitively (e.g., "Mbappe" = "MBAPPE") |
+| **Runner-up** | 20 p | Predict which team finishes second | Must match the team by ID |
 | **Bronze Match Winner** | 20 p | Predict the winner of the 3rd-place match | Must match the team by ID |
-| **Most Goals Team** | 10 p | Predict the team that scores the most goals in the tournament | Must match the team by ID |
-| **Most Conceded Team** | 10 p | Predict the team that concedes the most goals | Must match the team by ID |
-| **Custom Bonus 1** | 10 p | Extra bonus question defined by league admin | Matched case-insensitively |
-| **Custom Bonus 2** | 10 p | Extra bonus question defined by league admin | Matched case-insensitively |
-
-| **Tournament bonuses max** | **100 p** | | |
+| **Top Scorer** | 20 p | Predict the player who scores the most goals | Matched case-insensitively (e.g., "Mbappe" = "MBAPPE") |
+| **Tournament bonuses max** | **80 p** | | |
 
 > Tournament bonuses are counted in the global leaderboard.
 
@@ -96,10 +92,10 @@ Before the tournament begins, you can make seven long-term predictions. Each cor
 
 | Category | Max Points |
 |---|---|
-| Match results (72 group + 32 knockout = 104 matches) | 728 p |
-| Bracket bonus | 172 p |
-| Tournament bonuses | 100 p |
-| **Grand total** | **1 000 p** |
+| Match results (72 group + 32 knockout = 104 matches) | 936 p |
+| Bracket bonus | 131 p |
+| Tournament bonuses | 80 p |
+| **Grand total** | **1 147 p** |
 
 ---
 

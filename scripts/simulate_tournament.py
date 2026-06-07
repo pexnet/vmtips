@@ -224,7 +224,7 @@ def _outcome(home: int, away: int) -> int:
 def _match_points(pred_home: int, pred_away: int, actual_home: int, actual_away: int) -> int:
     points = 0
     if _outcome(pred_home, pred_away) == _outcome(actual_home, actual_away):
-        points += 3
+        points += 5
     if pred_home == actual_home:
         points += 2
     if pred_away == actual_away:
@@ -254,11 +254,11 @@ def group_prediction_for_match(match_number: int) -> tuple[int, int]:
 
     variant = match_number % 5
     if variant == 0:
-        # Perfect: outcome + both team scores = 7p.
+        # Perfect: outcome + both team scores = 9p.
         return actual_home, actual_away
     if variant == 1:
-        # Correct outcome only = 3p.
-        return _find_prediction_with_points(actual_home, actual_away, 3, change_both_scores=True)
+        # Correct outcome only = 5p.
+        return _find_prediction_with_points(actual_home, actual_away, 5, change_both_scores=True)
     if variant in {2, 3}:
         # One team score correct only = 2p.
         return _find_prediction_with_points(actual_home, actual_away, 2)

@@ -1,20 +1,20 @@
 """
 Tests for the scoring engine.
 
-Scoring rules (from VM-tips-2026 Excel, 7p per match):
-  - Correct outcome (home/draw/away): 3p
+Scoring rules:
+  - Correct outcome/winner (home/draw/away): 5p
   - Correct home score: 2p
   - Correct away score: 2p
-  - Perfect (all 3): 7p
+  - Perfect (all 3): 9p
 
 Bracket round points:
   - round_of_32: 1p
   - round_of_16: 3p
-  - quarter_final: 5p
-  - semi_final: 7p
-  - final: 9p
-  - match_for_third_place: 9p
-  - world_champion: 11p
+  - quarter_final: 3p
+  - semi_final: 3p
+  - final: 3p
+  - match_for_third_place: 3p
+  - world_champion: 3p
 
 Tournament bonus points (Excel):
   - World champion: 20p
@@ -32,48 +32,48 @@ from scoring import calculate_match_points, calculate_tournament_bonus_points, c
 
 class TestMatchScoring:
     def test_perfect_prediction(self):
-        """Exact result: outcome(3) + home(2) + away(2) = 7."""
+        """Exact result: outcome(5) + home(2) + away(2) = 9."""
         result = calculate_match_points(2, 1, 2, 1)
-        assert result["points"] == 7
+        assert result["points"] == 9
         assert result["perfect"] is True
         assert result["outcome_correct"] is True
         assert result["home_score_correct"] is True
         assert result["away_score_correct"] is True
 
     def test_correct_outcome_only(self):
-        """Correct winner but wrong scores: 3p only."""
+        """Correct winner but wrong scores: 5p only."""
         result = calculate_match_points(3, 0, 2, 1)
-        assert result["points"] == 3
+        assert result["points"] == 5
         assert result["outcome_correct"] is True
         assert result["home_score_correct"] is False
         assert result["away_score_correct"] is False
 
     def test_correct_outcome_and_home_score(self):
-        """Correct winner + home score: 3+2 = 5."""
+        """Correct winner + home score: 5+2 = 7."""
         result = calculate_match_points(2, 0, 2, 1)
-        assert result["points"] == 5
+        assert result["points"] == 7
         assert result["outcome_correct"] is True
         assert result["home_score_correct"] is True
 
     def test_correct_outcome_and_away_score(self):
-        """Correct winner + away score: 3+2 = 5."""
+        """Correct winner + away score: 5+2 = 7."""
         result = calculate_match_points(3, 1, 2, 1)
-        assert result["points"] == 5
+        assert result["points"] == 7
         assert result["outcome_correct"] is True
         assert result["away_score_correct"] is True
 
     def test_draw_prediction_wrong_scores(self):
-        """Predict draw but wrong scores: outcome(3) only."""
+        """Predict draw but wrong scores: outcome(5) only."""
         result = calculate_match_points(1, 1, 0, 0)
-        assert result["points"] == 3
+        assert result["points"] == 5
         assert result["outcome_correct"] is True
         assert result["home_score_correct"] is False
         assert result["away_score_correct"] is False
 
     def test_correct_draw_exact(self):
-        """Exact draw: 3+2+2 = 7."""
+        """Exact draw: 5+2+2 = 9."""
         result = calculate_match_points(1, 1, 1, 1)
-        assert result["points"] == 7
+        assert result["points"] == 9
         assert result["perfect"] is True
 
     def test_wrong_outcome_right_home_score(self):
@@ -93,7 +93,7 @@ class TestMatchScoring:
     def test_wrong_outcome_nothing_else(self):
         """Only correct outcome: pred 3-2 vs actual 2-0."""
         result = calculate_match_points(3, 2, 2, 0)
-        assert result["points"] == 3
+        assert result["points"] == 5
         assert result["outcome_correct"] is True
         assert result["home_score_correct"] is False
         assert result["away_score_correct"] is False
@@ -281,39 +281,39 @@ class TestBracketScoring:
         assert result["points"] == 3
 
     def test_correct_quarter_final(self):
-        """Correct quarter_final placement earns 5 points: 1 qualification + two 2p steps."""
+        """Correct quarter_final placement earns 3 points: no extra after round_of_16."""
         preds = [{"team_id": 1, "round": "quarter_final"}]
         actuals = [{"team_id": 1, "round": "quarter_final"}]
         result = calculate_bracket_points(preds, actuals)
-        assert result["points"] == 5
+        assert result["points"] == 3
 
     def test_correct_semi_final(self):
-        """Correct semi_final placement earns 7 points: 1 qualification + three 2p steps."""
+        """Correct semi_final placement earns 3 points: no extra after round_of_16."""
         preds = [{"team_id": 1, "round": "semi_final"}]
         actuals = [{"team_id": 1, "round": "semi_final"}]
         result = calculate_bracket_points(preds, actuals)
-        assert result["points"] == 7
+        assert result["points"] == 3
 
     def test_correct_final(self):
-        """Correct final placement earns 9 points: 1 qualification + four 2p steps."""
+        """Correct final placement earns 3 points: no extra after round_of_16."""
         preds = [{"team_id": 1, "round": "final"}]
         actuals = [{"team_id": 1, "round": "final"}]
         result = calculate_bracket_points(preds, actuals)
-        assert result["points"] == 9
+        assert result["points"] == 3
 
     def test_correct_match_for_third_place(self):
-        """Correct match_for_third_place placement earns 9 points: 1 qualification + four 2p steps."""
+        """Correct match_for_third_place placement earns 3 points: no extra after round_of_16."""
         preds = [{"team_id": 1, "round": "match_for_third_place"}]
         actuals = [{"team_id": 1, "round": "match_for_third_place"}]
         result = calculate_bracket_points(preds, actuals)
-        assert result["points"] == 9
+        assert result["points"] == 3
 
     def test_correct_world_champion(self):
-        """Correct world_champion placement earns 11 points: 1 qualification + five 2p steps."""
+        """Correct world_champion placement earns 3 points: no extra after round_of_16."""
         preds = [{"team_id": 1, "round": "world_champion"}]
         actuals = [{"team_id": 1, "round": "world_champion"}]
         result = calculate_bracket_points(preds, actuals)
-        assert result["points"] == 11
+        assert result["points"] == 3
 
     def test_wrong_team_same_round(self):
         """Wrong team in same round gives 0 points."""
@@ -342,8 +342,8 @@ class TestBracketScoring:
             {"team_id": 3, "round": "semi_final"},
         ]
         result = calculate_bracket_points(preds, actuals)
-        # 3 + 5 + 7 = 15
-        assert result["points"] == 15
+        # 3 + 3 + 3 = 9
+        assert result["points"] == 9
         assert len(result["details"]) == 3
 
     def test_mixed_correct_and_wrong(self):
@@ -361,11 +361,11 @@ class TestBracketScoring:
         assert len(result["details"]) == 1
 
     def test_bracket_round_points_constant(self):
-        """BRACKET_ROUND_POINTS has expected values from Excel."""
+        """BRACKET_ROUND_POINTS has expected current VMTips values."""
         assert BRACKET_ROUND_POINTS["round_of_32"] == 1
         assert BRACKET_ROUND_POINTS["round_of_16"] == 3
-        assert BRACKET_ROUND_POINTS["quarter_final"] == 5
-        assert BRACKET_ROUND_POINTS["semi_final"] == 7
-        assert BRACKET_ROUND_POINTS["final"] == 9
-        assert BRACKET_ROUND_POINTS["match_for_third_place"] == 9
-        assert BRACKET_ROUND_POINTS["world_champion"] == 11
+        assert BRACKET_ROUND_POINTS["quarter_final"] == 3
+        assert BRACKET_ROUND_POINTS["semi_final"] == 3
+        assert BRACKET_ROUND_POINTS["final"] == 3
+        assert BRACKET_ROUND_POINTS["match_for_third_place"] == 3
+        assert BRACKET_ROUND_POINTS["world_champion"] == 3

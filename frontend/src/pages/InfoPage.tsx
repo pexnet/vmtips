@@ -11,10 +11,10 @@ export default function InfoPage() {
   const { t } = useTranslation();
 
   const matchRows = [
-    { label: t("info.match.outcome"), points: 3 },
+    { label: t("info.match.outcome"), points: 5 },
     { label: t("info.match.home_goals"), points: 2 },
     { label: t("info.match.away_goals"), points: 2 },
-    { label: t("info.match.max"), points: 7, bold: true },
+    { label: t("info.match.max"), points: 9, bold: true },
   ];
 
   const bracketRows = [
@@ -46,7 +46,7 @@ export default function InfoPage() {
   const totalBracketPts = Object.entries(bracketSlots)
     .reduce((sum, [key, slots]) => sum + slots * BRACKET_ROUND_POINTS[key as keyof typeof BRACKET_ROUND_POINTS], 0);
   const totalBonusPts = bonusRows.reduce((sum, row) => sum + row.points, 0);
-  const totalMatchPts = 104 * 7; // 72 group + 32 knockout
+  const totalMatchPts = 104 * 9; // 72 group + 32 knockout
   const grandTotal = totalMatchPts + totalBracketPts + totalBonusPts;
 
   return (

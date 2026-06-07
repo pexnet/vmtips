@@ -1,10 +1,10 @@
 """
 Tests for the leaderboard endpoints.
-Scoring rules (7p max per match):
-  - Correct outcome: 3p
+Scoring rules (9p max per match):
+  - Correct outcome/winner: 5p
   - Correct home score: 2p
   - Correct away score: 2p
-  - Perfect (all 3): 7p
+  - Perfect (all 3): 9p
 """
 
 
@@ -41,8 +41,8 @@ class TestGlobalLeaderboard:
     def test_leaderboard_with_scores(self, client, set_match_result):
         """Two users with predictions on a finished match.
 
-        Alice predicts 2-1, actual 2-1 = perfect (outcome 3 + home 2 + away 2 = 7p)
-        Bob predicts 1-0, actual 2-1 = outcome only (3p)
+        Alice predicts 2-1, actual 2-1 = perfect (outcome 5 + home 2 + away 2 = 9p)
+        Bob predicts 1-0, actual 2-1 = outcome only (5p)
         """
         set_match_result(1, 2, 1)
 
@@ -57,13 +57,13 @@ class TestGlobalLeaderboard:
         # Seeded admin user (0 points) is also in the leaderboard
         assert len(data["leaderboard"]) >= 2
 
-        # Alice should be first (7 points), Bob second (3 points)
+        # Alice should be first (9 points), Bob second (5 points)
         alice = next(u for u in data["leaderboard"] if u["display_name"] == "Alice")
-        assert alice["total_points"] == 7
+        assert alice["total_points"] == 9
         assert alice["rank"] == 1
 
         bob = next(u for u in data["leaderboard"] if u["display_name"] == "Bob")
-        assert bob["total_points"] == 3
+        assert bob["total_points"] == 5
         assert bob["rank"] == 2
 
     def test_global_endpoint_uses_one_league_not_all_user_leagues(self, client, set_match_result):
@@ -86,23 +86,23 @@ class TestGlobalLeaderboard:
 
         global_data = client.get("/leaderboard/global").json()
         row = next(u for u in global_data["leaderboard"] if u["display_name"] == "Multi")
-        assert row["total_points"] == 7
+        assert row["total_points"] == 9
 
         custom_data = client.get(
             f"/leaderboard/league/{custom_league_id}",
             headers={"Authorization": f"Bearer {token}"},
         ).json()
         custom_row = next(u for u in custom_data["leaderboard"] if u["display_name"] == "Multi")
-        assert custom_row["total_points"] == 3
+        assert custom_row["total_points"] == 5
 
 
 class TestPersonalScores:
     def test_my_scores(self, client, set_match_result):
         """GET /leaderboard/me returns my score breakdown.
 
-        Carol predicts match1: 2-1 (actual 2-1) = 7p (perfect)
-        Carol predicts match2: 1-1 (actual 0-0) = 3p (draw correct outcome, wrong scores)
-        Total = 10p
+        Carol predicts match1: 2-1 (actual 2-1) = 9p (perfect)
+        Carol predicts match2: 1-1 (actual 0-0) = 5p (draw correct outcome, wrong scores)
+        Total = 14p
         """
         set_match_result(1, 2, 1)
         set_match_result(2, 0, 0)
@@ -119,13 +119,13 @@ class TestPersonalScores:
         data = r.json()
 
         assert data["display_name"] == "Carol"
-        assert data["total_points"] == 10
+        assert data["total_points"] == 14
         assert data["predictions_made"] == 2
         assert data["matches_scored"] == 2
         assert data["perfect_predictions"] == 1
         assert len(data["breakdown"]) == 2
         assert data["breakdown"][0]["perfect"] is True
-        assert data["breakdown"][0]["points"] == 7
+        assert data["breakdown"][0]["points"] == 9
 
     def test_my_scores_defaults_to_one_league(self, client, set_match_result):
         set_match_result(1, 2, 1)
@@ -142,8 +142,8 @@ class TestPersonalScores:
 
         default_score = client.get(f"/leaderboard/me?league_id={default_league_id}", headers={"Authorization": f"Bearer {token}"}).json()
         current_score = client.get("/leaderboard/me", headers={"Authorization": f"Bearer {token}"}).json()
-        assert default_score["total_points"] == 7
-        assert current_score["total_points"] == 3
+        assert default_score["total_points"] == 9
+        assert current_score["total_points"] == 5
 
     def test_my_scores_no_auth(self, client):
         """GET /leaderboard/me without token returns 401."""
@@ -155,8 +155,8 @@ class TestLeagueLeaderboard:
     def test_league_leaderboard(self, client, set_match_result):
         """Members-only leaderboard for a league.
 
-        Alice predicts 2-1 (actual 2-1) = 7p
-        Bob predicts 1-0 (actual 2-1) = 3p
+        Alice predicts 2-1 (actual 2-1) = 9p
+        Bob predicts 1-0 (actual 2-1) = 5p
         """
         set_match_result(1, 2, 1)
 
@@ -178,8 +178,8 @@ class TestLeagueLeaderboard:
 
         assert data["league_name"] == "My League"
         assert len(data["leaderboard"]) == 2
-        assert data["leaderboard"][0]["total_points"] == 7
-        assert data["leaderboard"][1]["total_points"] == 3
+        assert data["leaderboard"][0]["total_points"] == 9
+        assert data["leaderboard"][1]["total_points"] == 5
 
     def test_league_not_member(self, client):
         """Non-member cannot view league leaderboard."""
