@@ -22,8 +22,9 @@ import {
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import { useLeagueDetail, useLeagueBonusQuestions, useCreateBonusQuestion, useUpdateBonusQuestion, useDeleteBonusQuestion, useMyBonusAnswer, useSaveBonusAnswer } from "../hooks/useLeagues";
+import { isGroupOpen, usePhase } from "../hooks/usePhase";
 
-function BonusAnswerForm({ leagueId, questionId }: { leagueId: number; questionId: number }) {
+function BonusAnswerForm({ leagueId, questionId, locked }: { leagueId: number; questionId: number; locked: boolean }) {
   const { t } = useTranslation();
   const { data: answer } = useMyBonusAnswer(leagueId, questionId);
   const saveMutation = useSaveBonusAnswer();
@@ -40,12 +41,13 @@ function BonusAnswerForm({ leagueId, questionId }: { leagueId: number; questionI
         label={t("leagues.answer")}
         value={answerText}
         onChange={(e) => setAnswerText(e.target.value)}
+        disabled={locked}
         fullWidth
       />
       <Button
         variant="outlined"
         onClick={() => saveMutation.mutate({ leagueId, questionId, answerText: answerText.trim() })}
-        disabled={!answerText.trim()}
+        disabled={locked || !answerText.trim()}
       >
         {t("common.save")}
       </Button>
@@ -60,6 +62,7 @@ export default function LeagueBonusQuestionsPage() {
 
   const { data: league } = useLeagueDetail(id);
   const { data: questions = [], isLoading, error } = useLeagueBonusQuestions(id);
+  const { data: phaseData } = usePhase();
   const createMutation = useCreateBonusQuestion();
   const updateMutation = useUpdateBonusQuestion();
   const deleteMutation = useDeleteBonusQuestion();
@@ -70,6 +73,7 @@ export default function LeagueBonusQuestionsPage() {
   const [editQuestion, setEditQuestion] = useState<{ id: number; question_text: string; points_value: string; answer: string } | null>(null);
 
   const isAdmin = league?.is_admin ?? false;
+  const answersLocked = !isGroupOpen(phaseData);
 
   const handleCreate = () => {
     if (!id || !newQuestion.question_text.trim() || !newQuestion.points_value) return;
@@ -136,6 +140,9 @@ export default function LeagueBonusQuestionsPage() {
         </Typography>
       )}
       {error && <Alert severity="error" sx={{ mb: 2 }}>{t("common.error")}</Alert>}
+      {!isAdmin && answersLocked && (
+        <Alert severity="info" sx={{ mb: 2 }}>{t("phase.group_closed_msg")}</Alert>
+      )}
 
       {isAdmin && (
         <Box sx={{ mb: 3 }}>
@@ -181,7 +188,9 @@ export default function LeagueBonusQuestionsPage() {
                   secondary={`${t("leagues.points")}: ${q.points_value}${q.answer ? ` | ${t("leagues.answer")}: ${q.answer}` : ""}`}
                 />
               </ListItem>
-              {!isAdmin && id && <BonusAnswerForm leagueId={id} questionId={q.id} />}
+              {!isAdmin && id && (
+                <BonusAnswerForm leagueId={id} questionId={q.id} locked={answersLocked} />
+              )}
             </Paper>
           ))}
         </List>

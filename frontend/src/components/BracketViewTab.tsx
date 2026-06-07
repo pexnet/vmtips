@@ -103,24 +103,19 @@ function predictedWinnerSide(prediction: KnockoutMatchPrediction): "home" | "awa
 function isMatchLocked(
   matchDate: string | null,
   status: string,
-  phase: string | undefined,
-  matchRound: string
+  phaseData: Parameters<typeof isKnockoutOpen>[0],
 ): boolean {
   // Finished matches are always locked
   if (status === "finished") return true;
 
   // If the tournament is fully closed, everything is locked
-  if (phase === "knockout_closed") return true;
+  if (!isKnockoutOpen(phaseData)) return true;
 
   // If match has already kicked off, it's locked
   if (matchDate) {
     const kickoff = new Date(matchDate);
     if (!isNaN(kickoff.getTime()) && kickoff <= new Date()) return true;
   }
-
-  // If we're still in group_open, early knockout rounds are locked
-  // (Users can only predict knockouts after group stage closes or during knockout_open)
-  if (phase === "group_open" && matchRound !== "group") return true;
 
   return false;
 }
@@ -136,6 +131,12 @@ export default function BracketViewTab() {
   const [matchPredictions, setMatchPredictions] = useState(
     {} as Record<number, KnockoutMatchPrediction>
   );
+  const [dirtyMatchIds, setDirtyMatchIds] = useState<Set<number>>(() => new Set());
+
+  useEffect(() => {
+    setMatchPredictions({});
+    setDirtyMatchIds(new Set());
+  }, [selectedLeagueId]);
 
   // Pre-fill from existing predictions whenever data loads
   useEffect(() => {
@@ -180,6 +181,7 @@ export default function BracketViewTab() {
       ...prev,
       [id]: { ...prev[id], [side]: val },
     }));
+    setDirtyMatchIds((prev) => new Set(prev).add(id));
   };
 
   const handleKnockoutMetaChange = (
@@ -191,11 +193,22 @@ export default function BracketViewTab() {
       ...prev,
       [id]: { ...prev[id], [field]: val },
     }));
+    setDirtyMatchIds((prev) => new Set(prev).add(id));
   };
 
   const handleSave = () => {
+    const editableMatchIds = new Set(
+      knockout_matches
+        .filter((match) => !isMatchLocked(match.match_date, match.actual.status, phaseData))
+        .map((match) => match.match_id),
+    );
     const batch = Object.entries(matchPredictions)
-      .filter(([, v]) => v.home !== "" && v.away !== "")
+      .filter(([id, v]) => (
+        dirtyMatchIds.has(Number(id)) &&
+        editableMatchIds.has(Number(id)) &&
+        v.home !== "" &&
+        v.away !== ""
+      ))
       .map(([id, v]) => ({
         match_id: Number(id),
         home_goals: Number(v.home),
@@ -217,6 +230,11 @@ export default function BracketViewTab() {
     predictionsApi
       .batch(selectedLeagueId, batch)
       .then(() => {
+        setDirtyMatchIds((prev) => {
+          const next = new Set(prev);
+          batch.forEach((prediction) => next.delete(prediction.match_id));
+          return next;
+        });
         setSaveMsg(t("predictions.save_success"));
         setErrorMsg("");
       })
@@ -236,10 +254,10 @@ export default function BracketViewTab() {
     }))
     .filter((r) => r.matches.length > 0);
 
-  const groupClosed = isGroupClosed(phaseData);
   const tournamentClosed = isTournamentClosed(phaseData);
-  const knockoutEditable = groupClosed && !tournamentClosed;
   const knockoutOpen = isKnockoutOpen(phaseData);
+  const groupClosed = isGroupClosed(phaseData);
+  const knockoutEditable = knockoutOpen && !tournamentClosed;
 
   return (
     <Box>
@@ -360,7 +378,7 @@ export default function BracketViewTab() {
               const winnerSide = predictedWinnerSide(matchPred);
 
               const isFinished = act.status === "finished";
-              const isLocked = isMatchLocked(m.match_date, act.status, phaseData?.phase, m.round);
+              const isLocked = isMatchLocked(m.match_date, act.status, phaseData);
               const isDisabled = isLocked || !knockoutEditable;
 
               const kickoff = m.match_date
@@ -622,7 +640,7 @@ export default function BracketViewTab() {
           variant="contained"
           size="large"
           onClick={handleSave}
-          disabled={!knockoutEditable || Object.keys(matchPredictions).length === 0}
+          disabled={!knockoutEditable || dirtyMatchIds.size === 0}
         >
           {t("matches.save_predictions")}
         </Button>

@@ -4,12 +4,14 @@ League Bonus Questions router: CRUD for bonus questions within a league.
 Only the league admin can create, update, or delete bonus questions.
 Any league member can list and view bonus questions.
 """
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from database import get_db
 from errors import NotFoundError, ForbiddenError, ValidationError
-from models import League, LeagueBonusAnswer, LeagueBonusQuestion, LeagueMember, User
+from models import League, LeagueBonusAnswer, LeagueBonusQuestion, LeagueMember, TournamentPhase, User
 from schemas import (
     LeagueBonusAnswerCreate,
     LeagueBonusQuestionCreate,
@@ -62,6 +64,21 @@ def _score_answer(question: LeagueBonusQuestion, answer_text: str) -> tuple[bool
         return None, None
     is_correct = answer_text.strip().lower() == question.answer.strip().lower()
     return is_correct, question.points_value if is_correct else 0
+
+
+def _answers_are_open(db: Session) -> bool:
+    """League bonus answers share the group-stage prediction deadline."""
+    phase = db.query(TournamentPhase).first()
+    if phase is None:
+        return True
+    if phase.phase != "group_open":
+        return False
+    if phase.group_deadline is None:
+        return True
+    deadline = phase.group_deadline
+    if deadline.tzinfo is None:
+        deadline = deadline.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) < deadline
 
 
 @router.post(
@@ -279,6 +296,12 @@ def save_bonus_answer(
             error_code="bonus_question_not_found",
         )
 
+    if not _answers_are_open(db):
+        raise ForbiddenError(
+            detail="bonus_answers_locked",
+            error_code="bonus_answers_locked",
+        )
+
     answer_text = payload.answer_text.strip()
     is_correct, points_awarded = _score_answer(question, answer_text)
 
@@ -308,8 +331,8 @@ def save_bonus_answer(
     return {
         "question_id": question_id,
         "answer_text": answer.answer_text,
-        "is_correct": answer.is_correct,
-        "points_awarded": answer.points_awarded,
+        "is_correct": None,
+        "points_awarded": None,
     }
 
 
@@ -359,9 +382,10 @@ def get_my_bonus_answer(
             "is_correct": None,
             "points_awarded": None,
         }
+    answers_open = _answers_are_open(db)
     return {
         "question_id": question_id,
         "answer_text": answer.answer_text,
-        "is_correct": answer.is_correct,
-        "points_awarded": answer.points_awarded,
+        "is_correct": None if answers_open else answer.is_correct,
+        "points_awarded": None if answers_open else answer.points_awarded,
     }

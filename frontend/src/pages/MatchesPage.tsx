@@ -365,6 +365,7 @@ export default function MatchesPage() {
   const [predictions, setPredictions] = useState(
     {} as Record<number, { home: string; away: string }>
   );
+  const [dirtyMatchIds, setDirtyMatchIds] = useState<Set<number>>(() => new Set());
 
   // Phase gating
   const { data: phaseData } = usePhase();
@@ -385,6 +386,11 @@ export default function MatchesPage() {
   const { data: teams = [] } = useTeamsFromMatches();
   const { data: bonusesData } = useTournamentBonuses(selectedLeagueId ?? undefined);
 
+  useEffect(() => {
+    setPredictions({});
+    setDirtyMatchIds(new Set());
+  }, [selectedLeagueId]);
+
   // Populate bonuses form when tournament bonuses are loaded
   useEffect(() => {
     if (bonusesData) {
@@ -402,16 +408,14 @@ export default function MatchesPage() {
 
   // Pre-fill predictions from saved ones
   useEffect(() => {
-    if (predictionsList.length > 0) {
-      const filled: Record<number, { home: string; away: string }> = {};
-      predictionsList.forEach((p) => {
-        filled[p.match_id] = {
-          home: String(p.home_goals),
-          away: String(p.away_goals),
-        };
-      });
-      setPredictions((prev) => ({ ...prev, ...filled }));
-    }
+    const filled: Record<number, { home: string; away: string }> = {};
+    predictionsList.forEach((p) => {
+      filled[p.match_id] = {
+        home: String(p.home_goals),
+        away: String(p.away_goals),
+      };
+    });
+    setPredictions((prev) => ({ ...filled, ...prev }));
   }, [predictionsList]);
 
   const handleChange = (id: number, side: "home" | "away", val: string) => {
@@ -419,11 +423,27 @@ export default function MatchesPage() {
       ...prev,
       [id]: { ...prev[id], [side]: val },
     }));
+    setDirtyMatchIds((prev) => new Set(prev).add(id));
   };
 
   const handleSave = () => {
+    const now = new Date();
+    const editableGroupMatchIds = new Set(
+      matches
+        .filter((match) => (
+          match.round === "group" &&
+          match.status !== "finished" &&
+          new Date(match.match_date) > now
+        ))
+        .map((match) => match.id),
+    );
     const batch = Object.entries(predictions)
-      .filter(([, v]) => v.home !== "" && v.away !== "")
+      .filter(([id, v]) => (
+        dirtyMatchIds.has(Number(id)) &&
+        editableGroupMatchIds.has(Number(id)) &&
+        v.home !== "" &&
+        v.away !== ""
+      ))
       .map(([id, v]) => ({
         match_id: Number(id),
         home_goals: Number(v.home),
@@ -446,6 +466,11 @@ export default function MatchesPage() {
     predictionsApi
       .batch(selectedLeagueId, batch)
       .then(() => {
+        setDirtyMatchIds((prev) => {
+          const next = new Set(prev);
+          batch.forEach((prediction) => next.delete(prediction.match_id));
+          return next;
+        });
         setSaveMsg(t("predictions.save_success"));
       })
       .catch((err: unknown) => {
@@ -679,7 +704,7 @@ export default function MatchesPage() {
               }
               handleSave();
             }}
-            disabled={groupLocked || Object.keys(predictions).length === 0}
+            disabled={groupLocked || dirtyMatchIds.size === 0}
           >
             {t("matches.save_predictions")}
           </Button>

@@ -2,6 +2,7 @@
 Leaderboard router: global, per-league, and personal score breakdown.
 """
 import math
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -13,7 +14,7 @@ from errors import NotFoundError, ForbiddenError
 from models import (
     User, Prediction, Match, League, LeagueMember, Score,
     BracketPrediction, TournamentResult, TournamentBonus,
-    KnockoutAdvancement, LeagueBonusAnswer, LeagueBonusQuestion,
+    KnockoutAdvancement, LeagueBonusAnswer, LeagueBonusQuestion, TournamentPhase,
 )
 from security import fetch_current_user
 from scoring import calculate_match_points, calculate_bracket_points, calculate_tournament_bonus_points, BRACKET_ROUND_POINTS
@@ -31,6 +32,21 @@ def _empty_score() -> dict:
         "predictions_made": 0,
         "perfect_predictions": 0,
     }
+
+
+def _league_bonus_scores_visible(db: Session) -> bool:
+    """Hide bonus correctness and points until group predictions are locked."""
+    phase = db.query(TournamentPhase).first()
+    if phase is None:
+        return False
+    if phase.phase != "group_open":
+        return True
+    if phase.group_deadline is None:
+        return False
+    deadline = phase.group_deadline
+    if deadline.tzinfo is None:
+        deadline = deadline.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) >= deadline
 
 
 def _resolve_user_league_id(db: Session, user_id: int, league_id: int | None = None) -> int | None:
@@ -169,22 +185,23 @@ def _batch_calculate_scores(
         for row in bonus_rows:
             scores[row.user_id]["tournament_bonus_points"] = int(row.tournament_bonus_points or 0)
 
-    league_bonus_rows = (
-        db.query(
-            LeagueBonusAnswer.user_id,
-            func.coalesce(func.sum(LeagueBonusAnswer.points_awarded), 0).label("league_bonus_points"),
+    if _league_bonus_scores_visible(db):
+        league_bonus_rows = (
+            db.query(
+                LeagueBonusAnswer.user_id,
+                func.coalesce(func.sum(LeagueBonusAnswer.points_awarded), 0).label("league_bonus_points"),
+            )
+            .join(LeagueBonusQuestion, LeagueBonusAnswer.question_id == LeagueBonusQuestion.id)
+            .filter(
+                LeagueBonusQuestion.league_id == league_id,
+                LeagueBonusAnswer.user_id.in_(user_ids),
+                LeagueBonusAnswer.points_awarded.isnot(None),
+            )
+            .group_by(LeagueBonusAnswer.user_id)
+            .all()
         )
-        .join(LeagueBonusQuestion, LeagueBonusAnswer.question_id == LeagueBonusQuestion.id)
-        .filter(
-            LeagueBonusQuestion.league_id == league_id,
-            LeagueBonusAnswer.user_id.in_(user_ids),
-            LeagueBonusAnswer.points_awarded.isnot(None),
-        )
-        .group_by(LeagueBonusAnswer.user_id)
-        .all()
-    )
-    for row in league_bonus_rows:
-        scores[row.user_id]["league_bonus_points"] = int(row.league_bonus_points or 0)
+        for row in league_bonus_rows:
+            scores[row.user_id]["league_bonus_points"] = int(row.league_bonus_points or 0)
 
     for score in scores.values():
         score["total_points"] = (
@@ -319,16 +336,18 @@ def _calculate_user_score(user_id: int, db: Session, league_id: int | None = Non
             "custom_bonus_2_correct": tb_result.get("custom_bonus_2_correct", False),
         }
 
-    league_bonus_points = (
-        db.query(func.coalesce(func.sum(LeagueBonusAnswer.points_awarded), 0))
-        .join(LeagueBonusQuestion, LeagueBonusAnswer.question_id == LeagueBonusQuestion.id)
-        .filter(
-            LeagueBonusAnswer.user_id == user_id,
-            LeagueBonusQuestion.league_id == league_id,
-            LeagueBonusAnswer.points_awarded.isnot(None),
+    league_bonus_points = 0
+    if _league_bonus_scores_visible(db):
+        league_bonus_points = (
+            db.query(func.coalesce(func.sum(LeagueBonusAnswer.points_awarded), 0))
+            .join(LeagueBonusQuestion, LeagueBonusAnswer.question_id == LeagueBonusQuestion.id)
+            .filter(
+                LeagueBonusAnswer.user_id == user_id,
+                LeagueBonusQuestion.league_id == league_id,
+                LeagueBonusAnswer.points_awarded.isnot(None),
+            )
+            .scalar()
         )
-        .scalar()
-    )
     league_bonus_points = int(league_bonus_points or 0)
 
     total_points = total_match_points + total_bracket_points + tournament_bonus_points + league_bonus_points

@@ -14,14 +14,32 @@ from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
 from errors import ForbiddenError, ValidationError
-from models import Prediction, Match, TournamentBonus, BracketPrediction, TournamentPhase, LeagueMember
+from models import Prediction, Match, Team, TournamentBonus, BracketPrediction, TournamentPhase, LeagueMember
 from schemas import PredictionBatchCreate, TournamentBonusCreate, BracketPredictionBatch
 from routers.auth import fetch_current_user
 from bracket_engine import save_generated_bracket
-from scoring import BRACKET_ROUND_POINTS
 
 router = APIRouter(prefix="/predictions", tags=["predictions"])
 logger = logging.getLogger("vmtips")
+
+BRACKET_ROUND_LIMITS = {
+    "round_of_32": 32,
+    "round_of_16": 16,
+    "quarter_final": 8,
+    "semi_final": 4,
+    "match_for_third_place": 2,
+    "final": 2,
+    "world_champion": 1,
+}
+
+BRACKET_PARENT_ROUNDS = {
+    "round_of_16": "round_of_32",
+    "quarter_final": "round_of_16",
+    "semi_final": "quarter_final",
+    "final": "semi_final",
+    "match_for_third_place": "semi_final",
+    "world_champion": "final",
+}
 
 
 def _get_phase(db: Session) -> TournamentPhase:
@@ -67,12 +85,15 @@ def _can_predict_group(phase: TournamentPhase) -> bool:
 
 def _can_predict_bracket(phase: TournamentPhase) -> bool:
     """Check if knockout bracket predictions are allowed."""
+    now = datetime.now(timezone.utc)
+    if phase.knockout_deadline is not None:
+        deadline = phase.knockout_deadline
+        if deadline.tzinfo is None:
+            deadline = deadline.replace(tzinfo=timezone.utc)
+        if now >= deadline:
+            return False
+
     if phase.phase == "knockout_open":
-        if phase.knockout_deadline is not None:
-            deadline = phase.knockout_deadline
-            if deadline.tzinfo is None:
-                deadline = deadline.replace(tzinfo=timezone.utc)
-            return datetime.now(timezone.utc) < deadline
         return True
     if phase.phase == "group_closed":
         # Bracket opens when group stage is closed (may have a scheduled open time)
@@ -80,7 +101,7 @@ def _can_predict_bracket(phase: TournamentPhase) -> bool:
             opens = phase.knockout_opens_at
             if opens.tzinfo is None:
                 opens = opens.replace(tzinfo=timezone.utc)
-            return datetime.now(timezone.utc) >= opens
+            return now >= opens
         return False  # Not yet open
     return False
 
@@ -113,6 +134,56 @@ def _pred_to_dict(pred: Prediction) -> dict:
             },
         },
     }
+
+
+def _validate_bracket_entries(db: Session, entries) -> None:
+    """Validate bracket capacity, team IDs, and round progression."""
+    entries_by_round = {round_name: set() for round_name in BRACKET_ROUND_LIMITS}
+    team_ids = set()
+
+    for entry in entries:
+        if entry.round not in BRACKET_ROUND_LIMITS:
+            raise ValidationError(
+                detail=f"invalid_round: {entry.round}",
+                error_code="invalid_round",
+            )
+        if entry.team_id in entries_by_round[entry.round]:
+            raise ValidationError(
+                detail=f"duplicate_bracket_team: {entry.round}",
+                error_code="duplicate_bracket_team",
+            )
+        entries_by_round[entry.round].add(entry.team_id)
+        team_ids.add(entry.team_id)
+
+    valid_team_ids = {
+        team_id
+        for (team_id,) in db.query(Team.id).filter(Team.id.in_(team_ids)).all()
+    } if team_ids else set()
+    if invalid_team_ids := team_ids - valid_team_ids:
+        raise ValidationError(
+            detail=f"invalid_team_ids: {sorted(invalid_team_ids)}",
+            error_code="invalid_team_ids",
+        )
+
+    for round_name, limit in BRACKET_ROUND_LIMITS.items():
+        if len(entries_by_round[round_name]) > limit:
+            raise ValidationError(
+                detail=f"too_many_bracket_teams: {round_name}",
+                error_code="too_many_bracket_teams",
+            )
+
+    for round_name, parent_round in BRACKET_PARENT_ROUNDS.items():
+        if not entries_by_round[round_name].issubset(entries_by_round[parent_round]):
+            raise ValidationError(
+                detail=f"invalid_bracket_progression: {round_name}",
+                error_code="invalid_bracket_progression",
+            )
+
+    if entries_by_round["final"] & entries_by_round["match_for_third_place"]:
+        raise ValidationError(
+            detail="final_and_third_place_must_be_disjoint",
+            error_code="invalid_bracket_progression",
+        )
 
 
 @router.get("")
@@ -401,29 +472,15 @@ def save_bracket_predictions(
     if not member:
         raise ForbiddenError(detail="not_league_member", error_code="not_league_member")
 
-    valid_rounds = set(BRACKET_ROUND_POINTS.keys())
-    for entry in payload.entries:
-        if entry.round not in valid_rounds:
-            raise ValidationError(
-                detail=f"invalid_round: {entry.round}",
-                error_code="invalid_round",
-            )
+    _validate_bracket_entries(db, payload.entries)
 
-    saved = 0
-    for entry in payload.entries:
-        existing = (
-            db.query(BracketPrediction)
-            .filter(
-                BracketPrediction.user_id == current_user.id,
-                BracketPrediction.league_id == league_id,
-                BracketPrediction.team_id == entry.team_id,
-                BracketPrediction.round == entry.round,
-            )
-            .first()
-        )
-        if existing:
-            existing.source = "knockout_prediction"
-        else:
+    try:
+        db.query(BracketPrediction).filter(
+            BracketPrediction.user_id == current_user.id,
+            BracketPrediction.league_id == league_id,
+        ).delete(synchronize_session=False)
+
+        for entry in payload.entries:
             db.add(BracketPrediction(
                 user_id=current_user.id,
                 league_id=league_id,
@@ -431,7 +488,9 @@ def save_bracket_predictions(
                 round=entry.round,
                 source="knockout_prediction",
             ))
-        saved += 1
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
-    db.commit()
-    return {"saved": saved}
+    return {"saved": len(payload.entries)}

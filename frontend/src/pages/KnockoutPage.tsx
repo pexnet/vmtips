@@ -519,8 +519,6 @@ export default function KnockoutPage() {
         entries.push({ team_id: teamId, round });
       }
     }
-    if (entries.length === 0) return;
-
     saveBracketMutation.mutate(entries, {
       onSuccess: () => {
         setSaveMsg(t("knockout.bracket_saved"));
@@ -765,7 +763,7 @@ export default function KnockoutPage() {
               variant="contained"
               size="large"
               onClick={handleSaveBracket}
-              disabled={saveBracketMutation.isPending || Object.values(bracketSelections).every((arr) => arr.length === 0)}
+              disabled={saveBracketMutation.isPending || knockoutLocked}
             >
               {saveBracketMutation.isPending ? <CircularProgress size={24} color="inherit" /> : t("knockout.save_bracket")}
             </Button>

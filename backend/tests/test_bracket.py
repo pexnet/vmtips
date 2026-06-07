@@ -21,15 +21,16 @@ class TestBracketPredictionEndpoints:
             "/predictions/bracket",
             json={
                 "entries": [
+                    {"team_id": 1, "round": "round_of_32"},
                     {"team_id": 1, "round": "round_of_16"},
-                    {"team_id": 2, "round": "quarter_final"},
-                    {"team_id": 3, "round": "semi_final"},
+                    {"team_id": 1, "round": "quarter_final"},
+                    {"team_id": 1, "round": "semi_final"},
                 ]
             },
             headers={"Authorization": f"Bearer {token}"},
         )
         assert r.status_code == 200
-        assert r.json()["saved"] == 3
+        assert r.json()["saved"] == 4
 
     def test_bracket_locked_in_group_open(self, client):
         """Bracket predictions are locked when phase is group_open (default)."""
@@ -58,7 +59,7 @@ class TestBracketPredictionEndpoints:
             json={
                 "entries": [
                     {"team_id": 1, "round": "round_of_32"},
-                    {"team_id": 2, "round": "final"},
+                    {"team_id": 1, "round": "round_of_16"},
                 ]
             },
             headers={"Authorization": f"Bearer {token}"},
@@ -73,7 +74,7 @@ class TestBracketPredictionEndpoints:
         assert len(data) == 2
         rounds = {e["round"] for e in data}
         assert "round_of_32" in rounds
-        assert "final" in rounds
+        assert "round_of_16" in rounds
 
     def test_invalid_round_rejected(self, client, set_phase):
         """Invalid round name returns 400."""
@@ -110,14 +111,14 @@ class TestBracketPredictionEndpoints:
         # First save
         client.post(
             "/predictions/bracket",
-            json={"entries": [{"team_id": 1, "round": "final"}]},
+            json={"entries": [{"team_id": 1, "round": "round_of_32"}]},
             headers={"Authorization": f"Bearer {token}"},
         )
 
         # Second save (same entry)
         r = client.post(
             "/predictions/bracket",
-            json={"entries": [{"team_id": 1, "round": "final"}]},
+            json={"entries": [{"team_id": 1, "round": "round_of_32"}]},
             headers={"Authorization": f"Bearer {token}"},
         )
         assert r.status_code == 200
@@ -130,6 +131,89 @@ class TestBracketPredictionEndpoints:
         )
         data = r.json()
         assert len(data) == 1
+
+    def test_rejects_bracket_round_over_capacity(self, client, set_phase):
+        set_phase("knockout_open")
+        token = _register_and_login(client, "bracketcap@example.com", "secret123", "BracketCap")
+
+        r = client.post(
+            "/predictions/bracket",
+            json={
+                "entries": [
+                    {"team_id": team_id, "round": "round_of_16"}
+                    for team_id in range(1, 18)
+                ]
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert r.status_code == 400
+        assert r.json()["error"] == "too_many_bracket_teams"
+
+    def test_rejects_invalid_bracket_progression(self, client, set_phase):
+        set_phase("knockout_open")
+        token = _register_and_login(client, "bracketflow@example.com", "secret123", "BracketFlow")
+
+        r = client.post(
+            "/predictions/bracket",
+            json={"entries": [{"team_id": 1, "round": "quarter_final"}]},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert r.status_code == 400
+        assert r.json()["error"] == "invalid_bracket_progression"
+
+    def test_rejects_unknown_bracket_team(self, client, set_phase):
+        set_phase("knockout_open")
+        token = _register_and_login(client, "bracketteam@example.com", "secret123", "BracketTeam")
+
+        r = client.post(
+            "/predictions/bracket",
+            json={"entries": [{"team_id": 99999, "round": "round_of_32"}]},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert r.status_code == 400
+        assert r.json()["error"] == "invalid_team_ids"
+
+    def test_bracket_save_replaces_removed_entries(self, client, set_phase):
+        set_phase("knockout_open")
+        token = _register_and_login(client, "bracketreplace@example.com", "secret123", "BracketReplace")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        client.post(
+            "/predictions/bracket",
+            json={"entries": [
+                {"team_id": 1, "round": "round_of_32"},
+                {"team_id": 2, "round": "round_of_32"},
+            ]},
+            headers=headers,
+        )
+        r = client.post(
+            "/predictions/bracket",
+            json={"entries": [{"team_id": 1, "round": "round_of_32"}]},
+            headers=headers,
+        )
+
+        assert r.status_code == 200
+        listed = client.get("/predictions/bracket", headers=headers).json()
+        assert [(entry["team_id"], entry["round"]) for entry in listed] == [(1, "round_of_32")]
+
+    def test_empty_bracket_clears_predictions(self, client, set_phase):
+        set_phase("knockout_open")
+        token = _register_and_login(client, "bracketclear@example.com", "secret123", "BracketClear")
+        headers = {"Authorization": f"Bearer {token}"}
+        client.post(
+            "/predictions/bracket",
+            json={"entries": [{"team_id": 1, "round": "round_of_32"}]},
+            headers=headers,
+        )
+
+        r = client.post("/predictions/bracket", json={"entries": []}, headers=headers)
+
+        assert r.status_code == 200
+        assert r.json()["saved"] == 0
+        assert client.get("/predictions/bracket", headers=headers).json() == []
 
 
 class TestBracketScoringIntegration:
