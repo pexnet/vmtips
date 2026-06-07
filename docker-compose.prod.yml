@@ -2,8 +2,10 @@ services:
   app:
     image: ghcr.io/pexnet/vmtips:latest
     container_name: vmtips
-    ports:
-      - "127.0.0.1:8000:8000"
+    expose:
+      - "8000"
+    # The app is only exposed on the internal Docker network. Put Caddy or
+    # another reverse proxy on the same external `web` network.
     # The non-root appuser (uid 1000) inside the container needs to own
     # the host bind-mount directory, otherwise SQLite cannot open the file.
     # Run `mkdir -p ./data` on the host before `docker compose up -d`
@@ -23,9 +25,15 @@ services:
       - CORS_ORIGINS=${CORS_ORIGINS:-}
       - STATIC_DIR=/app/static
     restart: unless-stopped
+    networks:
+      - web
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
+
+networks:
+  web:
+    external: true

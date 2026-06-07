@@ -75,6 +75,12 @@ Replace every example password. The file is gitignored and appears inside the
 production container as `/data/start_users.json`. It is only used to create
 missing accounts; editing it later does not reset existing passwords.
 
+Create the shared Docker network used by Caddy and app containers:
+
+```bash
+docker network create web
+```
+
 Start the app:
 
 ```bash
@@ -82,12 +88,11 @@ cd /opt/apps/vmtips
 docker compose --env-file .env -f docker-compose.prod.yml pull
 docker compose --env-file .env -f docker-compose.prod.yml up -d
 docker compose --env-file .env -f docker-compose.prod.yml ps
-curl http://127.0.0.1:8000/api/health
 ```
 
-Production compose binds the app to `127.0.0.1:8000`, so it is not directly
-reachable from the public internet. Put Caddy, nginx, or another reverse proxy
-in front of it for HTTPS.
+Production compose only exposes port `8000` on the internal Docker `web` network,
+so the app is not directly reachable from the public internet. Put Caddy, nginx,
+or another reverse proxy on the same Docker network in front of it for HTTPS.
 
 ## Caddy HTTPS Reverse Proxy
 
@@ -107,10 +112,16 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+    networks:
+      - web
 
 volumes:
   caddy_data:
   caddy_config:
+
+networks:
+  web:
+    external: true
 ```
 
 Create `/opt/apps/reverse-proxy/Caddyfile`:
@@ -121,7 +132,7 @@ Create `/opt/apps/reverse-proxy/Caddyfile`:
 }
 
 vmtips.duckdns.org {
-    reverse_proxy 127.0.0.1:8000
+    reverse_proxy vmtips:8000
 }
 ```
 
@@ -146,7 +157,7 @@ cd /opt/apps/vmtips
 docker compose --env-file .env -f docker-compose.prod.yml pull
 docker compose --env-file .env -f docker-compose.prod.yml up -d
 docker compose --env-file .env -f docker-compose.prod.yml ps
-curl http://127.0.0.1:8000/api/health
+curl https://vmtips.duckdns.org/api/health
 ```
 
 ## Persistent Data
@@ -171,4 +182,4 @@ maintenance or server migration.
 | Image not available | Confirm the tag exists in GHCR and the server can pull `ghcr.io/pexnet/vmtips:latest`. |
 | Database write errors | Ensure `./data` exists and is writable by Docker. |
 | CORS errors | Set `CORS_ORIGINS` to the public frontend origin. |
-| Health check fails | Test `curl http://127.0.0.1:8000/api/health` on the server. |
+| Health check fails | Test `curl https://vmtips.duckdns.org/api/health`; if that fails, check Caddy and app container logs. |
