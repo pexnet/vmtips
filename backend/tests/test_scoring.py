@@ -7,14 +7,14 @@ Scoring rules (from VM-tips-2026 Excel, 7p per match):
   - Correct away score: 2p
   - Perfect (all 3): 7p
 
-Bracket round points (Excel):
+Bracket round points:
   - round_of_32: 1p
-  - round_of_16: 2p
-  - quarter_final: 4p
-  - semi_final: 6p
-  - final: 8p
-  - match_for_third_place: 8p
-  - world_champion: 20p
+  - round_of_16: 3p
+  - quarter_final: 5p
+  - semi_final: 7p
+  - final: 9p
+  - match_for_third_place: 9p
+  - world_champion: 11p
 
 Tournament bonus points (Excel):
   - World champion: 20p
@@ -274,46 +274,46 @@ class TestBracketScoring:
         assert result["details"][0]["points"] == 1
 
     def test_correct_round_of_16(self):
-        """Correct round_of_16 placement earns 2 points."""
+        """Correct round_of_16 placement earns 3 points: 1 knockout qualification + one 2p step."""
         preds = [{"team_id": 1, "round": "round_of_16"}]
         actuals = [{"team_id": 1, "round": "round_of_16"}]
         result = calculate_bracket_points(preds, actuals)
-        assert result["points"] == 2
+        assert result["points"] == 3
 
     def test_correct_quarter_final(self):
-        """Correct quarter_final placement earns 4 points."""
+        """Correct quarter_final placement earns 5 points: 1 qualification + two 2p steps."""
         preds = [{"team_id": 1, "round": "quarter_final"}]
         actuals = [{"team_id": 1, "round": "quarter_final"}]
         result = calculate_bracket_points(preds, actuals)
-        assert result["points"] == 4
+        assert result["points"] == 5
 
     def test_correct_semi_final(self):
-        """Correct semi_final placement earns 6 points."""
+        """Correct semi_final placement earns 7 points: 1 qualification + three 2p steps."""
         preds = [{"team_id": 1, "round": "semi_final"}]
         actuals = [{"team_id": 1, "round": "semi_final"}]
         result = calculate_bracket_points(preds, actuals)
-        assert result["points"] == 6
+        assert result["points"] == 7
 
     def test_correct_final(self):
-        """Correct final placement earns 8 points."""
+        """Correct final placement earns 9 points: 1 qualification + four 2p steps."""
         preds = [{"team_id": 1, "round": "final"}]
         actuals = [{"team_id": 1, "round": "final"}]
         result = calculate_bracket_points(preds, actuals)
-        assert result["points"] == 8
+        assert result["points"] == 9
 
     def test_correct_match_for_third_place(self):
-        """Correct match_for_third_place placement earns 8 points."""
+        """Correct match_for_third_place placement earns 9 points: 1 qualification + four 2p steps."""
         preds = [{"team_id": 1, "round": "match_for_third_place"}]
         actuals = [{"team_id": 1, "round": "match_for_third_place"}]
         result = calculate_bracket_points(preds, actuals)
-        assert result["points"] == 8
+        assert result["points"] == 9
 
     def test_correct_world_champion(self):
-        """Correct world_champion placement earns 20 points."""
+        """Correct world_champion placement earns 11 points: 1 qualification + five 2p steps."""
         preds = [{"team_id": 1, "round": "world_champion"}]
         actuals = [{"team_id": 1, "round": "world_champion"}]
         result = calculate_bracket_points(preds, actuals)
-        assert result["points"] == 20
+        assert result["points"] == 11
 
     def test_wrong_team_same_round(self):
         """Wrong team in same round gives 0 points."""
@@ -342,8 +342,8 @@ class TestBracketScoring:
             {"team_id": 3, "round": "semi_final"},
         ]
         result = calculate_bracket_points(preds, actuals)
-        # 2 + 4 + 6 = 12
-        assert result["points"] == 12
+        # 3 + 5 + 7 = 15
+        assert result["points"] == 15
         assert len(result["details"]) == 3
 
     def test_mixed_correct_and_wrong(self):
@@ -357,15 +357,15 @@ class TestBracketScoring:
             {"team_id": 2, "round": "quarter_final"},
         ]
         result = calculate_bracket_points(preds, actuals)
-        assert result["points"] == 2
+        assert result["points"] == 3
         assert len(result["details"]) == 1
 
     def test_bracket_round_points_constant(self):
         """BRACKET_ROUND_POINTS has expected values from Excel."""
         assert BRACKET_ROUND_POINTS["round_of_32"] == 1
-        assert BRACKET_ROUND_POINTS["round_of_16"] == 2
-        assert BRACKET_ROUND_POINTS["quarter_final"] == 4
-        assert BRACKET_ROUND_POINTS["semi_final"] == 6
-        assert BRACKET_ROUND_POINTS["final"] == 8
-        assert BRACKET_ROUND_POINTS["match_for_third_place"] == 8
-        assert BRACKET_ROUND_POINTS["world_champion"] == 20
+        assert BRACKET_ROUND_POINTS["round_of_16"] == 3
+        assert BRACKET_ROUND_POINTS["quarter_final"] == 5
+        assert BRACKET_ROUND_POINTS["semi_final"] == 7
+        assert BRACKET_ROUND_POINTS["final"] == 9
+        assert BRACKET_ROUND_POINTS["match_for_third_place"] == 9
+        assert BRACKET_ROUND_POINTS["world_champion"] == 11
