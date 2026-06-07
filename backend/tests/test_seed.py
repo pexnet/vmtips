@@ -74,7 +74,11 @@ def test_seed_creates_release_users_league_and_lock(seeded_db):
     phase = seeded_db.query(TournamentPhase).one()
     first_match_at = seeded_db.query(Match.match_date).order_by(Match.match_date).first()[0]
 
+    configured_users = load_start_users(TEST_START_USERS_FILE)
+    configured_passwords = [user["password"] for user in configured_users]
+
     assert len(users) == 7
+    assert len(set(configured_passwords)) == len(configured_passwords)
     assert all(not user.is_admin and user.is_active for user in users)
     assert {user.id for user in users} == member_ids
     assert admin.id not in member_ids
@@ -145,3 +149,23 @@ def test_start_users_file_rejects_short_password(db, tmp_path):
         assert "at least 6 characters" in str(exc)
     else:
         raise AssertionError("short start-user password was accepted")
+
+
+def test_start_users_file_rejects_duplicate_passwords(db, tmp_path):
+    start_users_file = tmp_path / "start_users.json"
+    start_users_file.write_text(
+        json.dumps(
+            [
+                {"username": "one", "password": "same-password"},
+                {"username": "two", "password": "same-password"},
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        seed_default_users(db, start_users_file=start_users_file)
+    except ValueError as exc:
+        assert "duplicate password" in str(exc)
+    else:
+        raise AssertionError("duplicate start-user password was accepted")

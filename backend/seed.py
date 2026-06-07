@@ -212,6 +212,7 @@ def load_start_users(start_users_file: Path = START_USERS_FILE) -> list[dict]:
     users = []
     seen_usernames = set()
     seen_emails = set()
+    seen_passwords = set()
     for index, raw_user in enumerate(raw_users):
         if not isinstance(raw_user, dict):
             raise ValueError(f"start_users.json entry {index} must be an object")
@@ -241,8 +242,11 @@ def load_start_users(start_users_file: Path = START_USERS_FILE) -> list[dict]:
             raise ValueError(f"duplicate username in start_users.json: {username}")
         if email in seen_emails:
             raise ValueError(f"duplicate email in start_users.json: {email}")
+        if password in seen_passwords:
+            raise ValueError(f"duplicate password in start_users.json for user: {username}")
         seen_usernames.add(username)
         seen_emails.add(email)
+        seen_passwords.add(password)
         users.append(
             {
                 "username": username,
