@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Container,
   Typography,
@@ -336,6 +337,7 @@ function QualificationStandings({
 export default function MatchesPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { selectedLeagueId } = useLeague();
   const [tab, setTab] = useState(0);
   const [error, setError] = useState("");
@@ -470,7 +472,10 @@ export default function MatchesPage() {
         bronze_winner_team_id: bonuses.bronze_winner_team_id || undefined,
         top_scorer_name: bonuses.top_scorer_name || undefined,
       })
-      .then(() => setSaveMsg(t("predictions.save_success")))
+      .then(() => {
+        void queryClient.invalidateQueries({ queryKey: ["predictions", "tournament", selectedLeagueId] });
+        setSaveMsg(t("predictions.save_success"));
+      })
       .catch(() => setError(t("common.error")));
   };
 

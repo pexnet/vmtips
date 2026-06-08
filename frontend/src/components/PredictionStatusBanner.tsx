@@ -1,4 +1,4 @@
-import { Alert } from "@mui/material";
+import { Alert, Box } from "@mui/material";
 import { useTranslation } from "react-i18next";
 
 import { usePredictionStatus } from "../hooks/usePredictionStatus";
@@ -10,16 +10,27 @@ export default function PredictionStatusBanner({ leagueId }: { leagueId: number 
   if (!leagueId || status.round === "closed") {
     return <Alert severity="info" sx={{ mb: 2 }}>{t("predictionStatus.closed")}</Alert>;
   }
-  if (status.missing === 0) {
-    return (
-      <Alert severity="success" sx={{ mb: 2 }}>
-        {t(`predictionStatus.${status.round}Complete`, status)}
-      </Alert>
-    );
-  }
+
+  const hasMissingMatchPredictions = status.missing > 0;
+  const hasMissingBonuses = status.round === "group" && status.bonusMissing > 0;
+  const severity = hasMissingMatchPredictions || hasMissingBonuses ? "warning" : "success";
+
   return (
-    <Alert severity="warning" sx={{ mb: 2 }}>
-      {t(`predictionStatus.${status.round}Remaining`, status)}
+    <Alert severity={severity} sx={{ mb: 2 }}>
+      <Box component="span" sx={{ display: "block" }}>
+        {t(
+          `predictionStatus.${status.round}${hasMissingMatchPredictions ? "Remaining" : "Complete"}`,
+          status,
+        )}
+      </Box>
+      {status.round === "group" && (
+        <Box component="span" sx={{ display: "block", mt: 0.5 }}>
+          {t(
+            `predictionStatus.${hasMissingBonuses ? "bonusRemaining" : "bonusComplete"}`,
+            status,
+          )}
+        </Box>
+      )}
     </Alert>
   );
 }

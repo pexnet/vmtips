@@ -1,10 +1,15 @@
 import { useMatches } from "./useMatches";
-import { usePredictions } from "./usePredictions";
+import { usePredictions, useTournamentBonuses } from "./usePredictions";
 import { isGroupOpen, isKnockoutOpen, usePhase } from "./usePhase";
+
+function hasText(value: string | null | undefined) {
+  return Boolean(value?.trim());
+}
 
 export function usePredictionStatus(leagueId: number | null) {
   const { data: matches = [] } = useMatches();
   const { data: predictions = [] } = usePredictions(leagueId ?? undefined);
+  const { data: tournamentBonuses } = useTournamentBonuses(leagueId ?? undefined);
   const { data: phase } = usePhase();
 
   const round = isGroupOpen(phase)
@@ -24,10 +29,21 @@ export function usePredictionStatus(leagueId: number | null) {
       .filter((matchId) => relevantIds.has(matchId)),
   );
 
+  const bonusTotal = round === "group" ? 4 : 0;
+  const bonusSaved = bonusTotal === 0 ? 0 : [
+    tournamentBonuses?.winner_team_id,
+    tournamentBonuses?.runner_up_team_id,
+    tournamentBonuses?.bronze_winner_team_id,
+    hasText(tournamentBonuses?.top_scorer_name) ? 1 : null,
+  ].filter(Boolean).length;
+
   return {
     saved: savedIds.size,
     total: relevantMatches.length,
     missing: Math.max(0, relevantMatches.length - savedIds.size),
+    bonusSaved,
+    bonusTotal,
+    bonusMissing: Math.max(0, bonusTotal - bonusSaved),
     round,
   };
 }

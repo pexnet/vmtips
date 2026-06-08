@@ -29,6 +29,8 @@
     "groupComplete": "Alla {{total}} gruppspelsmatcher är tippade.",
     "knockoutRemaining": "Slutspelstips: {{saved}}/{{total}} sparade - {{missing}} kvar",
     "knockoutComplete": "Alla {{total}} slutspelsmatcher är tippade.",
+    "bonusRemaining": "Bonusfrågor: {{bonusSaved}}/{{bonusTotal}} besvarade - {{bonusMissing}} kvar innan turneringen startar.",
+    "bonusComplete": "Alla {{bonusTotal}} bonusfrågor är besvarade.",
     "closed": "Tippandet är stängt."
   },
   "matches": {

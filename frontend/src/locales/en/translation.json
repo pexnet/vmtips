@@ -29,6 +29,8 @@
     "groupComplete": "All {{total}} group matches predicted.",
     "knockoutRemaining": "Knockout predictions: {{saved}}/{{total}} saved - {{missing}} left",
     "knockoutComplete": "All {{total}} knockout matches predicted.",
+    "bonusRemaining": "Bonus questions: {{bonusSaved}}/{{bonusTotal}} answered - {{bonusMissing}} left before the tournament starts.",
+    "bonusComplete": "All {{bonusTotal}} bonus questions answered.",
     "closed": "Predictions are closed."
   },
   "matches": {
