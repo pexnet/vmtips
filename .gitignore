@@ -149,6 +149,7 @@ activemq-data/
 
 # Environments
 .env
+.env.local*
 .envrc
 .venv
 env/
@@ -232,3 +233,7 @@ __marimo__/
 
 # Private initial-user credentials
 /backend/data/start_users.json
+
+# Local production backup mirrors (contain production data)
+data/prod-backups/
+data/prod-latest/
