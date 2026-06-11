@@ -22,7 +22,7 @@ Points for a single match prediction are calculated by checking three independen
 
 | Criterion | Points | Description |
 |---|---|---|
-| **Correct outcome (1X2)** | 5 p | You correctly picked the winner (home win, away win, or draw) |
+| **Correct outcome (1X2)** | 3 p | You correctly picked the winner (home win, away win, or draw) |
 | **Correct home score** | 2 p | You predicted the exact number of goals scored by the home team |
 | **Correct away score** | 2 p | You predicted the exact number of goals scored by the away team |
 
@@ -30,19 +30,19 @@ Points for a single match prediction are calculated by checking three independen
 
 A **perfect prediction** (exact scoreline) automatically satisfies all three criteria:
 
-5 (outcome) + 2 (home score) + 2 (away score) = **9 points**
+3 (outcome) + 2 (home score) + 2 (away score) = **7 points**
 
 ### Examples
 
-| # | Your Prediction | Actual Result | Outcome (5p) | Home Score (2p) | Away Score (2p) | **Total** |
+| # | Your Prediction | Actual Result | Outcome (3p) | Home Score (2p) | Away Score (2p) | **Total** |
 |---|---|---|---|---|---|---|
-| 1 | 2-1 | **2-1** | ✅ 5 | ✅ 2 | ✅ 2 | **9 p** |
-| 2 | 1-1 | **1-1** | ✅ 5 | ✅ 2 | ✅ 2 | **9 p** |
-| 3 | 3-1 | **2-0** | ✅ 5 | ❌ | ❌ | **5 p** |
-| 4 | 2-1 | **3-1** | ✅ 5 | ❌ | ✅ 2 | **7 p** |
+| 1 | 2-1 | **2-1** | ✅ 3 | ✅ 2 | ✅ 2 | **7 p** |
+| 2 | 1-1 | **1-1** | ✅ 3 | ✅ 2 | ✅ 2 | **7 p** |
+| 3 | 3-1 | **2-0** | ✅ 3 | ❌ | ❌ | **3 p** |
+| 4 | 2-1 | **3-1** | ✅ 3 | ❌ | ✅ 2 | **5 p** |
 | 5 | 2-0 | **2-3** | ❌ | ✅ 2 | ❌ | **2 p** |
-| 6 | 1-1 | **0-0** | ✅ 5 | ❌ | ❌ | **5 p** |
-| 7 | 3-2 | **2-0** | ✅ 5 | ❌ | ❌ | **5 p** |
+| 6 | 1-1 | **0-0** | ✅ 3 | ❌ | ❌ | **3 p** |
+| 7 | 3-2 | **2-0** | ✅ 3 | ❌ | ❌ | **3 p** |
 | 8 | 2-0 | **0-1** | ❌ | ❌ | ❌ | **0 p** |
 
 ---
@@ -66,7 +66,7 @@ A **perfect prediction** (exact scoreline) automatically satisfies all three cri
 
 For knockout matches, points are calculated in two parallel tracks:
 
-1. **Match result points** — You get points for correct outcome/goals on each match slot (regardless of which teams actually play). For example, if you predicted Germany–South Korea 3-1 in Round of 32 match #73, and the real match becomes Brazil–Scotland 3-1, you still get 9p for your result prediction (if the scores match).
+1. **Match result points** — You get points for correct outcome/goals on each match slot (regardless of which teams actually play). For example, if you predicted Germany–South Korea 3-1 in Round of 32 match #73, and the real match becomes Brazil–Scotland 3-1, you still get 7p for your result prediction (if the scores match).
 
 2. **Team bonus** — Extra points for each team you correctly placed in the right round.
 
@@ -92,10 +92,10 @@ Before the tournament begins, you can make four long-term predictions. Each corr
 
 | Category | Max Points |
 |---|---|
-| Match results (72 group + 32 knockout = 104 matches) | 936 p |
+| Match results (72 group + 32 knockout = 104 matches) | 728 p |
 | Bracket bonus | 131 p |
 | Tournament bonuses | 80 p |
-| **Grand total** | **1 147 p** |
+| **Grand total** | **939 p** |
 
 ---
 

@@ -104,7 +104,7 @@ def _batch_calculate_scores(
         db.query(
             Prediction.user_id,
             func.count(Prediction.id).label("predictions_made"),
-            func.coalesce(func.sum(case((and_(scored_match, outcome_correct), 5), else_=0)), 0).label("outcome_points"),
+            func.coalesce(func.sum(case((and_(scored_match, outcome_correct), 3), else_=0)), 0).label("outcome_points"),
             func.coalesce(func.sum(case((and_(scored_match, Prediction.home_goals == Match.home_goals), 2), else_=0)), 0).label("home_goal_points"),
             func.coalesce(func.sum(case((and_(scored_match, Prediction.away_goals == Match.away_goals), 2), else_=0)), 0).label("away_goal_points"),
             func.coalesce(func.sum(case((perfect, 1), else_=0)), 0).label("perfect_predictions"),

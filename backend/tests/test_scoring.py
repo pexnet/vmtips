@@ -2,10 +2,10 @@
 Tests for the scoring engine.
 
 Scoring rules:
-  - Correct outcome/winner (home/draw/away): 5p
+  - Correct outcome/winner (home/draw/away): 3p
   - Correct home score: 2p
   - Correct away score: 2p
-  - Perfect (all 3): 9p
+  - Perfect (all 3): 7p
 
 Bracket round points:
   - round_of_32: 1p
@@ -32,48 +32,48 @@ from scoring import calculate_match_points, calculate_tournament_bonus_points, c
 
 class TestMatchScoring:
     def test_perfect_prediction(self):
-        """Exact result: outcome(5) + home(2) + away(2) = 9."""
+        """Exact result: outcome(3) + home(2) + away(2) = 7."""
         result = calculate_match_points(2, 1, 2, 1)
-        assert result["points"] == 9
+        assert result["points"] == 7
         assert result["perfect"] is True
         assert result["outcome_correct"] is True
         assert result["home_score_correct"] is True
         assert result["away_score_correct"] is True
 
     def test_correct_outcome_only(self):
-        """Correct winner but wrong scores: 5p only."""
+        """Correct winner but wrong scores: 3p only."""
         result = calculate_match_points(3, 0, 2, 1)
-        assert result["points"] == 5
+        assert result["points"] == 3
         assert result["outcome_correct"] is True
         assert result["home_score_correct"] is False
         assert result["away_score_correct"] is False
 
     def test_correct_outcome_and_home_score(self):
-        """Correct winner + home score: 5+2 = 7."""
+        """Correct winner + home score: 3+2 = 5."""
         result = calculate_match_points(2, 0, 2, 1)
-        assert result["points"] == 7
+        assert result["points"] == 5
         assert result["outcome_correct"] is True
         assert result["home_score_correct"] is True
 
     def test_correct_outcome_and_away_score(self):
-        """Correct winner + away score: 5+2 = 7."""
+        """Correct winner + away score: 3+2 = 5."""
         result = calculate_match_points(3, 1, 2, 1)
-        assert result["points"] == 7
+        assert result["points"] == 5
         assert result["outcome_correct"] is True
         assert result["away_score_correct"] is True
 
     def test_draw_prediction_wrong_scores(self):
-        """Predict draw but wrong scores: outcome(5) only."""
+        """Predict draw but wrong scores: outcome(3) only."""
         result = calculate_match_points(1, 1, 0, 0)
-        assert result["points"] == 5
+        assert result["points"] == 3
         assert result["outcome_correct"] is True
         assert result["home_score_correct"] is False
         assert result["away_score_correct"] is False
 
     def test_correct_draw_exact(self):
-        """Exact draw: 5+2+2 = 9."""
+        """Exact draw: 3+2+2 = 7."""
         result = calculate_match_points(1, 1, 1, 1)
-        assert result["points"] == 9
+        assert result["points"] == 7
         assert result["perfect"] is True
 
     def test_wrong_outcome_right_home_score(self):
@@ -93,7 +93,7 @@ class TestMatchScoring:
     def test_wrong_outcome_nothing_else(self):
         """Only correct outcome: pred 3-2 vs actual 2-0."""
         result = calculate_match_points(3, 2, 2, 0)
-        assert result["points"] == 5
+        assert result["points"] == 3
         assert result["outcome_correct"] is True
         assert result["home_score_correct"] is False
         assert result["away_score_correct"] is False

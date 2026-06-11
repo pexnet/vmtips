@@ -121,7 +121,7 @@
     "no_league_selected": "No league selected.",
     "tournament_bonus_points": "Bonus Points",
     "scoring_help_title": "How scoring works",
-    "scoring_help_text": "Group-stage and knockout match scores can earn up to 9 points per match: 5 pts for the correct outcome, 2 pts for the correct home goals, and 2 pts for the correct away goals. In the knockout stage you also earn team advancement points for teams predicted in the correct round: 1 pt for the Round of 32 and 3 pts for the Round of 16 and every later round. Bonus questions can add up to 80 pts."
+    "scoring_help_text": "Group-stage and knockout match scores can earn up to 7 points per match: 3 pts for the correct outcome, 2 pts for the correct home goals, and 2 pts for the correct away goals. In the knockout stage you also earn team advancement points for teams predicted in the correct round: 1 pt for the Round of 32 and 3 pts for the Round of 16 and every later round. Bonus questions can add up to 80 pts."
   },
   "phase": {
     "group_open": "Group Stage Open",
@@ -323,8 +323,8 @@
     "phase1_desc": "Phase 1 - Group Stage: Before the tournament starts, you predict all group stage matches and answer the bonus questions. When the group stage starts, those predictions are locked.",
     "phase2_desc": "Phase 2 - Knockout Stage: After the group stage, the admin confirms which teams advanced. You then predict the knockout bracket and knockout match scores. When the knockout stage starts, those predictions are locked.",
     "match_title": "Match Points",
-    "match_desc": "Each match can earn up to 9 points. The three checks below are added together:",
-    "match_detail": "Example: an exact 2-1 prediction gives 5p for the correct outcome, 2p for the home team's goals, and 2p for the away team's goals = 9p. If the outcome is wrong but one team's goal count is correct, you still get those 2p.",
+    "match_desc": "Each match can earn up to 7 points. The three checks below are added together:",
+    "match_detail": "Example: an exact 2-1 prediction gives 3p for the correct outcome, 2p for the home team's goals, and 2p for the away team's goals = 7p. If the outcome is wrong but one team's goal count is correct, you still get those 2p.",
     "match": {
       "outcome": "Correct outcome (1X2)",
       "home_goals": "Correct home goals",
@@ -362,7 +362,7 @@
     "bracket_per_team_note": "Bracket points are awarded per correct team per round.",
     "knockout_match_note": "Knockout match score points are separate from bracket points. You can earn match score points for a knockout match slot even if the teams in that slot differ from your predicted bracket.",
     "total_title": "Total Points Available",
-    "total_match_results": "Match results (104 × 9p: 72 group + 32 knockout)",
+    "total_match_results": "Match results (104 × 7p: 72 group + 32 knockout)",
     "total_bracket": "Knockout bracket",
     "total_bonuses": "Bonus questions",
     "grand_total": "Grand total"

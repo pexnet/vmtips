@@ -2,16 +2,16 @@
 Scoring engine for the VMTips application.
 Calculates points for match predictions, bracket predictions, and tournament bonuses.
 
-Scoring rules match the current VMTips rules (9p per match variant).
+Scoring rules match the current VMTips rules (7p per match variant).
 """
 from typing import Optional
 
 
 # ── Match points (group + knockout) ──────────────────────────────
-# Correct outcome (1X2): 5 points
+# Correct outcome (1X2): 3 points
 # Correct home goals:     2 points
 # Correct away goals:     2 points
-# Maximum per match:      9 points
+# Maximum per match:      7 points
 
 # ── Bracket round point values ────────────────────────────────────
 # Points per correctly predicted team in each knockout round.
@@ -56,10 +56,10 @@ def calculate_match_points(
     Calculate points for a single match prediction.
 
     Scoring:
-        - Correct outcome (1X2):       5 points
+        - Correct outcome (1X2):       3 points
         - Correct home team goals:      2 points
         - Correct away team goals:      2 points
-        - Maximum per match:            9 points
+        - Maximum per match:            7 points
 
     Returns a dict with:
         - points: total points earned
@@ -78,7 +78,7 @@ def calculate_match_points(
 
     points = 0
     if outcome_correct:
-        points += 5
+        points += 3
     if home_score_correct:
         points += 2
     if away_score_correct:
