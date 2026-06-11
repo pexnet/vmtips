@@ -259,8 +259,34 @@ def load_start_users(start_users_file: Path = START_USERS_FILE) -> list[dict]:
 
 
 def seed_default_users(db, start_users_file: Path = START_USERS_FILE):
-    """Create initial participants from the private start-users file."""
+    """Create initial participants from the private start-users file.
+
+    Idempotent: if any configured user would conflict with existing data
+    (by email or display_name_lower), the entire seed batch is skipped
+    and the configured list is returned unchanged. This makes the function
+    safe to call on every container start without raising UNIQUE-constraint
+    errors when a real user has already claimed a display_name.
+    """
     configured_users = load_start_users(start_users_file)
+
+    if configured_users:
+        emails = [u["email"] for u in configured_users]
+        display_names_lower = [u["display_name"].strip().lower() for u in configured_users]
+        conflicts = (
+            db.query(User)
+            .filter(
+                (User.email.in_(emails))
+                | (User.display_name_lower.in_(display_names_lower))
+            )
+            .count()
+        )
+        if conflicts > 0:
+            print(
+                f"[seed] {conflicts} existing user(s) conflict with default seed "
+                f"(by email or display_name); skipping seed_default_users."
+            )
+            return configured_users
+
     created_users = []
     for configured_user in configured_users:
         email = configured_user["email"]

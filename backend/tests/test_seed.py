@@ -103,6 +103,50 @@ def test_seed_is_idempotent(seeded_db):
     assert seeded_db.query(LeagueMember).count() == membership_count
 
 
+def test_seed_default_users_skips_on_display_name_conflict(db, tmp_path):
+    """A real user who registered through the API may already hold a
+    display_name_lower that a default seed user wants. seed_default_users
+    must skip the whole batch in that case (no exception, no duplicate).
+    """
+    # Pre-existing API-registered user with display_name "Janne" (lowercase
+    # "janne" — same as a configured seed user).
+    real_user = User(
+        email="real-janne@example.com",
+        password_hash="x",
+        display_name="Janne",
+        is_admin=False,
+        is_active=True,
+    )
+    db.add(real_user)
+    db.commit()
+
+    start_users_file = tmp_path / "start_users.json"
+    start_users_file.write_text(
+        json.dumps(
+            [
+                {
+                    "username": "janne",
+                    "password": "secret-password",
+                    "display_name": "Janne",
+                    "email": "janne@vmtips.se",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    # Should not raise IntegrityError on display_name_lower UNIQUE.
+    configured = seed_default_users(db, start_users_file=start_users_file)
+
+    # Configured list is still returned unchanged.
+    assert len(configured) == 1
+    # The conflicting seed user was NOT created.
+    assert db.query(User).filter(User.email == "janne@vmtips.se").count() == 0
+    # The pre-existing real user is untouched.
+    real = db.query(User).filter(User.email == "real-janne@example.com").one()
+    assert real.display_name == "Janne"
+
+
 def test_default_users_are_read_from_private_file(db, tmp_path):
     start_users_file = tmp_path / "start_users.json"
     start_users_file.write_text(

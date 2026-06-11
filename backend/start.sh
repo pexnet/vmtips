@@ -102,10 +102,15 @@ finally:
     db.close()
 "
 
-# Seed release defaults after the configured admin exists. Existing users,
-# memberships, and an administrator-overridden lock timestamp are preserved.
+# Seed release defaults (first-boot only).
+# Once any non-admin user exists, the release seed has already been applied
+# on a previous deploy. Re-running it can conflict with users who registered
+# through the API (e.g. display_name_lower UNIQUE), so we skip the whole
+# block on subsequent container starts. Seed is a dev/init tool, not a
+# runtime operation.
 python -c "
 from database import SessionLocal
+from models import User
 from seed import (
     START_USERS_FILE,
     seed_default_users,
@@ -117,14 +122,20 @@ from seed import (
 
 db = SessionLocal()
 try:
-    configured_users = seed_default_users(db, start_users_file=START_USERS_FILE)
-    seed_tournament_phase(db)
-    seed_tournament_phase_lock(db)
-    seed_tournament_result(db)
-    seed_default_league(
-        db,
-        default_user_emails=[user['email'] for user in configured_users],
-    )
+    non_admin = db.query(User).filter(User.is_admin == False).count()
+    if non_admin > 0:
+        print(f'[startup] {non_admin} non-admin user(s) exist; release-defaults seed already applied, skipping.')
+    else:
+        print('[startup] First boot — seeding release defaults.')
+        configured_users = seed_default_users(db, start_users_file=START_USERS_FILE)
+        seed_tournament_phase(db)
+        seed_tournament_phase_lock(db)
+        seed_tournament_result(db)
+        seed_default_league(
+            db,
+            default_user_emails=[user['email'] for user in configured_users],
+        )
+        print('[startup] Release defaults seeded.')
 finally:
     db.close()
 "
