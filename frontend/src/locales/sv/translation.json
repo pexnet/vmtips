@@ -121,7 +121,7 @@
     "no_league_selected": "Ingen liga vald.",
     "tournament_bonus_points": "Bonuspoäng",
     "scoring_help_title": "Så räknas poängen",
-    "scoring_help_text": "Gruppspel och slutspelsmatcher ger upp till 7 poäng per match: 3p för rätt utfall, 2p för rätt hemmamål och 2p för rätt bortamål. I slutspelet får du dessutom poäng för lag som du tippat till rätt omgång: 1p för sextondelsfinal och 3p för åttondelsfinal och alla senare rundor. Bonusfrågorna kan ge upp till 80p."
+    "scoring_help_text": "Gruppspel och slutspelsmatcher ger upp till 7 poäng per match: 3p för rätt utfall, 2p för rätt hemmamål och 2p för rätt bortamål. I slutspelet får du dessutom 1p för varje lag som du tippat till rätt omgång (gäller alla slutspelsrundor). Bonusfrågorna kan ge upp till 80p."
   },
   "phase": {
     "group_open": "Gruppspel öppet",

@@ -15,17 +15,16 @@ from typing import Optional
 
 # ── Bracket round point values ────────────────────────────────────
 # Points per correctly predicted team in each knockout round.
-# A team reaching the Round of 32 earns 1 point. Round of 16 and every later
-# correct knockout placement is capped at 3 points, separate from tournament
-# bonuses.
+# A team correctly placed in any knockout round earns a flat 1 point,
+# separate from tournament bonuses.
 BRACKET_ROUND_POINTS = {
     "round_of_32": 1,
-    "round_of_16": 3,
-    "quarter_final": 3,
-    "semi_final": 3,
-    "match_for_third_place": 3,
-    "final": 3,
-    "world_champion": 3,
+    "round_of_16": 1,
+    "quarter_final": 1,
+    "semi_final": 1,
+    "match_for_third_place": 1,
+    "final": 1,
+    "world_champion": 1,
 }
 
 # ── Tournament bonus point values ─────────────────────────────────

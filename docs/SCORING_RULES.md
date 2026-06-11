@@ -54,13 +54,13 @@ A **perfect prediction** (exact scoreline) automatically satisfies all three cri
 | Round | Points per team |
 |---|---|
 | Round of 32 | 1 p |
-| Round of 16 | 3 p |
-| Quarterfinal | 3 p |
-| Semifinal | 3 p |
-| Match for Third Place | 3 p |
-| Final | 3 p |
-| **World Champion** | **3 p** |
-| **Max total bracket** | **131 p** |
+| Round of 16 | 1 p |
+| Quarterfinal | 1 p |
+| Semifinal | 1 p |
+| Match for Third Place | 1 p |
+| Final | 1 p |
+| **World Champion** | **1 p** |
+| **Max total bracket** | **65 p** |
 
 ### Note: Dual match result points in knockout stage
 
@@ -93,9 +93,9 @@ Before the tournament begins, you can make four long-term predictions. Each corr
 | Category | Max Points |
 |---|---|
 | Match results (72 group + 32 knockout = 104 matches) | 728 p |
-| Bracket bonus | 131 p |
+| Bracket bonus | 65 p |
 | Tournament bonuses | 80 p |
-| **Grand total** | **939 p** |
+| **Grand total** | **873 p** |
 
 ---
 
