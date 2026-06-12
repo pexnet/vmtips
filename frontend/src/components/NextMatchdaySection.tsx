@@ -19,7 +19,7 @@ export default function NextMatchdaySection({ upcoming, memberOrder }: NextMatch
   const { t } = useTranslation();
 
   return (
-    <Accordion defaultExpanded={false}>
+    <Accordion defaultExpanded>
       <AccordionSummary expandIcon={<ExpandMoreIcon />}>
         <Typography variant="h6">{t("leaderboard.next_matchday")}</Typography>
       </AccordionSummary>
