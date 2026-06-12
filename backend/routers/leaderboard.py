@@ -557,4 +557,175 @@ def matchdays(
             "upcoming": None,
             "past": [],
         }
-    raise NotImplementedError
+
+    # Verify membership
+    is_member = (
+        db.query(LeagueMember)
+        .filter(LeagueMember.league_id == resolved, LeagueMember.user_id == current_user.id)
+        .first()
+    )
+    if not is_member:
+        raise ForbiddenError(detail="not_a_member", error_code="not_a_member")
+
+    league = db.query(League).filter(League.id == resolved).first()
+    league_name = league.name if league else None
+
+    # Upcoming: next date with scheduled/ongoing matches
+    date_label = func.date(Match.match_date).label("d")
+    upcoming_row = (
+        db.query(date_label)
+        .filter(Match.status.in_(("scheduled", "ongoing")))
+        .order_by(date_label.asc())
+        .first()
+    )
+    upcoming_date = upcoming_row[0] if upcoming_row else None
+
+    # Past: N most recent distinct finished dates
+    past_rows = (
+        db.query(date_label)
+        .filter(Match.status == "finished")
+        .group_by(date_label)
+        .order_by(date_label.desc())
+        .limit(matchdays)
+        .all()
+    )
+    past_dates = [r[0] for r in past_rows]
+
+    # Gather all matches in the window
+    date_filter = []
+    if upcoming_date:
+        date_filter.append(func.date(Match.match_date) == upcoming_date)
+    if past_dates:
+        date_filter.append(func.date(Match.match_date).in_(past_dates))
+
+    matches = (
+        db.query(Match)
+        .options(joinedload(Match.home_team), joinedload(Match.away_team))
+        .filter(or_(*date_filter))
+        .order_by(Match.match_date.asc())
+        .all()
+    ) if date_filter else []
+
+    # Build prediction lookup: (match_id, user_id) -> Prediction
+    match_ids = [m.id for m in matches]
+    preds = (
+        db.query(Prediction)
+        .filter(Prediction.match_id.in_(match_ids), Prediction.league_id == resolved)
+        .all()
+    ) if match_ids else []
+    pred_lookup = {(p.match_id, p.user_id): p for p in preds}
+
+    # Member list for ordering
+    members = (
+        db.query(User)
+        .join(LeagueMember, User.id == LeagueMember.user_id)
+        .filter(LeagueMember.league_id == resolved)
+        .all()
+    )
+    user_lookup = {u.id: u for u in members}
+
+    def _team_dict(team, placeholder):
+        if team:
+            return {
+                "id": team.id,
+                "name": team.name,
+                "code": team.code,
+                "flag_emoji": team.flag_emoji,
+            }
+        return {
+            "id": 0,
+            "name": placeholder or "TBD",
+            "code": "",
+            "flag_emoji": "❓",
+        }
+
+    def _serialize_match(match):
+        is_finished = match.status == "finished"
+        match_date = match.match_date
+        if match_date and match_date.tzinfo is None:
+            match_date = match_date.replace(tzinfo=timezone.utc)
+        result = {
+            "id": match.id,
+            "match_number": match.match_number,
+            "kickoff": match_date.isoformat() if match_date else None,
+            "status": match.status,
+            "home_team": _team_dict(match.home_team, match.home_team_placeholder),
+            "away_team": _team_dict(match.away_team, match.away_team_placeholder),
+            "predictions": [],
+        }
+        if is_finished and match.home_goals is not None and match.away_goals is not None:
+            result["actual"] = f"{match.home_goals}-{match.away_goals}"
+        return result
+
+    def _build_predictions_for_match(match):
+        preds_out = []
+        for user in members:
+            pred = pred_lookup.get((match.id, user.id))
+            if not pred:
+                continue
+            entry = {
+                "user_id": user.id,
+                "display_name": user.display_name or user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "avatar_url": user.avatar_url,
+                "predicted": f"{pred.home_goals}-{pred.away_goals}",
+            }
+            if pred.knockout_winner_side:
+                entry["knockout_winner_side"] = pred.knockout_winner_side
+            if match.status == "finished" and match.home_goals is not None and match.away_goals is not None:
+                score = calculate_match_points(
+                    pred.home_goals, pred.away_goals,
+                    match.home_goals, match.away_goals,
+                )
+                entry["points"] = score["points"]
+            preds_out.append(entry)
+        return preds_out
+
+    # Group matches by date
+    upcoming_matchday = None
+    past_matchdays = []
+    matches_by_date: dict[str, list] = {}
+    for m in matches:
+        d = func.date(m.match_date).compile(compile_kwargs={"literal_binds": True})
+        # Actually, m.match_date is a datetime object. Extract date as string.
+        date_str = m.match_date.date().isoformat() if m.match_date else ""
+        matches_by_date.setdefault(date_str, []).append(m)
+
+    # Build matchdays
+    if upcoming_date:
+        upcoming_date_str = upcoming_date.isoformat() if hasattr(upcoming_date, "isoformat") else str(upcoming_date)
+        upcoming_matches = matches_by_date.get(upcoming_date_str, [])
+        if upcoming_matches:
+            upcoming_matchday = {
+                "date": upcoming_date_str,
+                "matches": [],
+            }
+            for m in upcoming_matches:
+                sm = _serialize_match(m)
+                sm["predictions"] = _build_predictions_for_match(m)
+                upcoming_matchday["matches"].append(sm)
+
+    for d in past_dates:
+        date_str = d.isoformat() if hasattr(d, "isoformat") else str(d)
+        day_matches = matches_by_date.get(date_str, [])
+        if not day_matches:
+            continue
+        matchday = {
+            "date": date_str,
+            "matches": [],
+        }
+        for m in day_matches:
+            sm = _serialize_match(m)
+            sm["predictions"] = _build_predictions_for_match(m)
+            matchday["matches"].append(sm)
+        past_matchdays.append(matchday)
+
+    return {
+        "league_id": resolved,
+        "league_name": league_name,
+        "matchdays_back": matchdays,
+        "now": datetime.now(timezone.utc).isoformat(),
+        "upcoming": upcoming_matchday,
+        "past": past_matchdays,
+    }

@@ -206,12 +206,69 @@ class TestMatchdaysView:
         r = client.get("/leaderboard/matchdays")
         assert r.status_code in (401, 403)
 
-    def test_matchdays_empty_when_no_matches(self, client):
-        """With no matches scheduled, payload reports upcoming=None and past=[]."""
+    def test_matchdays_basic_structure(self, client):
+        """Endpoint returns valid shape even when DB already has seeded matches."""
         token = _register_and_login(client, "alice_md@example.com", "secret123", "Alice")
         r = client.get("/leaderboard/matchdays", headers={"Authorization": f"Bearer {token}"})
         assert r.status_code == 200
         data = r.json()
-        assert data["upcoming"] is None
-        assert data["past"] == []
+        assert "past" in data
+        assert "upcoming" in data
         assert data["league_id"] is not None
+        # If there are finished matches in the seeded DB, past may be non-empty;
+        # if there are future scheduled matches, upcoming may be non-None.
+        # We only assert structural correctness here.
+
+    def test_matchdays_includes_finished_and_upcoming(self, client, set_match_result):
+        """Finished match shows predictions + points; upcoming match shows predictions only."""
+        alice_token = _register_and_login(client, "a_md@example.com", "secret123", "Alice")
+        bob_token = _register_and_login(client, "b_md@example.com", "secret123", "Bob")
+
+        # Use match 3 (2026-06-18) — future and predictable
+        _save_predictions(client, alice_token, [
+            {"match_id": 3, "home_goals": 2, "away_goals": 1},
+        ])
+        _save_predictions(client, bob_token, [
+            {"match_id": 3, "home_goals": 1, "away_goals": 0},
+        ])
+
+        # Mark match 3 as finished (2-1)
+        set_match_result(3, 2, 1)
+
+        r = client.get("/leaderboard/matchdays", headers={"Authorization": f"Bearer {alice_token}"})
+        assert r.status_code == 200
+        data = r.json()
+
+        # Past should contain match 3
+        assert len(data["past"]) >= 1
+        past_matchday = data["past"][0]
+        finished = next(m for m in past_matchday["matches"] if m["match_number"] == 3)
+        assert finished["actual"] == "2-1"
+        alice_pred = next(p for p in finished["predictions"] if p["display_name"] == "Alice")
+        assert alice_pred["points"] == 7
+        bob_pred = next(p for p in finished["predictions"] if p["display_name"] == "Bob")
+        assert bob_pred["points"] == 3
+
+        # Upcoming section should exist (next scheduled date) and contain at least one match
+        assert data["upcoming"] is not None
+        assert len(data["upcoming"]["matches"]) >= 1
+        # Predictions in upcoming matches never include points (backend only adds points for finished)
+        for m in data["upcoming"]["matches"]:
+            for p in m.get("predictions", []):
+                assert "points" not in p
+
+    def test_matchdays_forbidden_for_non_member(self, client):
+        """A user who is not a member of the requested league gets 403."""
+        owner_token = _register_and_login(client, "owner@example.com", "secret123", "Owner")
+        outsider_token = _register_and_login(client, "outsider@example.com", "secret123", "Outsider")
+        # Create a custom league that outsider is NOT a member of
+        league = client.post(
+            "/leagues",
+            json={"name": "Secret League", "tournament_id": 1},
+            headers={"Authorization": f"Bearer {owner_token}"},
+        ).json()
+        r = client.get(
+            f"/leaderboard/matchdays?league_id={league['id']}",
+            headers={"Authorization": f"Bearer {outsider_token}"},
+        )
+        assert r.status_code == 403
