@@ -537,3 +537,24 @@ def my_scores(
         "bracket_details": score["bracket_details"],
         "breakdown": score["breakdown"],
     }
+
+
+@router.get("/matchdays")
+def matchdays(
+    league_id: Optional[int] = Query(None, description="League to scope the view"),
+    matchdays: int = Query(5, ge=1, le=20, description="Past matchdays to include"),
+    current_user=Depends(fetch_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return upcoming + recent-past matchday predictions for the current league."""
+    resolved = _resolve_user_league_id(db, current_user.id, league_id)
+    if resolved is None:
+        return {
+            "league_id": None,
+            "league_name": None,
+            "matchdays_back": matchdays,
+            "now": datetime.now(timezone.utc).isoformat(),
+            "upcoming": None,
+            "past": [],
+        }
+    raise NotImplementedError
