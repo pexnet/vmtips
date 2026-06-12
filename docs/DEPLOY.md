@@ -152,12 +152,36 @@ curl -I https://vmtips.duckdns.org/api/health
 
 ## Updates
 
+### Before deploying a new version
+
+Mandatory local preflight (catches build-time TypeScript errors and seed-safety issues that backend tests miss):
+
+1. In the private sysadmin repo (`/home/pex/code/vmtips-sysadmin`):
+   ```bash
+   ./scripts/fetch_latest_prod_backup.sh
+   docker compose -p vmtips -f ../vmtips/docker-compose.yml -f docker-compose.dev-prod-db.yml up --build -d
+   ```
+2. Watch the Docker build output — a TypeScript compile error in the frontend will fail the build here, before it reaches the VPS.
+3. Verify the container reaches `healthy` and `start.sh` logs show the seed-skip message:
+   ```bash
+   docker logs vmtips-app-1 | grep -E "startup|seed|already"
+   ```
+4. Open http://localhost:8000 in a browser and do a visual walkthrough of `/leaderboard`, `/info`, language toggle EN↔SV.
+5. Stop the local container after sign-off:
+   ```bash
+   docker compose -p vmtips -f ../vmtips/docker-compose.yml -f docker-compose.dev-prod-db.yml down
+   ```
+
+See `docs/OPERATIONS.md` in the private sysadmin repo for the full runbook.
+
+### Deploy a new version on the VPS
+
 ```bash
 cd /opt/apps/vmtips
 docker compose --env-file .env -f docker-compose.prod.yml pull
 docker compose --env-file .env -f docker-compose.prod.yml up -d
 docker compose --env-file .env -f docker-compose.prod.yml ps
-curl https://vmtips.duckdns.org/api/health
+curl -fsS https://vmtips.duckdns.org/api/health
 ```
 
 ## Persistent Data
