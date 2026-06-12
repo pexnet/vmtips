@@ -198,3 +198,20 @@ class TestLeagueLeaderboard:
         r = client.get("/leaderboard/league/99999", headers={"Authorization": f"Bearer {token}"})
         assert r.status_code == 404
         assert r.json()["detail"] == "league_not_found"
+
+
+class TestMatchdaysView:
+    def test_matchdays_requires_auth(self, client):
+        """GET /leaderboard/matchdays without a token is rejected."""
+        r = client.get("/leaderboard/matchdays")
+        assert r.status_code in (401, 403)
+
+    def test_matchdays_empty_when_no_matches(self, client):
+        """With no matches scheduled, payload reports upcoming=None and past=[]."""
+        token = _register_and_login(client, "alice_md@example.com", "secret123", "Alice")
+        r = client.get("/leaderboard/matchdays", headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 200
+        data = r.json()
+        assert data["upcoming"] is None
+        assert data["past"] == []
+        assert data["league_id"] is not None
