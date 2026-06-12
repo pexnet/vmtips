@@ -27,7 +27,7 @@ export default function MatchdayGrid({ matchday, memberOrder }: MatchdayGridProp
   matchday.matches.forEach((m) =>
     m.predictions.forEach((p) => memberSet.add(p.display_name))
   );
-  const members = memberOrder ?? Array.from(memberSet);
+  const members = memberOrder?.length ? memberOrder : Array.from(memberSet);
 
   return (
     <Box sx={{ mb: 2 }}>

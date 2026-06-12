@@ -570,11 +570,13 @@ def matchdays(
     league = db.query(League).filter(League.id == resolved).first()
     league_name = league.name if league else None
 
-    # Upcoming: next date with scheduled/ongoing matches
+    # Upcoming: next date with scheduled/ongoing matches (>= today)
+    today = datetime.now(timezone.utc).date()
     date_label = func.date(Match.match_date).label("d")
     upcoming_row = (
         db.query(date_label)
         .filter(Match.status.in_(("scheduled", "ongoing")))
+        .filter(func.date(Match.match_date) >= today)
         .order_by(date_label.asc())
         .first()
     )
@@ -622,7 +624,6 @@ def matchdays(
         .filter(LeagueMember.league_id == resolved)
         .all()
     )
-    user_lookup = {u.id: u for u in members}
 
     def _team_dict(team, placeholder):
         if team:
@@ -696,6 +697,7 @@ def matchdays(
     if upcoming_date:
         upcoming_date_str = upcoming_date.isoformat() if hasattr(upcoming_date, "isoformat") else str(upcoming_date)
         upcoming_matches = matches_by_date.get(upcoming_date_str, [])
+        upcoming_matches = [m for m in upcoming_matches if m.status in ("scheduled", "ongoing")]
         if upcoming_matches:
             upcoming_matchday = {
                 "date": upcoming_date_str,
@@ -709,6 +711,7 @@ def matchdays(
     for d in past_dates:
         date_str = d.isoformat() if hasattr(d, "isoformat") else str(d)
         day_matches = matches_by_date.get(date_str, [])
+        day_matches = [m for m in day_matches if m.status == "finished"]
         if not day_matches:
             continue
         matchday = {
