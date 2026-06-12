@@ -155,7 +155,16 @@
     "match": "Match",
     "predicted": "Tippat",
     "actual": "Faktiskt",
-    "match_points": "Poäng"
+    "match_points": "Poäng",
+    "next_matchday": "Nästa omgång",
+    "previous_matches": "Tidigare matcher",
+    "matchday_header": "Omgång {{date}}",
+    "match_count": "{{count}} match",
+    "match_count_plural": "{{count}} matcher",
+    "no_upcoming": "Inga kommande matcher planerade.",
+    "no_past": "Inga färdigspelade matcher ännu.",
+    "no_prediction": "—",
+    "points_short": "{{points}}p"
   },
   "leagues": {
     "title": "Ligor",

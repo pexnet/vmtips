@@ -247,3 +247,48 @@ export function getErrorDetail(err: unknown): string {
   }
   return String(err);
 }
+
+// ── Matchday Leaderboard View ─────────────────────────────────
+
+export interface MatchdayTeam {
+  id: number;
+  name: string;
+  code: string;
+  flag_emoji: string;
+}
+
+export interface MatchdayPredictionEntry {
+  user_id: number;
+  display_name: string;
+  first_name: string | null;
+  last_name: string | null;
+  avatar_url: string | null;
+  predicted: string;
+  knockout_winner_side?: "home" | "away";
+  points?: number;
+}
+
+export interface MatchdayMatch {
+  id: number;
+  match_number: number;
+  kickoff: string;
+  status: string;
+  home_team: MatchdayTeam;
+  away_team: MatchdayTeam;
+  actual?: string;
+  predictions: MatchdayPredictionEntry[];
+}
+
+export interface MatchdayGroup {
+  date: string;
+  matches: MatchdayMatch[];
+}
+
+export interface MatchdaysResponse {
+  league_id: number | null;
+  league_name: string | null;
+  matchdays_back: number;
+  now: string;
+  upcoming: MatchdayGroup | null;
+  past: MatchdayGroup[];
+}

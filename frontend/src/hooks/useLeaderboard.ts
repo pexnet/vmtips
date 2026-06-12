@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { leaderboardApi } from "../api/client";
-import type { LeaderboardEntry, PersonalScore, GlobalLeaderboardResponse } from "../types/api";
+import type { LeaderboardEntry, PersonalScore, GlobalLeaderboardResponse, MatchdaysResponse } from "../types/api";
 
 export function useGlobalLeaderboard(leagueId?: number | null) {
   return useQuery<LeaderboardEntry[]>({
@@ -33,5 +33,16 @@ export function useLeagueLeaderboard(leagueId: number | null) {
       return res.data as { leaderboard: LeaderboardEntry[]; league_name: string };
     },
     enabled: !!leagueId,
+  });
+}
+
+export function useMatchdays(leagueId?: number | null, matchdays: number = 5, enabled = true) {
+  return useQuery<MatchdaysResponse>({
+    queryKey: ["leaderboard", "matchdays", leagueId, matchdays],
+    queryFn: async () => {
+      const res = await leaderboardApi.matchdays(leagueId ?? undefined, matchdays);
+      return res.data as MatchdaysResponse;
+    },
+    enabled,
   });
 }

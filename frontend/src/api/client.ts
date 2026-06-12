@@ -128,6 +128,8 @@ export const leaderboardApi = {
   global: (leagueId?: number) => api.get(`/leaderboard/global${leagueId !== undefined ? `?league_id=${leagueId}` : ""}`),
   me: (leagueId?: number) => api.get(`/leaderboard/me${leagueId !== undefined ? `?league_id=${leagueId}` : ""}`),
   league: (id: number) => api.get(`/leaderboard/league/${id}`),
+  matchdays: (leagueId?: number, matchdays: number = 5) =>
+    api.get(`/leaderboard/matchdays${leagueId !== undefined ? `?league_id=${leagueId}&matchdays=${matchdays}` : `?matchdays=${matchdays}`}`),
 };
 
 // Phase (public endpoint)

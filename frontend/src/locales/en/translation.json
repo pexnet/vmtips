@@ -155,7 +155,16 @@
     "match": "Match",
     "predicted": "Predicted",
     "actual": "Actual",
-    "match_points": "Points"
+    "match_points": "Points",
+    "next_matchday": "Next matchday",
+    "previous_matches": "Previous matches",
+    "matchday_header": "Matchday {{date}}",
+    "match_count": "{{count}} match",
+    "match_count_plural": "{{count}} matches",
+    "no_upcoming": "No upcoming matches scheduled.",
+    "no_past": "No finished matches yet.",
+    "no_prediction": "—",
+    "points_short": "{{points}}p"
   },
   "leagues": {
     "title": "Leagues",

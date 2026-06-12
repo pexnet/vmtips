@@ -19,11 +19,17 @@ import {
   Chip,
 } from "@mui/material";
 
-import { usePersonalScore, useLeagueLeaderboard } from "../hooks/useLeaderboard";
+import {
+  usePersonalScore,
+  useLeagueLeaderboard,
+  useMatchdays,
+} from "../hooks/useLeaderboard";
 import { useLeagues } from "../hooks/useLeagues";
 import { useAuth } from "../contexts/AuthContext";
 import { useLeague } from "../contexts/LeagueContext";
 import UserAvatar from "../components/UserAvatar";
+import NextMatchdaySection from "../components/NextMatchdaySection";
+import PreviousMatchesSection from "../components/PreviousMatchesSection";
 import type { LeaderboardEntry, ScoreBreakdown, League } from "../types/api";
 
 function LeagueLeaderboardSection() {
@@ -31,12 +37,19 @@ function LeagueLeaderboardSection() {
   const { data: leagues = [] } = useLeagues();
   const { selectedLeagueId, setSelectedLeagueId } = useLeague();
   const { data: leagueData, isLoading } = useLeagueLeaderboard(selectedLeagueId);
+  const { data: matchdaysData, isLoading: matchdaysLoading } = useMatchdays(
+    selectedLeagueId,
+    5,
+    !!selectedLeagueId
+  );
 
   useEffect(() => {
     if (!selectedLeagueId && leagues.length > 0) {
       setSelectedLeagueId(leagues[0].id);
     }
   }, [leagues, selectedLeagueId, setSelectedLeagueId]);
+
+  const memberOrder = leagueData?.leaderboard.map((e) => e.display_name) ?? [];
 
   return (
     <Box>
@@ -60,6 +73,20 @@ function LeagueLeaderboardSection() {
         <Box>
           <Typography variant="h6" gutterBottom>{leagueData.league_name}</Typography>
           <LeaderTable data={leagueData.leaderboard} />
+          {matchdaysLoading ? (
+            <CircularProgress sx={{ mt: 2 }} />
+          ) : matchdaysData ? (
+            <Box sx={{ mt: 2 }}>
+              <NextMatchdaySection
+                upcoming={matchdaysData.upcoming}
+                memberOrder={memberOrder}
+              />
+              <PreviousMatchesSection
+                past={matchdaysData.past}
+                memberOrder={memberOrder}
+              />
+            </Box>
+          ) : null}
         </Box>
       ) : null}
     </Box>
