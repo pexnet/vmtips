@@ -12,7 +12,7 @@ import {
   Chip,
   Tooltip,
 } from "@mui/material";
-import type { MatchdayGroup } from "../../types/api";
+import type { MatchdayGroup } from "../types/api";
 
 interface MatchdayGridProps {
   matchday: MatchdayGroup;
