@@ -12,11 +12,10 @@ class Settings(BaseSettings):
     jwt_expiration_hours: int = 168
     admin_email: str = "admin@example.com"
     admin_password: str = "admin"
-    world_cup_json_url: str = "https://worldcupjson.net/matches"
     openfootball_url: str = (
-        "https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json"
+        "https://raw.githubusercontent.com/openfootball/worldcup.json/refs/heads/master/2026/worldcup.json"
     )
-    sync_source: str = "openfootball"   # "worldcupjson" | "openfootball"
+    sync_source: str = "openfootball"
     auto_sync_enabled: bool = False       # set AUTO_SYNC_ENABLED=true in prod once tournament starts
     auto_sync_interval_minutes: int = 5   # how often auto-sync runs when enabled
     cors_origins: str = "http://localhost:5173,http://localhost:3000"

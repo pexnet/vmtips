@@ -1,12 +1,8 @@
 """
-Sync service: fetch match results from external World Cup APIs and update
-the local database.
+Sync service: fetch match results from the openfootball 2026 GitHub JSON and
+update the local database.
 
-Supports two sources:
-  1. worldcupjson.net  — live scores, status, real-time during tournament
-  2. openfootball.json  — static GitHub-hosted JSON, updated during tournament
-
-Toggle the source via config.sync_source and auto-sync via config.auto_sync_enabled.
+The stale worldcupjson.net path was removed because it returned 2022 data.
 """
 import json
 import logging
@@ -21,9 +17,8 @@ from models import SyncConfig
 logger = logging.getLogger("vmtips.sync")
 
 REQUEST_TIMEOUT = 15
-DEFAULT_API_URL = "https://worldcupjson.net/matches"
 DEFAULT_OPENFOOTBALL_URL = (
-    "https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json"
+    "https://raw.githubusercontent.com/openfootball/worldcup.json/refs/heads/master/2026/worldcup.json"
 )
 
 
@@ -108,60 +103,6 @@ def _parse_openfootball_score_pair(score_data) -> tuple[Optional[int], Optional[
 # Source parsers
 # ───────────────────────────────────────────────────────────────
 
-def _parse_worldcupjson_match(raw: dict) -> Optional[dict]:
-    """Parse a worldcupjson.net match entry into normalised form."""
-    match_number = raw.get("match_number") or raw.get("matchNumber") or raw.get("fifa_id")
-    if match_number is not None:
-        match_number = int(match_number)
-
-    home_raw = raw.get("home_team") or raw.get("homeTeam") or {}
-    away_raw = raw.get("away_team") or raw.get("awayTeam") or {}
-
-    if isinstance(home_raw, str):
-        home_code, home_name = home_raw, home_raw
-    elif isinstance(home_raw, dict):
-        home_code = home_raw.get("code", home_raw.get("country", ""))
-        home_name = home_raw.get("name", home_raw.get("country", home_code))
-    else:
-        return None
-
-    if isinstance(away_raw, str):
-        away_code, away_name = away_raw, away_raw
-    elif isinstance(away_raw, dict):
-        away_code = away_raw.get("code", away_raw.get("country", ""))
-        away_name = away_raw.get("name", away_raw.get("country", away_code))
-    else:
-        return None
-
-    home_goals = _parse_goals(
-        raw.get("home_goals", raw.get("homeGoals", home_raw.get("goals") if isinstance(home_raw, dict) else None))
-    )
-    away_goals = _parse_goals(
-        raw.get("away_goals", raw.get("awayGoals", away_raw.get("goals") if isinstance(away_raw, dict) else None))
-    )
-
-    raw_status = raw.get("status", raw.get("match_status", "scheduled"))
-    if isinstance(raw_status, dict):
-        raw_status = raw_status.get("code", "scheduled")
-    status = _normalize_status(str(raw_status))
-
-    match_date = raw.get("match_date") or raw.get("matchDate") or raw.get("datetime")
-    if match_date and isinstance(match_date, str):
-        match_date = match_date.replace("Z", "+00:00")
-
-    return {
-        "match_number": match_number,
-        "home_code": home_code,
-        "home_name": home_name,
-        "away_code": away_code,
-        "away_name": away_name,
-        "home_goals": home_goals,
-        "away_goals": away_goals,
-        "status": status,
-        "match_date": match_date,
-    }
-
-
 def _parse_openfootball_match(raw: dict) -> Optional[dict]:
     """Parse an openfootball JSON match entry into normalised form."""
     # 2026 openfootball rows are ordered 1..104 but group-stage rows may omit
@@ -216,18 +157,6 @@ def _parse_openfootball_match(raw: dict) -> Optional[dict]:
 # Fetch pipeline
 # ───────────────────────────────────────────────────────────────
 
-def _fetch_worldcupjson(api_url: str | None = None) -> list[dict]:
-    """Fetch matches from worldcupjson.net format."""
-    url = api_url or settings.world_cup_json_url or DEFAULT_API_URL
-    data = _fetch_json(url)
-    if isinstance(data, dict) and "matches" in data:
-        data = data["matches"]
-    if not isinstance(data, list):
-        raise SyncError("Unexpected worldcupjson response structure")
-    parsed = [_parse_worldcupjson_match(m) for m in data]
-    return [m for m in parsed if m is not None]
-
-
 def _fetch_openfootball(url: str | None = None) -> list[dict]:
     """Fetch matches from openfootball GitHub JSON format."""
     fetch_url = url or settings.openfootball_url or DEFAULT_OPENFOOTBALL_URL
@@ -252,14 +181,11 @@ def _fetch_matches(source: str | None = None, db=None) -> list[dict]:
     if source is None and db is not None:
         row = db.query(SyncConfig).first()
         source = row.source if row else None
-    src = source or settings.sync_source or "worldcupjson"
-    if src == "openfootball":
-        return _fetch_openfootball()
-    return _fetch_worldcupjson()
+    return _fetch_openfootball()
 
 
 # Backward-compatible alias used by tests
-_parse_api_match = _parse_worldcupjson_match
+_parse_api_match = _parse_openfootball_match
 
 
 # ───────────────────────────────────────────────────────────────

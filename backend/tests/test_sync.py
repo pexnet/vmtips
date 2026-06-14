@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock
 
 
 class TestSyncServiceParsing:
-    """Unit tests for sync_service._parse_api_match and helper functions."""
+    """Unit tests for the openfootball sync parser and helper functions."""
 
     def test_normalize_status_scheduled(self):
         from sync_service import _normalize_status
@@ -47,66 +47,35 @@ class TestSyncServiceParsing:
         from sync_service import _parse_goals
         assert _parse_goals("5") == 5
 
-    def test_parse_api_match_worldcupjson_format(self):
+    def test_parse_api_match_alias_uses_openfootball_shape(self):
         from sync_service import _parse_api_match
         raw = {
-            "match_number": 1,
-            "home_team": {"code": "MEX", "name": "Mexico", "goals": 1},
-            "away_team": {"code": "RSA", "name": "South Africa", "goals": 1},
-            "status": "completed",
+            "team1": "Mexico",
+            "team2": "South Africa",
+            "score": {"ft": [1, 1]},
+            "__match_number": 1,
         }
         result = _parse_api_match(raw)
         assert result is not None
         assert result["match_number"] == 1
-        assert result["home_code"] == "MEX"
-        assert result["away_code"] == "RSA"
+        assert result["home_name"] == "Mexico"
+        assert result["away_name"] == "South Africa"
         assert result["home_goals"] == 1
         assert result["away_goals"] == 1
         assert result["status"] == "finished"
 
-    def test_parse_api_match_string_teams(self):
+    def test_parse_api_match_unparseable_without_match_number(self):
         from sync_service import _parse_api_match
-        raw = {
-            "match_number": 5,
-            "home_team": "Mexico",
-            "away_team": "South Korea",
-            "home_goals": 2,
-            "away_goals": 0,
-            "status": "finished",
-        }
-        result = _parse_api_match(raw)
-        assert result is not None
-        assert result["home_code"] == "Mexico"
-        assert result["away_code"] == "South Korea"
-        assert result["home_goals"] == 2
-        assert result["away_goals"] == 0
-        assert result["status"] == "finished"
-
-    def test_parse_api_match_match_number_from_fifa_id(self):
-        from sync_service import _parse_api_match
-        raw = {
-            "fifa_id": 42,
-            "home_team": {"code": "BRA", "name": "Brazil"},
-            "away_team": {"code": "GER", "name": "Germany"},
-            "status": "scheduled",
-        }
-        result = _parse_api_match(raw)
-        assert result is not None
-        assert result["match_number"] == 42
-
-    def test_parse_api_match_unparseable(self):
-        from sync_service import _parse_api_match
-        result = _parse_api_match({"no_match_number": True, "home_team": 12345})
-        # home_team is int, which is not str or dict, should return None
+        result = _parse_api_match({"team1": "Mexico", "team2": "South Africa"})
         assert result is None
 
     def test_parse_api_match_scheduled_no_goals(self):
         from sync_service import _parse_api_match
         raw = {
-            "match_number": 10,
-            "home_team": {"code": "CAN", "name": "Canada"},
-            "away_team": {"code": "QAT", "name": "Qatar"},
-            "status": "scheduled",
+            "team1": "Canada",
+            "team2": "Qatar",
+            "score": None,
+            "__match_number": 10,
         }
         result = _parse_api_match(raw)
         assert result is not None
@@ -170,19 +139,10 @@ class TestSyncServiceParsing:
 class TestSyncServiceFetch:
     """Tests for _fetch_matches with mocked HTTP calls."""
 
-    def test_fetch_matches_success(self):
+    def test_fetch_matches_uses_openfootball_source(self):
         from sync_service import _fetch_matches
-        mock_data = [
-            {
-                "match_number": 1,
-                "home_team": {"code": "MEX"},
-                "away_team": {"code": "RSA"},
-                "status": "completed",
-                "home_goals": 1,
-                "away_goals": 1,
-            }
-        ]
         import json
+        mock_data = {"matches": [{"team1": "Mexico", "team2": "South Africa", "score": {"ft": [1, 0]}}]}
         mock_body = json.dumps(mock_data).encode("utf-8")
 
         with patch("sync_service.urllib.request.urlopen") as mock_urlopen:
@@ -192,26 +152,9 @@ class TestSyncServiceFetch:
             mock_resp.__exit__ = MagicMock(return_value=False)
             mock_urlopen.return_value = mock_resp
 
-            result = _fetch_matches("http://test.local/api")
+            result = _fetch_matches("openfootball")
             assert len(result) == 1
             assert result[0]["match_number"] == 1
-
-    def test_fetch_matches_wrapped_in_matches_key(self):
-        from sync_service import _fetch_matches
-        import json
-        mock_data = {"matches": [{"match_number": 3}]}
-        mock_body = json.dumps(mock_data).encode("utf-8")
-
-        with patch("sync_service.urllib.request.urlopen") as mock_urlopen:
-            mock_resp = MagicMock()
-            mock_resp.read.return_value = mock_body
-            mock_resp.__enter__ = lambda s: s
-            mock_resp.__exit__ = MagicMock(return_value=False)
-            mock_urlopen.return_value = mock_resp
-
-            result = _fetch_matches("http://test.local/api")
-            assert len(result) == 1
-            assert result[0]["match_number"] == 3
 
 
     def test_fetch_openfootball_assigns_match_numbers_by_file_order(self):

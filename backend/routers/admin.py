@@ -51,6 +51,9 @@ def _with_utc(value: datetime | None) -> datetime | None:
 def _get_sync_config_row(db: Session) -> SyncConfig:
     row = db.query(SyncConfig).first()
     if row:
+        if row.source != "openfootball":
+            row.source = "openfootball"
+            db.commit()
         return row
     row = SyncConfig(
         source=settings.sync_source,
@@ -363,7 +366,6 @@ def get_sync_config(
         "source": row.source,
         "auto_sync_enabled": row.auto_sync_enabled,
         "auto_sync_interval_minutes": row.auto_sync_interval_minutes,
-        "world_cup_json_url": settings.world_cup_json_url,
         "openfootball_url": settings.openfootball_url,
     }
 
@@ -383,8 +385,8 @@ def update_sync_config(
     """Update persisted sync configuration. Admin only."""
     row = _get_sync_config_row(db)
     if payload.source is not None:
-        if payload.source not in ("worldcupjson", "openfootball"):
-            raise HTTPException(status_code=422, detail="source must be 'worldcupjson' or 'openfootball'")
+        if payload.source != "openfootball":
+            raise HTTPException(status_code=422, detail="source must be 'openfootball'")
         row.source = payload.source
     if payload.auto_sync_enabled is not None:
         row.auto_sync_enabled = payload.auto_sync_enabled

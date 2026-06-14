@@ -281,7 +281,7 @@ class SyncConfig(Base):
     __tablename__ = "sync_config"
 
     id = Column(Integer, primary_key=True, index=True)
-    source = Column(String, nullable=False, default="worldcupjson")
+    source = Column(String, nullable=False, default="openfootball")
     auto_sync_enabled = Column(Boolean, default=False)
     auto_sync_interval_minutes = Column(Integer, default=5)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)

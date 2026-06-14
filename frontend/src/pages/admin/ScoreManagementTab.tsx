@@ -65,8 +65,13 @@ export default function ScoreManagementTab({
         <Box sx={{ mt: 3 }}>
           <Typography variant="subtitle1" sx={{ mb: 1 }}>{t("admin.sync_config")}</Typography>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <TextField label={t("admin.sync_source")} value={syncConfig.source}
-              onChange={(e) => setSyncConfig((c) => c ? { ...c, source: e.target.value } : c)} fullWidth />
+            <TextField
+              label={t("admin.sync_source")}
+              value={syncConfig.source}
+              fullWidth
+              disabled
+              helperText={(syncConfig as { openfootball_url?: string }).openfootball_url}
+            />
             <FormControlLabel control={<Switch checked={syncConfig.auto_sync_enabled}
               onChange={(e) => setSyncConfig((c) => c ? { ...c, auto_sync_enabled: e.target.checked } : c)} />}
               label={`${t("admin.auto_sync")}: ${syncConfig.auto_sync_enabled ? t("admin.auto_sync_on") : t("admin.auto_sync_off")}`} />

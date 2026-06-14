@@ -330,15 +330,11 @@ class TestSyncSourceInResponse:
         assert result["source"] == "openfootball"
 
     def test_sync_falls_back_to_default_source(self, client, db):
-        """When no source is passed, the default (settings.sync_source or
-        'worldcupjson') is used and reported."""
+        """When no source is passed, the openfootball default is used and reported."""
         from sync_service import sync_match_results
 
         with patch("sync_service._fetch_matches", return_value=[]):
             result = sync_match_results(db, source=None)
 
         assert "source" in result
-        # The default is "worldcupjson" per settings
-        assert result["source"] in ("worldcupjson", "openfootball"), (
-            f"Unexpected source: {result['source']}"
-        )
+        assert result["source"] == "openfootball"
