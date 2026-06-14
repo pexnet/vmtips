@@ -23,6 +23,9 @@ def _effective_sync_config(db) -> tuple[bool, str, int]:
     enabled. The DB row still supplies admin-visible interval settings.
     """
     row = db.query(SyncConfig).first()
+    if row and row.source != "openfootball":
+        row.source = "openfootball"
+        db.commit()
     env_enabled = os.environ.get("AUTO_SYNC_ENABLED")
     if env_enabled is not None:
         enabled = env_enabled.strip().lower() in {"1", "true", "yes", "on"}
