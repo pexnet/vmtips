@@ -22,6 +22,8 @@ from errors import AppError
 from logging_config import setup_logging, request_id_ctx
 from sync_scheduler import start_auto_sync, stop_auto_sync
 
+APP_VERSION = os.getenv("APP_VERSION", "local-dev")
+
 # Initialise structured logging as early as possible
 setup_logging()
 logger = logging.getLogger("vmtips")
@@ -40,7 +42,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="VMTips API",
     description="Backend API for the VMTips World Cup 2026 prediction game.",
-    version="0.1.0",
+    version=APP_VERSION,
     lifespan=lifespan,
 )
 app.state.limiter = limiter
@@ -147,7 +149,7 @@ app.add_middleware(
 @app.get("/api/health")
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": "0.1.0"}
+    return {"status": "ok", "version": APP_VERSION}
 
 # API Routers
 app.include_router(auth.router, prefix="/api")

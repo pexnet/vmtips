@@ -11,6 +11,9 @@ RUN npm run build
 # ── Production stage ─────────────────────────────────
 FROM python:3.11-slim AS production
 
+ARG APP_VERSION=local-dev
+ENV APP_VERSION=${APP_VERSION}
+
 WORKDIR /app
 
 # Create non-root user and data directory
