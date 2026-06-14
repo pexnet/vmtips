@@ -22,7 +22,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 # Pre-computed bcrypt hash of "dummy" for constant-time login failure
 _DUMMY_HASH = "$2b$12$EIx9hO4im1St7uFtCC0zYe4M05Ao6CRKu0VJgPnlLz9xqf4N0AG2S"
 _ALLOWED_AVATAR_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
-_MAX_AVATAR_BYTES = 1_000_000
+_MAX_AVATAR_BYTES = 3_000_000
 
 def _fetch_current_user(
     user: User = Depends(fetch_current_user),
