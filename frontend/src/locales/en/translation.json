@@ -158,7 +158,7 @@
     "predicted": "Predicted",
     "actual": "Actual",
     "match_points": "Points",
-    "next_matchday": "Next matchday",
+    "upcoming_matches": "Upcoming matches",
     "previous_matches": "Previous matches",
     "matchday_header": "Matchday {{date}}",
     "match_count": "{{count}} match",

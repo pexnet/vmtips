@@ -158,7 +158,7 @@
     "predicted": "Tippat",
     "actual": "Faktiskt",
     "match_points": "Poäng",
-    "next_matchday": "Nästa omgång",
+    "upcoming_matches": "Kommande matcher",
     "previous_matches": "Tidigare matcher",
     "matchday_header": "Omgång {{date}}",
     "match_count": "{{count}} match",

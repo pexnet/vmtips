@@ -289,6 +289,6 @@ export interface MatchdaysResponse {
   league_name: string | null;
   matchdays_back: number;
   now: string;
-  upcoming: MatchdayGroup | null;
+  upcoming: MatchdayGroup[];
   past: MatchdayGroup[];
 }

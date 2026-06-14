@@ -11,7 +11,7 @@ import type { MatchdayGroup } from "../types/api";
 import MatchdayGrid from "./MatchdayGrid";
 
 interface NextMatchdaySectionProps {
-  upcoming: MatchdayGroup | null;
+  upcoming: MatchdayGroup[];
   memberOrder?: string[];
 }
 
@@ -21,13 +21,19 @@ export default function NextMatchdaySection({ upcoming, memberOrder }: NextMatch
   return (
     <Accordion defaultExpanded>
       <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-        <Typography variant="h6">{t("leaderboard.next_matchday")}</Typography>
+        <Typography variant="h6">{t("leaderboard.upcoming_matches")}</Typography>
       </AccordionSummary>
       <AccordionDetails>
-        {!upcoming || upcoming.matches.length === 0 ? (
+        {upcoming.length === 0 ? (
           <Alert severity="info">{t("leaderboard.no_upcoming")}</Alert>
         ) : (
-          <MatchdayGrid matchday={upcoming} memberOrder={memberOrder} />
+          upcoming.map((matchday) => (
+            <MatchdayGrid
+              key={matchday.date}
+              matchday={matchday}
+              memberOrder={memberOrder}
+            />
+          ))
         )}
       </AccordionDetails>
     </Accordion>

@@ -214,9 +214,11 @@ class TestMatchdaysView:
         data = r.json()
         assert "past" in data
         assert "upcoming" in data
+        assert isinstance(data["upcoming"], list)
         assert data["league_id"] is not None
+        assert len(data["upcoming"]) <= 2
         # If there are finished matches in the seeded DB, past may be non-empty;
-        # if there are future scheduled matches, upcoming may be non-None.
+        # if there are future scheduled matches, upcoming may contain up to two groups.
         # We only assert structural correctness here.
 
     def test_matchdays_includes_finished_and_upcoming(self, client, set_match_result):
@@ -249,13 +251,15 @@ class TestMatchdaysView:
         bob_pred = next(p for p in finished["predictions"] if p["display_name"] == "Bob")
         assert bob_pred["points"] == 3
 
-        # Upcoming section should exist (next scheduled date) and contain at least one match
-        assert data["upcoming"] is not None
-        assert len(data["upcoming"]["matches"]) >= 1
+        # Upcoming section should contain up to two upcoming matchdays.
+        assert isinstance(data["upcoming"], list)
+        assert 1 <= len(data["upcoming"]) <= 2
         # Predictions in upcoming matches never include points (backend only adds points for finished)
-        for m in data["upcoming"]["matches"]:
-            for p in m.get("predictions", []):
-                assert "points" not in p
+        for upcoming_matchday in data["upcoming"]:
+            assert len(upcoming_matchday["matches"]) >= 1
+            for m in upcoming_matchday["matches"]:
+                for p in m.get("predictions", []):
+                    assert "points" not in p
 
     def test_matchdays_forbidden_for_non_member(self, client):
         """A user who is not a member of the requested league gets 403."""

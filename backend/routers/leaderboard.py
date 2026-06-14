@@ -554,7 +554,7 @@ def matchdays(
             "league_name": None,
             "matchdays_back": matchdays,
             "now": datetime.now(timezone.utc).isoformat(),
-            "upcoming": None,
+            "upcoming": [],
             "past": [],
         }
 
@@ -570,17 +570,19 @@ def matchdays(
     league = db.query(League).filter(League.id == resolved).first()
     league_name = league.name if league else None
 
-    # Upcoming: next date with scheduled/ongoing matches (>= today)
+    # Upcoming: next two distinct dates with scheduled/ongoing matches (>= today)
     today = datetime.now(timezone.utc).date()
     date_label = func.date(Match.match_date).label("d")
-    upcoming_row = (
+    upcoming_rows = (
         db.query(date_label)
         .filter(Match.status.in_(("scheduled", "ongoing")))
         .filter(func.date(Match.match_date) >= today)
+        .group_by(date_label)
         .order_by(date_label.asc())
-        .first()
+        .limit(2)
+        .all()
     )
-    upcoming_date = upcoming_row[0] if upcoming_row else None
+    upcoming_dates = [r[0] for r in upcoming_rows]
 
     # Past: N most recent distinct finished dates
     past_rows = (
@@ -595,8 +597,8 @@ def matchdays(
 
     # Gather all matches in the window
     date_filter = []
-    if upcoming_date:
-        date_filter.append(func.date(Match.match_date) == upcoming_date)
+    if upcoming_dates:
+        date_filter.append(func.date(Match.match_date).in_(upcoming_dates))
     if past_dates:
         date_filter.append(func.date(Match.match_date).in_(past_dates))
 
@@ -684,7 +686,7 @@ def matchdays(
         return preds_out
 
     # Group matches by date
-    upcoming_matchday = None
+    upcoming_matchdays = []
     past_matchdays = []
     matches_by_date: dict[str, list] = {}
     for m in matches:
@@ -694,19 +696,21 @@ def matchdays(
         matches_by_date.setdefault(date_str, []).append(m)
 
     # Build matchdays
-    if upcoming_date:
+    for upcoming_date in upcoming_dates:
         upcoming_date_str = upcoming_date.isoformat() if hasattr(upcoming_date, "isoformat") else str(upcoming_date)
         upcoming_matches = matches_by_date.get(upcoming_date_str, [])
         upcoming_matches = [m for m in upcoming_matches if m.status in ("scheduled", "ongoing")]
-        if upcoming_matches:
-            upcoming_matchday = {
-                "date": upcoming_date_str,
-                "matches": [],
-            }
-            for m in upcoming_matches:
-                sm = _serialize_match(m)
-                sm["predictions"] = _build_predictions_for_match(m)
-                upcoming_matchday["matches"].append(sm)
+        if not upcoming_matches:
+            continue
+        upcoming_matchday = {
+            "date": upcoming_date_str,
+            "matches": [],
+        }
+        for m in upcoming_matches:
+            sm = _serialize_match(m)
+            sm["predictions"] = _build_predictions_for_match(m)
+            upcoming_matchday["matches"].append(sm)
+        upcoming_matchdays.append(upcoming_matchday)
 
     for d in past_dates:
         date_str = d.isoformat() if hasattr(d, "isoformat") else str(d)
@@ -729,6 +733,6 @@ def matchdays(
         "league_name": league_name,
         "matchdays_back": matchdays,
         "now": datetime.now(timezone.utc).isoformat(),
-        "upcoming": upcoming_matchday,
+        "upcoming": upcoming_matchdays,
         "past": past_matchdays,
     }
