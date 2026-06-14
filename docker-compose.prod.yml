@@ -24,7 +24,8 @@ services:
       - WORLD_CUP_JSON_URL=https://worldcupjson.net/matches
       - SYNC_SOURCE=openfootball
       - AUTO_SYNC_ENABLED=true
-      - AUTO_SYNC_INTERVAL_MINUTES=5
+      # AUTO_SYNC_INTERVAL_MINUTES is intentionally not set here so the
+      # admin UI / SyncConfig row controls the interval at runtime.
       - CORS_ORIGINS=${CORS_ORIGINS:-}
       - STATIC_DIR=/app/static
     restart: unless-stopped
