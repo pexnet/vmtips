@@ -10,9 +10,9 @@ Toggle the source via config.sync_source and auto-sync via config.auto_sync_enab
 """
 import json
 import logging
+import os
 import urllib.request
 import urllib.error
-from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from config import settings
@@ -81,10 +81,27 @@ def _parse_goals(score_data) -> Optional[int]:
         return score_data
     if isinstance(score_data, dict):
         return score_data.get("full_time", score_data.get("goals", None))
+    if isinstance(score_data, (list, tuple)) and score_data:
+        try:
+            return int(score_data[0])
+        except (ValueError, TypeError):
+            return None
     try:
         return int(score_data)
     except (ValueError, TypeError):
         return None
+
+
+def _parse_openfootball_score_pair(score_data) -> tuple[Optional[int], Optional[int]]:
+    """Extract full-time goals from openfootball's score shape."""
+    if not isinstance(score_data, dict):
+        return None, None
+    full_time = score_data.get("ft") or score_data.get("full_time")
+    if isinstance(full_time, (list, tuple)) and len(full_time) >= 2:
+        return _parse_goals(full_time[0]), _parse_goals(full_time[1])
+    if isinstance(full_time, dict):
+        return _parse_goals(full_time.get("home")), _parse_goals(full_time.get("away"))
+    return None, None
 
 
 # ───────────────────────────────────────────────────────────────
@@ -147,40 +164,36 @@ def _parse_worldcupjson_match(raw: dict) -> Optional[dict]:
 
 def _parse_openfootball_match(raw: dict) -> Optional[dict]:
     """Parse an openfootball JSON match entry into normalised form."""
-    # openfootball uses 'num' for match number and 'team1'/'team2' for team names
-    match_number = raw.get("num") or raw.get("match_number")
+    # 2026 openfootball rows are ordered 1..104 but group-stage rows may omit
+    # explicit `num`; _fetch_openfootball injects __match_number from file order.
+    match_number = raw.get("num") or raw.get("match_number") or raw.get("__match_number")
     if match_number is not None:
         try:
             match_number = int(match_number)
         except (ValueError, TypeError):
             match_number = None
 
-    # If there's no match_number this is likely a group-stage match we cannot map
     if match_number is None:
         return None
 
     home_name = raw.get("team1") or raw.get("home_team") or raw.get("homeTeam") or ""
     away_name = raw.get("team2") or raw.get("away_team") or raw.get("awayTeam") or ""
 
-    # Goals in openfootball usually appear as top-level keys during/after the match
-    home_goals = _parse_goals(raw.get("goals1") or raw.get("home_goals") or raw.get("score1"))
-    away_goals = _parse_goals(raw.get("goals2") or raw.get("away_goals") or raw.get("score2"))
+    score_home, score_away = _parse_openfootball_score_pair(raw.get("score"))
+    home_goals = score_home
+    away_goals = score_away
+    if home_goals is None:
+        home_goals = _parse_goals(raw.get("goals1") or raw.get("home_goals") or raw.get("score1"))
+    if away_goals is None:
+        away_goals = _parse_goals(raw.get("goals2") or raw.get("away_goals") or raw.get("score2"))
 
-    # Status detection: if goals are present → finished; if date is in the past → likely finished
-    # openfootball does not always include status, so we infer:
-    status = "scheduled"
-    if home_goals is not None and away_goals is not None:
+    raw_status = raw.get("status") or raw.get("match_status")
+    if raw_status:
+        status = _normalize_status(str(raw_status))
+    elif home_goals is not None and away_goals is not None:
         status = "finished"
     else:
-        raw_date = raw.get("date")
-        if raw_date:
-            try:
-                match_dt = datetime.strptime(raw_date, "%Y-%m-%d")
-                # If the match date + 3 hours is in the past, assume finished
-                if match_dt + timedelta(hours=3) < datetime.now(timezone.utc).replace(tzinfo=None):
-                    status = "finished"
-            except ValueError:
-                pass
+        status = "scheduled"
 
     match_date = raw.get("date") or raw.get("match_date") or raw.get("datetime")
     if match_date and isinstance(match_date, str):
@@ -224,7 +237,13 @@ def _fetch_openfootball(url: str | None = None) -> list[dict]:
     matches = data.get("matches", [])
     if not isinstance(matches, list):
         raise SyncError("Unexpected openfootball matches structure")
-    parsed = [_parse_openfootball_match(m) for m in matches]
+    numbered_matches = []
+    for index, match in enumerate(matches, start=1):
+        if isinstance(match, dict):
+            item = dict(match)
+            item.setdefault("__match_number", index)
+            numbered_matches.append(item)
+    parsed = [_parse_openfootball_match(m) for m in numbered_matches]
     return [m for m in parsed if m is not None]
 
 
@@ -265,7 +284,11 @@ def sync_match_results(db, source: str | None = None) -> dict:
     # `settings.sync_source` (the raw config value, which may be None
     # or empty), and a per-call `source` override was silently
     # invisible in the logs.
-    resolved_source = source or settings.sync_source or "worldcupjson"
+    row_source = None
+    if db is not None:
+        row = db.query(SyncConfig).first()
+        row_source = row.source if row else None
+    resolved_source = source or os.environ.get("SYNC_SOURCE") or row_source or settings.sync_source or "openfootball"
 
     raw_matches = _fetch_matches(resolved_source, db=db)
 
@@ -298,6 +321,11 @@ def sync_match_results(db, source: str | None = None) -> dict:
                 local.away_team_placeholder = None
 
         new_status = parsed["status"]
+        if local.status == "finished" and new_status != "finished":
+            # External feeds can temporarily omit results or mark rows as scheduled.
+            # Never downgrade a scored local match back to an unplayed state.
+            continue
+
         changed = False
 
         if local.status != new_status:

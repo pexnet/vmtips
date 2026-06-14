@@ -22,6 +22,9 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set}
       - START_USERS_FILE=/data/start_users.json
       - WORLD_CUP_JSON_URL=https://worldcupjson.net/matches
+      - SYNC_SOURCE=openfootball
+      - AUTO_SYNC_ENABLED=true
+      - AUTO_SYNC_INTERVAL_MINUTES=5
       - CORS_ORIGINS=${CORS_ORIGINS:-}
       - STATIC_DIR=/app/static
     restart: unless-stopped

@@ -115,6 +115,58 @@ class TestSyncServiceParsing:
         assert result["status"] == "scheduled"
 
 
+    def test_parse_openfootball_2026_group_score_shape(self):
+        """openfootball 2026 group rows use score.ft and may lack explicit num."""
+        from sync_service import _parse_openfootball_match
+
+        raw = {
+            "round": "Matchday 1",
+            "date": "2026-06-11",
+            "time": "13:00 UTC-6",
+            "team1": "Mexico",
+            "team2": "South Africa",
+            "score": {"ft": [2, 0], "ht": [1, 0]},
+            "goals1": [{"name": "Julián Quiñones", "minute": "9"}],
+            "goals2": [],
+            "group": "Group A",
+            "ground": "Mexico City",
+            "__match_number": 1,
+        }
+
+        result = _parse_openfootball_match(raw)
+
+        assert result is not None
+        assert result["match_number"] == 1
+        assert result["home_name"] == "Mexico"
+        assert result["away_name"] == "South Africa"
+        assert result["home_goals"] == 2
+        assert result["away_goals"] == 0
+        assert result["status"] == "finished"
+
+    def test_parse_openfootball_2026_scheduled_group_row(self):
+        """Unplayed openfootball rows should map to scheduled matches without goals."""
+        from sync_service import _parse_openfootball_match
+
+        raw = {
+            "round": "Matchday 1",
+            "date": "2026-06-12",
+            "time": "18:00 UTC-5",
+            "team1": "United States",
+            "team2": "Paraguay",
+            "score": None,
+            "group": "Group D",
+            "__match_number": 10,
+        }
+
+        result = _parse_openfootball_match(raw)
+
+        assert result is not None
+        assert result["match_number"] == 10
+        assert result["home_goals"] is None
+        assert result["away_goals"] is None
+        assert result["status"] == "scheduled"
+
+
 class TestSyncServiceFetch:
     """Tests for _fetch_matches with mocked HTTP calls."""
 
@@ -160,6 +212,34 @@ class TestSyncServiceFetch:
             result = _fetch_matches("http://test.local/api")
             assert len(result) == 1
             assert result[0]["match_number"] == 3
+
+
+    def test_fetch_openfootball_assigns_match_numbers_by_file_order(self):
+        """The 2026 openfootball file has group rows without num; order maps to 1..104."""
+        from sync_service import _fetch_openfootball
+        import json
+
+        mock_data = {
+            "name": "World Cup 2026",
+            "matches": [
+                {"team1": "Mexico", "team2": "South Africa", "score": {"ft": [2, 0]}},
+                {"team1": "Canada", "team2": "Qatar", "score": None},
+            ],
+        }
+        mock_body = json.dumps(mock_data).encode("utf-8")
+
+        with patch("sync_service.urllib.request.urlopen") as mock_urlopen:
+            mock_resp = MagicMock()
+            mock_resp.read.return_value = mock_body
+            mock_resp.__enter__ = lambda s: s
+            mock_resp.__exit__ = MagicMock(return_value=False)
+            mock_urlopen.return_value = mock_resp
+
+            result = _fetch_openfootball("http://test.local/openfootball.json")
+
+        assert [row["match_number"] for row in result] == [1, 2]
+        assert result[0]["home_goals"] == 2
+        assert result[0]["away_goals"] == 0
 
     def test_fetch_matches_http_error(self):
         from sync_service import _fetch_json, SyncError
@@ -298,6 +378,39 @@ class TestSyncMatchResults:
         assert result["updated"] == 0
 
 
+    def test_sync_does_not_downgrade_finished_match_to_scheduled(self, seeded_db):
+        from sync_service import sync_match_results
+        from models import Match
+
+        match = seeded_db.query(Match).filter(Match.match_number == 1).first()
+        match.status = "finished"
+        match.home_goals = 2
+        match.away_goals = 0
+        seeded_db.commit()
+
+        mock_api_data = [
+            {
+                "match_number": 1,
+                "home_code": "",
+                "home_name": "Mexico",
+                "away_code": "",
+                "away_name": "South Africa",
+                "status": "scheduled",
+                "home_goals": None,
+                "away_goals": None,
+            }
+        ]
+
+        with patch("sync_service._fetch_matches", return_value=mock_api_data):
+            result = sync_match_results(seeded_db)
+
+        seeded_db.refresh(match)
+        assert result["updated"] == 0
+        assert match.status == "finished"
+        assert match.home_goals == 2
+        assert match.away_goals == 0
+
+
 class TestAdminSyncEndpoint:
     """Tests for the POST /admin/sync-results endpoint."""
 
@@ -348,3 +461,34 @@ class TestAdminSyncEndpoint:
         data = r.json()
         assert data["synced"] is False
         assert "Connection timeout" in data["message"]
+
+class TestAutoSyncRunner:
+    """Tests for the automatic score-sync scheduler helper."""
+
+    def test_run_auto_sync_once_skips_when_disabled(self, seeded_db):
+        from models import SyncConfig
+        from sync_scheduler import run_auto_sync_once
+
+        seeded_db.add(SyncConfig(source="openfootball", auto_sync_enabled=False, auto_sync_interval_minutes=5))
+        seeded_db.commit()
+
+        with patch("sync_scheduler.sync_match_results") as mock_sync:
+            result = run_auto_sync_once(lambda: seeded_db)
+
+        assert result["ran"] is False
+        assert result["reason"] == "disabled"
+        mock_sync.assert_not_called()
+
+    def test_run_auto_sync_once_runs_when_enabled(self, seeded_db):
+        from models import SyncConfig
+        from sync_scheduler import run_auto_sync_once
+
+        seeded_db.add(SyncConfig(source="openfootball", auto_sync_enabled=True, auto_sync_interval_minutes=5))
+        seeded_db.commit()
+
+        with patch("sync_scheduler.sync_match_results", return_value={"synced": True, "updated": 2}) as mock_sync:
+            result = run_auto_sync_once(lambda: seeded_db)
+
+        assert result["ran"] is True
+        assert result["result"] == {"synced": True, "updated": 2}
+        mock_sync.assert_called_once_with(seeded_db, source="openfootball")

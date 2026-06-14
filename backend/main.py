@@ -6,6 +6,7 @@ import os
 import time
 import uuid
 import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
@@ -19,15 +20,28 @@ from rate_limit import limiter
 from routers import auth, matches, predictions, leagues, leaderboard, admin, league_bonus_questions, teams, bracket
 from errors import AppError
 from logging_config import setup_logging, request_id_ctx
+from sync_scheduler import start_auto_sync, stop_auto_sync
 
 # Initialise structured logging as early as possible
 setup_logging()
 logger = logging.getLogger("vmtips")
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifecycle: start/stop periodic score sync."""
+    start_auto_sync(app)
+    try:
+        yield
+    finally:
+        await stop_auto_sync(app)
+
+
 app = FastAPI(
     title="VMTips API",
     description="Backend API for the VMTips World Cup 2026 prediction game.",
     version="0.1.0",
+    lifespan=lifespan,
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
