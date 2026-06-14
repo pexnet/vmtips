@@ -11,6 +11,9 @@ import {
   Box,
   Chip,
   Tooltip,
+  Divider,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import type { MatchdayGroup } from "../types/api";
 
@@ -19,8 +22,18 @@ interface MatchdayGridProps {
   memberOrder?: string[];
 }
 
+function formatKickoff(kickoff: string) {
+  return new Date(kickoff).toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
+}
+
 export default function MatchdayGrid({ matchday, memberOrder }: MatchdayGridProps) {
   const { t } = useTranslation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   // Gather unique member display names across all matches in this day
   const memberSet = new Set<string>();
@@ -28,6 +41,77 @@ export default function MatchdayGrid({ matchday, memberOrder }: MatchdayGridProp
     m.predictions.forEach((p) => memberSet.add(p.display_name))
   );
   const members = memberOrder?.length ? memberOrder : Array.from(memberSet);
+
+  if (isMobile) {
+    return (
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+          {t("leaderboard.matchday_header", { date: matchday.date })} ·{" "}
+          {matchday.matches.length === 1
+            ? t("leaderboard.match_count", { count: matchday.matches.length })
+            : t("leaderboard.match_count_plural", { count: matchday.matches.length })}
+        </Typography>
+
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
+          {matchday.matches.map((m) => {
+            const predMap = new Map(
+              m.predictions.map((p) => [p.display_name, p])
+            );
+            return (
+              <Paper key={m.id} variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1 }}>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="body1" sx={{ fontWeight: 800 }}>
+                      {m.home_team.flag_emoji} {m.home_team.code} vs {m.away_team.code} {m.away_team.flag_emoji}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {formatKickoff(m.kickoff)}
+                    </Typography>
+                  </Box>
+                  {m.actual && <Chip size="small" label={m.actual} color="success" />}
+                </Box>
+
+                <Divider sx={{ my: 1.25 }} />
+
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
+                  {members.map((name) => {
+                    const p = predMap.get(name);
+                    const showPoints = p?.points !== undefined;
+                    return (
+                      <Box
+                        key={name}
+                        sx={{
+                          display: "grid",
+                          gridTemplateColumns: showPoints ? "1fr auto auto" : "1fr auto",
+                          gap: 1,
+                          alignItems: "center",
+                        }}
+                      >
+                        <Typography variant="body2" noWrap sx={{ minWidth: 0 }}>
+                          {name}
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: p ? 700 : 400 }}>
+                          {p?.predicted ?? "—"}
+                        </Typography>
+                        {showPoints && (
+                          <Chip
+                            size="small"
+                            label={t("leaderboard.points_short", { points: p.points })}
+                            color={p.points === 7 ? "success" : "default"}
+                            sx={{ height: 22 }}
+                          />
+                        )}
+                      </Box>
+                    );
+                  })}
+                </Box>
+              </Paper>
+            );
+          })}
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ mb: 2 }}>
@@ -68,11 +152,7 @@ export default function MatchdayGrid({ matchday, memberOrder }: MatchdayGridProp
                       )}
                     </Box>
                     <Typography variant="caption" color="text.secondary">
-                      {new Date(m.kickoff).toLocaleTimeString(undefined, {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        timeZoneName: "short",
-                      })}
+                      {formatKickoff(m.kickoff)}
                     </Typography>
                   </TableCell>
                   {members.map((name) => {

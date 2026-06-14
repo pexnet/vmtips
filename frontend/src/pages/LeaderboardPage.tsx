@@ -17,6 +17,8 @@ import {
   Alert,
   CircularProgress,
   Chip,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 
 import {
@@ -95,6 +97,62 @@ function LeagueLeaderboardSection() {
 
 function LeaderTable({ data }: { data: LeaderboardEntry[] }) {
   const { t } = useTranslation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
+  if (isMobile) {
+    return (
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
+        {data.map((row) => (
+          <Paper
+            key={row.rank}
+            variant="outlined"
+            sx={{
+              p: 1.5,
+              borderRadius: 2,
+              display: "grid",
+              gridTemplateColumns: "auto 1fr auto",
+              gap: 1.25,
+              alignItems: "center",
+            }}
+          >
+            <Typography variant="h6" component="div" sx={{ fontWeight: 800, minWidth: 42 }}>
+              #{row.rank}
+            </Typography>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
+              <UserAvatar
+                displayName={row.display_name}
+                firstName={row.first_name}
+                lastName={row.last_name}
+                avatarUrl={row.avatar_url}
+                sx={{ width: 40, height: 40, fontSize: "0.85rem", flexShrink: 0 }}
+              />
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="body1" sx={{ fontWeight: 700 }} noWrap>
+                  {row.display_name}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {row.predictions_made} {t("leaderboard.predictions_short")} · {row.perfect_predictions} {t("leaderboard.perfect_short")}
+                </Typography>
+              </Box>
+            </Box>
+            <Box sx={{ textAlign: "right" }}>
+              <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1 }}>
+                {row.total_points}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {t("leaderboard.points")}
+              </Typography>
+            </Box>
+          </Paper>
+        ))}
+        {data.length === 0 && (
+          <Alert severity="info">{t("leaderboard.no_data")}</Alert>
+        )}
+      </Box>
+    );
+  }
+
   return (
     <TableContainer component={Paper}>
       <Table size="small">
@@ -144,6 +202,8 @@ export default function LeaderboardPage() {
   const [tab, setTab] = useState(0);
   const { isLoggedIn } = useAuth();
   const { selectedLeagueId } = useLeague();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   const { data: personal, isLoading: personalLoading } = usePersonalScore(isLoggedIn, selectedLeagueId);
 
@@ -156,10 +216,21 @@ export default function LeaderboardPage() {
   }
 
   return (
-    <Container sx={{ mt: 4, mb: 8 }}>
-      <Typography variant="h4" gutterBottom>{t("leaderboard.title")}</Typography>
+    <Container sx={{ mt: { xs: 2, sm: 4 }, mb: 8, px: { xs: 2, sm: 3 } }}>
+      <Typography
+        variant="h4"
+        gutterBottom
+        sx={{ fontSize: { xs: "2rem", sm: "2.125rem" }, fontWeight: 800 }}
+      >
+        {t("leaderboard.title")}
+      </Typography>
 
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
+      <Tabs
+        value={tab}
+        onChange={(_, v) => setTab(v)}
+        sx={{ mb: 2 }}
+        variant={isMobile ? "fullWidth" : "standard"}
+      >
         <Tab label={t("leaderboard.league")} />
         <Tab label={t("nav.profile")} />
       </Tabs>
