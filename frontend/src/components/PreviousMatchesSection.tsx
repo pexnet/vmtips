@@ -27,13 +27,19 @@ export default function PreviousMatchesSection({ past, memberOrder }: PreviousMa
         {past.length === 0 ? (
           <Alert severity="info">{t("leaderboard.no_past")}</Alert>
         ) : (
-          past.map((matchday) => (
-            <MatchdayGrid
-              key={matchday.date}
-              matchday={matchday}
-              memberOrder={memberOrder}
-            />
-          ))
+          past.map((matchday) => {
+            // Sort matches within each day so latest kickoffs appear first
+            const sortedMatches = [...matchday.matches].sort(
+              (a, b) => new Date(b.kickoff).getTime() - new Date(a.kickoff).getTime()
+            );
+            return (
+              <MatchdayGrid
+                key={matchday.date}
+                matchday={{ ...matchday, matches: sortedMatches }}
+                memberOrder={memberOrder}
+              />
+            );
+          })
         )}
       </AccordionDetails>
     </Accordion>
