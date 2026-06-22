@@ -21,6 +21,8 @@ export function usePersonalScore(enabled = true, leagueId?: number | null) {
       return res.data as PersonalScore;
     },
     enabled,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -33,6 +35,8 @@ export function useLeagueLeaderboard(leagueId: number | null) {
       return res.data as { leaderboard: LeaderboardEntry[]; league_name: string };
     },
     enabled: !!leagueId,
+    staleTime: 60_000, // 1 min — scores change only when matches finish
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -44,5 +48,7 @@ export function useMatchdays(leagueId?: number | null, matchdays: number = 5, en
       return res.data as MatchdaysResponse;
     },
     enabled,
+    staleTime: 60_000, // 1 min
+    refetchOnWindowFocus: false,
   });
 }

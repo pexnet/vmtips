@@ -617,15 +617,15 @@ def matchdays(
         .filter(Prediction.match_id.in_(match_ids), Prediction.league_id == resolved)
         .all()
     ) if match_ids else []
-    pred_lookup = {(p.match_id, p.user_id): p for p in preds}
 
-    # Member list for ordering
+    # Member list for ordering — build a user_id → user dict once
     members = (
         db.query(User)
         .join(LeagueMember, User.id == LeagueMember.user_id)
         .filter(LeagueMember.league_id == resolved)
         .all()
     )
+    member_by_id = {m.id: m for m in members}
 
     def _team_dict(team, placeholder):
         if team:
@@ -660,11 +660,16 @@ def matchdays(
             result["actual"] = f"{match.home_goals}-{match.away_goals}"
         return result
 
+    # Group predictions by match_id for efficient per-match lookup
+    preds_by_match: dict[int, list] = {}
+    for p in preds:
+        preds_by_match.setdefault(p.match_id, []).append(p)
+
     def _build_predictions_for_match(match):
         preds_out = []
-        for user in members:
-            pred = pred_lookup.get((match.id, user.id))
-            if not pred:
+        for pred in preds_by_match.get(match.id, []):
+            user = member_by_id.get(pred.user_id)
+            if not user:
                 continue
             entry = {
                 "user_id": user.id,
@@ -690,8 +695,6 @@ def matchdays(
     past_matchdays = []
     matches_by_date: dict[str, list] = {}
     for m in matches:
-        d = func.date(m.match_date).compile(compile_kwargs={"literal_binds": True})
-        # Actually, m.match_date is a datetime object. Extract date as string.
         date_str = m.match_date.date().isoformat() if m.match_date else ""
         matches_by_date.setdefault(date_str, []).append(m)
 

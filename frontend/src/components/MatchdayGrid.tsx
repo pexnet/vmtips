@@ -1,3 +1,4 @@
+import { useMemo, memo } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Paper,
@@ -15,7 +16,7 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import type { MatchdayGroup } from "../types/api";
+import type { MatchdayGroup, MatchdayPredictionEntry } from "../types/api";
 
 interface MatchdayGridProps {
   matchday: MatchdayGroup;
@@ -30,17 +31,30 @@ function formatKickoff(kickoff: string) {
   });
 }
 
-export default function MatchdayGrid({ matchday, memberOrder }: MatchdayGridProps) {
+function MatchdayGridBase({ matchday, memberOrder }: MatchdayGridProps) {
   const { t } = useTranslation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   // Gather unique member display names across all matches in this day
-  const memberSet = new Set<string>();
-  matchday.matches.forEach((m) =>
-    m.predictions.forEach((p) => memberSet.add(p.display_name))
-  );
-  const members = memberOrder?.length ? memberOrder : Array.from(memberSet);
+  const members = useMemo(() => {
+    if (memberOrder?.length) return memberOrder;
+    const memberSet = new Set<string>();
+    matchday.matches.forEach((m) =>
+      m.predictions.forEach((p) => memberSet.add(p.display_name))
+    );
+    return Array.from(memberSet);
+  }, [matchday.matches, memberOrder]);
+
+  // Pre-build prediction lookup maps per match — avoids rebuilding
+  // a new Map on every render of each row.
+  const predMapsByMatch = useMemo(() => {
+    const maps = new Map<number, Map<string, MatchdayPredictionEntry>>();
+    for (const m of matchday.matches) {
+      maps.set(m.id, new Map(m.predictions.map((p) => [p.display_name, p])));
+    }
+    return maps;
+  }, [matchday.matches]);
 
   if (isMobile) {
     return (
@@ -54,9 +68,7 @@ export default function MatchdayGrid({ matchday, memberOrder }: MatchdayGridProp
 
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
           {matchday.matches.map((m) => {
-            const predMap = new Map(
-              m.predictions.map((p) => [p.display_name, p])
-            );
+            const predMap = predMapsByMatch.get(m.id)!;
             return (
               <Paper key={m.id} variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1 }}>
@@ -135,9 +147,7 @@ export default function MatchdayGrid({ matchday, memberOrder }: MatchdayGridProp
           </TableHead>
           <TableBody>
             {matchday.matches.map((m) => {
-              const predMap = new Map(
-                m.predictions.map((p) => [p.display_name, p])
-              );
+              const predMap = predMapsByMatch.get(m.id)!;
               return (
                 <TableRow key={m.id}>
                   <TableCell>
@@ -200,3 +210,6 @@ export default function MatchdayGrid({ matchday, memberOrder }: MatchdayGridProp
     </Box>
   );
 }
+
+const MatchdayGrid = memo(MatchdayGridBase);
+export default MatchdayGrid;

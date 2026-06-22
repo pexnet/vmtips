@@ -14,6 +14,7 @@ from sqlalchemy import (
     UniqueConstraint,
     CheckConstraint,
     Float,
+    Index,
     event,
 )
 from sqlalchemy.orm import relationship
@@ -77,6 +78,9 @@ class Team(Base):
 
 class Match(Base):
     __tablename__ = "matches"
+    __table_args__ = (
+        Index("ix_matches_status_date", "status", "match_date"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     match_number = Column(Integer, unique=True, nullable=False)
@@ -100,6 +104,8 @@ class Prediction(Base):
     __tablename__ = "predictions"
     __table_args__ = (
         UniqueConstraint("user_id", "match_id", "league_id", name="uq_user_match_league_prediction"),
+        Index("ix_predictions_league_match", "league_id", "match_id"),
+        Index("ix_predictions_user_league", "user_id", "league_id"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
@@ -138,6 +144,7 @@ class LeagueMember(Base):
     __tablename__ = "league_members"
     __table_args__ = (
         UniqueConstraint("league_id", "user_id", name="uq_league_user"),
+        Index("ix_league_members_league", "league_id"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
@@ -153,6 +160,7 @@ class TournamentBonus(Base):
     __tablename__ = "tournament_bonuses"
     __table_args__ = (
         UniqueConstraint("user_id", "league_id", name="uq_user_league_bonus"),
+        Index("ix_tournament_bonuses_league_user", "league_id", "user_id"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
@@ -210,6 +218,7 @@ class BracketPrediction(Base):
     __tablename__ = "bracket_predictions"
     __table_args__ = (
         UniqueConstraint("user_id", "league_id", "team_id", "round", name="uq_user_league_team_round"),
+        Index("ix_bracket_predictions_league_user", "league_id", "user_id"),
     )
 
     id = Column(Integer, primary_key=True, index=True)

@@ -205,7 +205,12 @@ export default function LeaderboardPage() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
-  const { data: personal, isLoading: personalLoading } = usePersonalScore(isLoggedIn, selectedLeagueId);
+  // Only fetch personal score when the profile tab is active — avoids
+  // an unnecessary API call on initial page load.
+  const { data: personal, isLoading: personalLoading } = usePersonalScore(
+    isLoggedIn && tab === 1,
+    selectedLeagueId
+  );
 
   if (personalLoading && tab === 1) {
     return (
