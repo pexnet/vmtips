@@ -233,18 +233,30 @@ def sync_match_results(db, source: str | None = None) -> dict:
 
         local = local_matches[match_number]
 
-        # Resolve team IDs for placeholder matches
-        if local.home_team_id is None and parsed["home_code"]:
-            home_team = team_by_code.get(parsed["home_code"]) or team_by_name.get(parsed["home_name"])
+        # Resolve team IDs for placeholder matches.
+        # openfootball knockout rows carry team *names* but no codes,
+        # so we fall back to name lookup when code is empty.
+        if local.home_team_id is None:
+            home_team = None
+            if parsed["home_code"]:
+                home_team = team_by_code.get(parsed["home_code"])
+            if home_team is None and parsed["home_name"]:
+                home_team = team_by_name.get(parsed["home_name"])
             if home_team:
                 local.home_team_id = home_team.id
                 local.home_team_placeholder = None
+                changed = True
 
-        if local.away_team_id is None and parsed["away_code"]:
-            away_team = team_by_code.get(parsed["away_code"]) or team_by_name.get(parsed["away_name"])
+        if local.away_team_id is None:
+            away_team = None
+            if parsed["away_code"]:
+                away_team = team_by_code.get(parsed["away_code"])
+            if away_team is None and parsed["away_name"]:
+                away_team = team_by_name.get(parsed["away_name"])
             if away_team:
                 local.away_team_id = away_team.id
                 local.away_team_placeholder = None
+                changed = True
 
         new_status = parsed["status"]
         if local.status == "finished" and new_status != "finished":
