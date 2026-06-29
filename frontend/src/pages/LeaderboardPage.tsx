@@ -143,6 +143,11 @@ function LeaderTable({ data }: { data: LeaderboardEntry[] }) {
               <Typography variant="caption" color="text.secondary">
                 {t("leaderboard.points")}
               </Typography>
+              {row.bracket_points > 0 && (
+                <Typography variant="caption" sx={{ display: "block", color: "primary.light", fontWeight: 700 }}>
+                  +{row.bracket_points} {t("leaderboard.bracket")}
+                </Typography>
+              )}
             </Box>
           </Paper>
         ))}

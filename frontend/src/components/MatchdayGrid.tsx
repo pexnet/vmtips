@@ -112,9 +112,9 @@ function MatchdayGridBase({ matchday, memberOrder }: MatchdayGridProps) {
                             const boldAway = isDraw && winnerSide === "away";
                             return (
                               <Box component="span" sx={{ fontWeight: p ? 700 : 400, fontSize: "0.875rem" }}>
-                                <Box component="span" sx={{ fontWeight: boldHome ? 900 : "inherit" }}>{h}</Box>
+                                <Box component="span" sx={{ fontWeight: boldHome ? 900 : "inherit", color: boldHome ? "primary.light" : "inherit", fontSize: boldHome ? "1rem" : "inherit" }}>{h}</Box>
                                 -
-                                <Box component="span" sx={{ fontWeight: boldAway ? 900 : "inherit" }}>{a}</Box>
+                                <Box component="span" sx={{ fontWeight: boldAway ? 900 : "inherit", color: boldAway ? "primary.light" : "inherit", fontSize: boldAway ? "1rem" : "inherit" }}>{a}</Box>
                               </Box>
                             );
                           })()}
@@ -208,9 +208,9 @@ function MatchdayGridBase({ matchday, memberOrder }: MatchdayGridProps) {
                                 const boldAway = isDraw && winnerSide === "away";
                                 return (
                                   <Box component="span" sx={{ fontWeight: showPoints ? 700 : 400, fontSize: "0.875rem" }}>
-                                    <Box component="span" sx={{ fontWeight: boldHome ? 900 : "inherit" }}>{h}</Box>
+                                    <Box component="span" sx={{ fontWeight: boldHome ? 900 : "inherit", color: boldHome ? "primary.light" : "inherit", fontSize: boldHome ? "1rem" : "inherit" }}>{h}</Box>
                                     -
-                                    <Box component="span" sx={{ fontWeight: boldAway ? 900 : "inherit" }}>{a}</Box>
+                                    <Box component="span" sx={{ fontWeight: boldAway ? 900 : "inherit", color: boldAway ? "primary.light" : "inherit", fontSize: boldAway ? "1rem" : "inherit" }}>{a}</Box>
                                   </Box>
                                 );
                               })()}
