@@ -260,9 +260,6 @@ export interface MatchdayTeam {
 export interface MatchdayPredictionEntry {
   user_id: number;
   display_name: string;
-  first_name: string | null;
-  last_name: string | null;
-  avatar_url: string | null;
   predicted: string;
   knockout_winner_side?: "home" | "away";
   points?: number;

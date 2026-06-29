@@ -17,7 +17,7 @@ from slowapi import _rate_limit_exceeded_handler
 
 from config import settings
 from rate_limit import limiter
-from routers import auth, matches, predictions, leagues, leaderboard, admin, league_bonus_questions, teams, bracket
+from routers import auth, matches, predictions, leagues, leaderboard, admin, league_bonus_questions, teams, bracket, users
 from errors import AppError
 from logging_config import setup_logging, request_id_ctx
 from sync_scheduler import start_auto_sync, stop_auto_sync
@@ -161,6 +161,7 @@ app.include_router(admin.router, prefix="/api")
 app.include_router(league_bonus_questions.router, prefix="/api")
 app.include_router(teams.router, prefix="/api")
 app.include_router(bracket.router, prefix="/api")
+app.include_router(users.router, prefix="/api")
 
 # Static files — serve SPA index.html for all non-API, non-health paths
 API_PREFIXES = (

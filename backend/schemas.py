@@ -4,7 +4,7 @@ Pydantic schemas for request/response validation.
 from datetime import datetime
 from typing import Literal
 
-from pydantic import AliasChoices, BaseModel, EmailStr, Field
+from pydantic import AliasChoices, BaseModel, EmailStr, Field, model_validator
 
 # ── Auth ────────────────────────────────────────────────────
 
@@ -45,6 +45,13 @@ class UserOut(BaseModel):
     is_admin: bool = False
     is_active: bool = True
     last_login_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def _avatar_url_to_path(self):
+        """Convert stored data URI to a cached /api/users/{id}/avatar path."""
+        if self.avatar_url and self.avatar_url.startswith("data:"):
+            self.avatar_url = f"/api/users/{self.id}/avatar"
+        return self
 
     class Config:
         from_attributes = True
@@ -195,6 +202,13 @@ class LeagueMemberOut(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
     avatar_url: str | None = None
+
+    @model_validator(mode="after")
+    def _avatar_url_to_path(self):
+        """Convert stored data URI to a cached /api/users/{id}/avatar path."""
+        if self.avatar_url and self.avatar_url.startswith("data:"):
+            self.avatar_url = f"/api/users/{self.id}/avatar"
+        return self
 
 class LeagueOut(BaseModel):
     id: int

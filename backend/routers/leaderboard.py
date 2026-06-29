@@ -23,6 +23,13 @@ from bracket_engine import build_actual_advancements
 router = APIRouter(prefix="/leaderboard", tags=["leaderboard"])
 
 
+def _avatar_url_for(user_id: int, avatar_url: str | None) -> str | None:
+    """Return a cached avatar URL path, or None if no avatar."""
+    if not avatar_url:
+        return None
+    return f"/api/users/{user_id}/avatar"
+
+
 def _empty_score() -> dict:
     return {
         "total_points": 0,
@@ -416,7 +423,7 @@ def global_leaderboard(
             "display_name": user.display_name or user.email,
             "first_name": user.first_name,
             "last_name": user.last_name,
-            "avatar_url": user.avatar_url,
+            "avatar_url": _avatar_url_for(user.id, user.avatar_url),
             "total_points": score["total_points"],
             "predictions_made": score["predictions_made"],
             "perfect_predictions": score["perfect_predictions"],
@@ -486,7 +493,7 @@ def league_leaderboard(
             "display_name": user.display_name or user.email,
             "first_name": user.first_name,
             "last_name": user.last_name,
-            "avatar_url": user.avatar_url,
+            "avatar_url": _avatar_url_for(user.id, user.avatar_url),
             "total_points": score["total_points"],
             "predictions_made": score["predictions_made"],
             "perfect_predictions": score["perfect_predictions"],
@@ -524,7 +531,7 @@ def my_scores(
         "display_name": current_user.display_name or current_user.email,
         "first_name": current_user.first_name,
         "last_name": current_user.last_name,
-        "avatar_url": current_user.avatar_url,
+        "avatar_url": _avatar_url_for(current_user.id, current_user.avatar_url),
         "total_points": score["total_points"],
         "match_points": score["match_points"],
         "bracket_points": score["bracket_points"],
@@ -674,9 +681,6 @@ def matchdays(
             entry = {
                 "user_id": user.id,
                 "display_name": user.display_name or user.email,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "avatar_url": user.avatar_url,
                 "predicted": f"{pred.home_goals}-{pred.away_goals}",
             }
             if pred.knockout_winner_side:

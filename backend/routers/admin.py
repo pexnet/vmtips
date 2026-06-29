@@ -101,7 +101,7 @@ def _admin_user_out(user: User) -> dict:
         "display_name": user.display_name,
         "first_name": user.first_name,
         "last_name": user.last_name,
-        "avatar_url": user.avatar_url,
+        "avatar_url": f"/api/users/{user.id}/avatar" if user.avatar_url else None,
         "is_admin": user.is_admin,
         "is_active": user.is_active,
         "last_login_at": last_login_at,

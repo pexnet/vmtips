@@ -141,7 +141,7 @@ def test_upload_and_delete_avatar(client):
         files={"file": ("avatar.png", b"\x89PNG\r\n\x1a\n", "image/png")},
     )
     assert upload.status_code == 200
-    assert upload.json()["avatar_url"].startswith("data:image/png;base64,")
+    assert upload.json()["avatar_url"] == f"/api/users/{upload.json()['id']}/avatar"
 
     delete = client.delete("/auth/me/avatar", headers=headers)
     assert delete.status_code == 200
@@ -175,3 +175,52 @@ def test_me_no_token(client):
     response = client.get("/auth/me")
     assert response.status_code == 401
     assert response.json()["detail"] == "not_authenticated"
+
+
+def test_avatar_serving_endpoint(client):
+    """GET /users/{id}/avatar serves the raw image with cache headers."""
+    import base64
+
+    client.post("/auth/register", json={
+        "email": "avatar-serve@example.com",
+        "password": "secret123",
+        "display_name": "Avatar Serve",
+    })
+    login = client.post("/auth/login", json={
+        "email": "avatar-serve@example.com",
+        "password": "secret123",
+    })
+    token = login.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Upload a tiny PNG
+    png_bytes = b"\x89PNG\r\n\x1a\n" + b"\x00" * 50
+    upload = client.post(
+        "/auth/me/avatar",
+        headers=headers,
+        files={"file": ("avatar.png", png_bytes, "image/png")},
+    )
+    user_id = upload.json()["id"]
+    assert upload.json()["avatar_url"] == f"/api/users/{user_id}/avatar"
+
+    # Serve the avatar
+    resp = client.get(f"/users/{user_id}/avatar")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "image/png"
+    assert "max-age=604800" in resp.headers["cache-control"]
+    assert "immutable" in resp.headers["cache-control"]
+    assert resp.headers["etag"]
+    # Verify the bytes match the uploaded image
+    assert resp.content == png_bytes
+
+    # 304 on ETag match
+    etag = resp.headers["etag"]
+    resp2 = client.get(
+        f"/users/{user_id}/avatar",
+        headers={"If-None-Match": etag},
+    )
+    assert resp2.status_code == 304
+
+    # 404 for user with no avatar
+    resp3 = client.get("/users/99999/avatar")
+    assert resp3.status_code == 404

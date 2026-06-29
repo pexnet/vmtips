@@ -179,7 +179,7 @@ def get_league(
                 "display_name": u.display_name,
                 "first_name": u.first_name,
                 "last_name": u.last_name,
-                "avatar_url": u.avatar_url,
+                "avatar_url": f"/api/users/{u.id}/avatar" if u.avatar_url else None,
             }
             for u in members
         ],
