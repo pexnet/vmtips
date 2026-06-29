@@ -425,6 +425,8 @@ def global_leaderboard(
             "last_name": user.last_name,
             "avatar_url": _avatar_url_for(user.id, user.avatar_url),
             "total_points": score["total_points"],
+            "match_points": score["match_points"],
+            "bracket_points": score["bracket_points"],
             "predictions_made": score["predictions_made"],
             "perfect_predictions": score["perfect_predictions"],
         })
@@ -495,6 +497,8 @@ def league_leaderboard(
             "last_name": user.last_name,
             "avatar_url": _avatar_url_for(user.id, user.avatar_url),
             "total_points": score["total_points"],
+            "match_points": score["match_points"],
+            "bracket_points": score["bracket_points"],
             "predictions_made": score["predictions_made"],
             "perfect_predictions": score["perfect_predictions"],
         })

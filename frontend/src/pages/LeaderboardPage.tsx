@@ -161,6 +161,7 @@ function LeaderTable({ data }: { data: LeaderboardEntry[] }) {
             <TableCell>{t("leaderboard.rank")}</TableCell>
             <TableCell>{t("leaderboard.player")}</TableCell>
             <TableCell align="right">{t("leaderboard.points")}</TableCell>
+            <TableCell align="right">{t("leaderboard.bracket")}</TableCell>
             <TableCell align="right">{t("leaderboard.predictions")}</TableCell>
             <TableCell align="right">{t("leaderboard.perfect")}</TableCell>
           </TableRow>
@@ -182,13 +183,14 @@ function LeaderTable({ data }: { data: LeaderboardEntry[] }) {
                 </Box>
               </TableCell>
               <TableCell align="right"><strong>{row.total_points}</strong></TableCell>
+              <TableCell align="right">{row.bracket_points > 0 ? <Chip size="small" label={row.bracket_points} color="primary" variant="outlined" /> : 0}</TableCell>
               <TableCell align="right">{row.predictions_made}</TableCell>
               <TableCell align="right"><Chip size="small" label={row.perfect_predictions} color="success" /></TableCell>
             </TableRow>
           ))}
           {data.length === 0 && (
             <TableRow>
-              <TableCell colSpan={5} align="center">{t("leaderboard.no_data")}</TableCell>
+              <TableCell colSpan={6} align="center">{t("leaderboard.no_data")}</TableCell>
             </TableRow>
           )}
         </TableBody>

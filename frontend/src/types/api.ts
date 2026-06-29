@@ -106,6 +106,8 @@ export interface LeaderboardEntry {
   last_name: string | null;
   avatar_url: string | null;
   total_points: number;
+  match_points: number;
+  bracket_points: number;
   predictions_made: number;
   perfect_predictions: number;
   rank: number;
