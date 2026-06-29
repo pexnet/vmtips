@@ -9,6 +9,7 @@ Knockout slot definitions are sourced from match_table.py. Match records and
 kickoff times are seeded from worldcup2026_fixtures.json.
 """
 from collections import defaultdict
+from datetime import timezone
 from typing import Optional
 from sqlalchemy.orm import Session, joinedload
 from models import Prediction, Match, Team, BracketPrediction, KnockoutAdvancement
@@ -18,6 +19,15 @@ from match_table import (
     get_r32_match_numbers as _get_r32_match_numbers,
 )
 from third_place_table import get_annex_c_match_mapping
+
+
+def _iso_utc(dt) -> str | None:
+    """Serialize a naive datetime as UTC ISO string."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.isoformat()
 
 
 def _lazy_load_slot_data():
@@ -599,7 +609,7 @@ def get_bracket_view(db: Session, user_id: int, league_id: int) -> dict:
             "match_id": match.id,
             "match_number": mn,
             "round": rnd,
-            "match_date": match.match_date.isoformat() if match.match_date else None,
+            "match_date": _iso_utc(match.match_date),
             "user_prediction": {
                 "home_goals": pred.home_goals if pred else None,
                 "away_goals": pred.away_goals if pred else None,
