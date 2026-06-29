@@ -439,20 +439,16 @@ export default function BracketViewTab() {
                       </Box>
                     </Box>
 
-                    <Box sx={{ display: "flex", alignItems: "center" }}>
-                      <Box sx={{ flex: 1 }} />
-                      <Box sx={{ display: "grid", gridTemplateColumns: "56px 56px", gap: 1, width: 120, flexShrink: 0 }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ textAlign: "center" }}>
-                          {t("matches.predicted")}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ textAlign: "center" }}>
-                          {t("matches.result")}
-                        </Typography>
-                      </Box>
-                    </Box>
+                    <Box sx={{ display: "grid", gridTemplateColumns: "1fr 56px 56px", gap: 1, alignItems: "center" }}>
+                      <Box />
+                      <Typography variant="caption" color="text.secondary" sx={{ textAlign: "center" }}>
+                        {t("matches.predicted")}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ textAlign: "center" }}>
+                        {t("matches.result")}
+                      </Typography>
 
-                    <Box sx={{ display: "flex", alignItems: "center" }}>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flex: 1, minWidth: 0 }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, minWidth: 0 }}>
                         <Typography variant="body2" sx={{ fontSize: "1.1rem", flexShrink: 0 }}>
                           {act.home_team_flag ?? "🏳️"}
                         </Typography>
@@ -466,7 +462,6 @@ export default function BracketViewTab() {
                           <CheckCircleIcon color="success" sx={{ fontSize: 16, flexShrink: 0 }} />
                         )}
                       </Box>
-                      <Box sx={{ display: "grid", gridTemplateColumns: "56px 56px", gap: 1, width: 120, flexShrink: 0 }}>
                         <TextField
                           size="small"
                           type="text"
@@ -496,11 +491,9 @@ export default function BracketViewTab() {
                             <Typography variant="body2" color="text.secondary">-</Typography>
                           )}
                         </Box>
-                      </Box>
-                    </Box>
 
-                    <Box sx={{ display: "flex", alignItems: "center" }}>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flex: 1, minWidth: 0 }}>
+                      {/* Away team row */}
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, minWidth: 0 }}>
                         <Typography variant="body2" sx={{ fontSize: "1.1rem", flexShrink: 0 }}>
                           {act.away_team_flag ?? "🏳️"}
                         </Typography>
@@ -514,7 +507,6 @@ export default function BracketViewTab() {
                           <CheckCircleIcon color="success" sx={{ fontSize: 16, flexShrink: 0 }} />
                         )}
                       </Box>
-                      <Box sx={{ display: "grid", gridTemplateColumns: "56px 56px", gap: 1, width: 120, flexShrink: 0 }}>
                         <TextField
                           size="small"
                           type="text"
@@ -544,7 +536,6 @@ export default function BracketViewTab() {
                             <Typography variant="body2" color="text.secondary">-</Typography>
                           )}
                         </Box>
-                      </Box>
                     </Box>
 
                     {isDrawPrediction && (
