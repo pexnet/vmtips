@@ -89,6 +89,8 @@ function MatchdayGridBase({ matchday, memberOrder }: MatchdayGridProps) {
                   {members.map((name) => {
                     const p = predMap.get(name);
                     const showPoints = p?.points !== undefined;
+                    const isDraw = p?.predicted != null && p.predicted.split("-")[0] === p.predicted.split("-")[1];
+                    const winnerSide = p?.knockout_winner_side;
                     return (
                       <Box
                         key={name}
@@ -102,9 +104,16 @@ function MatchdayGridBase({ matchday, memberOrder }: MatchdayGridProps) {
                         <Typography variant="body2" noWrap sx={{ minWidth: 0 }}>
                           {name}
                         </Typography>
-                        <Typography variant="body2" sx={{ fontWeight: p ? 700 : 400 }}>
-                          {p?.predicted ?? "—"}
-                        </Typography>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                          <Typography variant="body2" sx={{ fontWeight: p ? 700 : 400 }}>
+                            {p?.predicted ?? "—"}
+                          </Typography>
+                          {isDraw && winnerSide && (
+                            <Typography variant="body2" component="span" sx={{ fontWeight: 900 }}>
+                              {winnerSide === "home" ? "1" : "2"}
+                            </Typography>
+                          )}
+                        </Box>
                         {showPoints && (
                           <Chip
                             size="small"
@@ -175,6 +184,8 @@ function MatchdayGridBase({ matchday, memberOrder }: MatchdayGridProps) {
                       );
                     }
                     const showPoints = p.points !== undefined;
+                    const isDraw = p.predicted != null && p.predicted.split("-")[0] === p.predicted.split("-")[1];
+                    const winnerSide = p.knockout_winner_side;
                     return (
                       <TableCell key={name} align="center">
                         <Tooltip
@@ -185,12 +196,19 @@ function MatchdayGridBase({ matchday, memberOrder }: MatchdayGridProps) {
                           }
                         >
                           <Box>
-                            <Typography
-                              variant="body2"
-                              sx={{ fontWeight: showPoints ? 700 : 400 }}
-                            >
-                              {p.predicted}
-                            </Typography>
+                            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0.5 }}>
+                              <Typography
+                                variant="body2"
+                                sx={{ fontWeight: showPoints ? 700 : 400 }}
+                              >
+                                {p.predicted}
+                              </Typography>
+                              {isDraw && winnerSide && (
+                                <Typography variant="body2" component="span" sx={{ fontWeight: 900 }}>
+                                  {winnerSide === "home" ? "1" : "2"}
+                                </Typography>
+                              )}
+                            </Box>
                             {showPoints && (
                               <Typography variant="caption" color="text.secondary">
                                 {t("leaderboard.points_short", { points: p.points })}
