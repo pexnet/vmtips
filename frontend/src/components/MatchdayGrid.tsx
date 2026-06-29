@@ -105,14 +105,19 @@ function MatchdayGridBase({ matchday, memberOrder }: MatchdayGridProps) {
                           {name}
                         </Typography>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                          <Typography variant="body2" sx={{ fontWeight: p ? 700 : 400 }}>
-                            {p?.predicted ?? "—"}
-                          </Typography>
-                          {isDraw && winnerSide && (
-                            <Typography variant="body2" component="span" sx={{ fontWeight: 900 }}>
-                              {winnerSide === "home" ? "1" : "2"}
-                            </Typography>
-                          )}
+                          {(() => {
+                            if (!p?.predicted) return <Typography variant="body2">{"—"}</Typography>;
+                            const [h, a] = p.predicted.split("-");
+                            const boldHome = isDraw && winnerSide === "home";
+                            const boldAway = isDraw && winnerSide === "away";
+                            return (
+                              <Box component="span" sx={{ fontWeight: p ? 700 : 400, fontSize: "0.875rem" }}>
+                                <Box component="span" sx={{ fontWeight: boldHome ? 900 : "inherit" }}>{h}</Box>
+                                -
+                                <Box component="span" sx={{ fontWeight: boldAway ? 900 : "inherit" }}>{a}</Box>
+                              </Box>
+                            );
+                          })()}
                         </Box>
                         {showPoints && (
                           <Chip
@@ -197,17 +202,18 @@ function MatchdayGridBase({ matchday, memberOrder }: MatchdayGridProps) {
                         >
                           <Box>
                             <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0.5 }}>
-                              <Typography
-                                variant="body2"
-                                sx={{ fontWeight: showPoints ? 700 : 400 }}
-                              >
-                                {p.predicted}
-                              </Typography>
-                              {isDraw && winnerSide && (
-                                <Typography variant="body2" component="span" sx={{ fontWeight: 900 }}>
-                                  {winnerSide === "home" ? "1" : "2"}
-                                </Typography>
-                              )}
+                              {(() => {
+                                const [h, a] = p.predicted.split("-");
+                                const boldHome = isDraw && winnerSide === "home";
+                                const boldAway = isDraw && winnerSide === "away";
+                                return (
+                                  <Box component="span" sx={{ fontWeight: showPoints ? 700 : 400, fontSize: "0.875rem" }}>
+                                    <Box component="span" sx={{ fontWeight: boldHome ? 900 : "inherit" }}>{h}</Box>
+                                    -
+                                    <Box component="span" sx={{ fontWeight: boldAway ? 900 : "inherit" }}>{a}</Box>
+                                  </Box>
+                                );
+                              })()}
                             </Box>
                             {showPoints && (
                               <Typography variant="caption" color="text.secondary">

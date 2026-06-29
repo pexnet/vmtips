@@ -62,6 +62,7 @@ function calculateMatchPoints(
   predAway: string,
   actualHome: number | null,
   actualAway: number | null,
+  knockoutWinnerSide?: "home" | "away" | null,
 ) {
   if (predHome === "" || predAway === "" || actualHome === null || actualAway === null) {
     return null;
@@ -69,7 +70,11 @@ function calculateMatchPoints(
 
   const predictedHome = Number(predHome);
   const predictedAway = Number(predAway);
-  const predictedOutcome = Math.sign(predictedHome - predictedAway);
+  let predictedOutcome = Math.sign(predictedHome - predictedAway);
+  // In knockout, a draw prediction with a winner side uses the winner as the outcome
+  if (predictedOutcome === 0 && knockoutWinnerSide) {
+    predictedOutcome = knockoutWinnerSide === "home" ? 1 : -1;
+  }
   const actualOutcome = Math.sign(actualHome - actualAway);
 
   let points = 0;

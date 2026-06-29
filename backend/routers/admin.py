@@ -439,6 +439,7 @@ def recalculate_scores(
                 pred.away_goals,
                 match.home_goals,
                 match.away_goals,
+                knockout_winner_side=pred.knockout_winner_side,
             )["points"]
             key = (pred.user_id, pred.league_id)
             user_match_points[key] = user_match_points.get(key, 0) + pts

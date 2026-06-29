@@ -50,6 +50,7 @@ def calculate_match_points(
     pred_away: int,
     actual_home: int,
     actual_away: int,
+    knockout_winner_side: str | None = None,
 ) -> dict:
     """
     Calculate points for a single match prediction.
@@ -60,6 +61,13 @@ def calculate_match_points(
         - Correct away team goals:      2 points
         - Maximum per match:            7 points
 
+    In knockout matches, a draw prediction with a knockout_winner_side
+    ('home' or 'away') is treated as predicting that team as the winner
+    for the outcome check — not as a draw. This means a player who
+    predicts 1-1 with away as winner gets outcome points if the actual
+    result is an away win (0-1, 1-2, etc.), even though the score was not
+    a draw. Goal points are still compared against the full-time score.
+
     Returns a dict with:
         - points: total points earned
         - outcome_correct: bool
@@ -68,6 +76,11 @@ def calculate_match_points(
         - perfect: bool (exact scoreline match)
     """
     pred_outcome = _determine_outcome(pred_home, pred_away)
+    # In knockout, a draw prediction with a winner side → use the winner side
+    # as the predicted outcome (after extra time / penalties).
+    if pred_outcome == "draw" and knockout_winner_side in ("home", "away"):
+        pred_outcome = knockout_winner_side
+
     actual_outcome = _determine_outcome(actual_home, actual_away)
 
     outcome_correct = pred_outcome == actual_outcome

@@ -55,9 +55,14 @@ function calcMatchPoints(
   predHome: number,
   predAway: number,
   actualHome: number,
-  actualAway: number
+  actualAway: number,
+  knockoutWinnerSide?: "home" | "away" | null,
 ): PredictionPointData {
-  const predOutcome = predHome > predAway ? "home" : predHome < predAway ? "away" : "draw";
+  let predOutcome = predHome > predAway ? "home" : predHome < predAway ? "away" : "draw";
+  // In knockout, a draw prediction with a winner side uses the winner as the outcome
+  if (predOutcome === "draw" && knockoutWinnerSide) {
+    predOutcome = knockoutWinnerSide;
+  }
   const actualOutcome = actualHome > actualAway ? "home" : actualHome < actualAway ? "away" : "draw";
   const outcomeCorrect = predOutcome === actualOutcome;
   const homeCorrect = predHome === actualHome;
@@ -398,7 +403,8 @@ export default function BracketViewTab() {
                     pred.home_goals ?? 0,
                     pred.away_goals ?? 0,
                     act.home_goals,
-                    act.away_goals
+                    act.away_goals,
+                    pred.knockout_winner_side,
                   );
                 }
                 return null;

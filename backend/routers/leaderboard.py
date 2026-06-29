@@ -94,10 +94,19 @@ def _batch_calculate_scores(
     actual_home_win = Match.home_goals > Match.away_goals
     actual_away_win = Match.home_goals < Match.away_goals
     actual_draw = Match.home_goals == Match.away_goals
+
+    # In knockout, a draw prediction with a winner side is treated as
+    # predicting that team as the winner for the outcome check.
+    # pred_draw AND knockout_winner_side='home' → predicted outcome = home
+    # pred_draw AND knockout_winner_side='away' → predicted outcome = away
+    # pred_draw AND knockout_winner_side IS NULL → predicted outcome = draw
+    pred_effective_home = or_(pred_home_win, and_(pred_draw, Prediction.knockout_winner_side == "home"))
+    pred_effective_away = or_(pred_away_win, and_(pred_draw, Prediction.knockout_winner_side == "away"))
+
     outcome_correct = or_(
-        and_(pred_home_win, actual_home_win),
-        and_(pred_away_win, actual_away_win),
-        and_(pred_draw, actual_draw),
+        and_(pred_effective_home, actual_home_win),
+        and_(pred_effective_away, actual_away_win),
+        and_(pred_draw, Prediction.knockout_winner_side.is_(None), actual_draw),
     )
     scored_match = and_(Match.home_goals.isnot(None), Match.away_goals.isnot(None))
     perfect = and_(
@@ -256,6 +265,7 @@ def _calculate_user_score(user_id: int, db: Session, league_id: int | None = Non
             pred.away_goals,
             match.home_goals,
             match.away_goals,
+            knockout_winner_side=pred.knockout_winner_side,
         )
         total_match_points += score["points"]
         if score["perfect"]:
@@ -693,6 +703,7 @@ def matchdays(
                 score = calculate_match_points(
                     pred.home_goals, pred.away_goals,
                     match.home_goals, match.away_goals,
+                    knockout_winner_side=pred.knockout_winner_side,
                 )
                 entry["points"] = score["points"]
             preds_out.append(entry)

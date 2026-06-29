@@ -106,6 +106,48 @@ class TestMatchScoring:
         assert result["home_score_correct"] is False
         assert result["away_score_correct"] is False
 
+    # ── Knockout draw + winner side scoring ──
+
+    def test_knockout_draw_with_away_winner_matches_away_win(self):
+        """Draw prediction with away winner vs actual away win → 3p for outcome."""
+        # Janne predicted 1-1 with away (Canada) as winner. Actual 0-1 (away win).
+        result = calculate_match_points(1, 1, 0, 1, knockout_winner_side="away")
+        assert result["points"] == 5  # 3 outcome + 0 home goals + 2 away goals
+        assert result["outcome_correct"] is True
+
+    def test_knockout_draw_with_home_winner_matches_home_win(self):
+        """Draw prediction with home winner vs actual home win → 3p for outcome."""
+        result = calculate_match_points(1, 1, 2, 0, knockout_winner_side="home")
+        assert result["outcome_correct"] is True
+        assert result["points"] == 3  # 3 outcome + 0 home + 0 away
+
+    def test_knockout_draw_with_wrong_winner(self):
+        """Draw prediction with away winner vs actual home win → 0p for outcome."""
+        result = calculate_match_points(1, 1, 2, 0, knockout_winner_side="away")
+        assert result["outcome_correct"] is False
+        assert result["points"] == 0
+
+    def test_knockout_draw_with_winner_vs_actual_draw(self):
+        """Draw prediction with winner side vs actual draw → 0p for outcome
+        (the prediction said a team wins, but it was actually a draw at full time).
+        Goal points still apply."""
+        result = calculate_match_points(1, 1, 1, 1, knockout_winner_side="away")
+        assert result["outcome_correct"] is False
+        assert result["points"] == 4  # 0 outcome + 2 home + 2 away
+
+    def test_knockout_draw_without_winner_side_vs_away_win(self):
+        """Draw prediction without winner side vs away win → 0p for outcome."""
+        result = calculate_match_points(1, 1, 0, 1, knockout_winner_side=None)
+        assert result["outcome_correct"] is False
+        assert result["points"] == 2  # 0 outcome + 0 home + 2 away
+
+    def test_non_draw_with_winner_side_ignored(self):
+        """Non-draw prediction ignores knockout_winner_side."""
+        # 2-1 is a home win, knockout_winner_side='away' should be ignored
+        result = calculate_match_points(2, 1, 2, 1, knockout_winner_side="away")
+        assert result["outcome_correct"] is True
+        assert result["points"] == 7  # perfect
+
 
 # ── Tournament bonus scoring ────────────────────────────────
 
